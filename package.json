@@ -32,7 +32,8 @@
         "prerelease": "pnpm run format && git add -A && pnpm run build",
         "change": "pnpm changeset",
         "fix": "eslint --fix ./packages",
-        "sync-repo": "tsx ./sync-repo.ts"
+        "sync-repo": "tsx ./sync-repo.ts",
+        "sync-repo-all": "tsx ./sync-repo.ts --all"
     },
     "devDependencies": {
         "@changesets/cli": "^2.22.0",

@@ -28,15 +28,56 @@ export type QueryEff<Root> = OpticErr | GetRoot<Root>
 export type RootAccessor<Root> = GetRoot<Root> | SetRoot<Root>
 
 export type CommandStack = {
-    parent?: CommandStack
     name: string
+    async: boolean
     args: unknown[]
     return: unknown
     states: { previous: unknown; next: unknown }[]
     stacks: CommandStack[]
 }
 
-export type CommandStackEff = Ctx<'commandStack', CommandStack>
+export const prettyPrintCommandStack = (commandStack: CommandStack) => {
+    const stackLines: string[] = []
+
+    const formatStack = (stack: CommandStack, indent = 0) => {
+        const spaces = ' '.repeat(indent * 2)
+
+        stackLines.push(`${spaces}Command: ${stack.name}`)
+
+        if (stack.args.length > 0) {
+            stackLines.push(`${spaces}Args: ${JSON.stringify(stack.args)}`)
+        }
+
+        if (stack.return !== undefined) {
+            stackLines.push(`${spaces}Return: ${JSON.stringify(stack.return)}`)
+        }
+
+        if (stack.states.length > 0) {
+            stackLines.push(`${spaces}States:`)
+            for (const state of stack.states) {
+                stackLines.push(`${spaces}  Previous: ${JSON.stringify(state.previous)}`)
+                stackLines.push(`${spaces}  Next: ${JSON.stringify(state.next)}`)
+            }
+        }
+
+        if (stack.stacks.length > 0) {
+            stackLines.push(`${spaces}Sub-Commands:`)
+            for (const subStack of stack.stacks) {
+                formatStack(subStack, indent + 1)
+            }
+        }
+    }
+
+    if (commandStack.name === '') {
+        commandStack.stacks.forEach(formatStack)
+    } else {
+        formatStack(commandStack)
+    }
+
+    return stackLines.join('\n')
+}
+
+export type CommandStackEff = Ctx<'commandStack', CommandStack | undefined>
 
 export type CommandEff<Root> = OpticErr | RootAccessor<Root> | CommandStackEff
 
@@ -68,11 +109,11 @@ export function* set<State, Root>(
 ): DomainCommand<void, Root> {
     const optic = domainOrOptic instanceof Domain ? domainOrOptic.$ : domainOrOptic
 
-    const commandStack = yield* Eff.ctx('commandStack').get<CommandStack>()
+    const commandStack = yield* Eff.ctx('commandStack').get<CommandStack | undefined>()
 
     const updateRoot = optic.set(function* (state) {
         if (typeof setStateInput !== 'function') {
-            commandStack.states.push({
+            commandStack?.states.push({
                 previous: state,
                 next: setStateInput,
             })
@@ -83,7 +124,7 @@ export function* set<State, Root>(
 
         const nextState = yield* getOpticValue(result)
 
-        commandStack.states.push({
+        commandStack?.states.push({
             previous: state,
             next: nextState,
         })
@@ -136,26 +177,31 @@ export function query() {
 
 export function command() {
     return function <This, Args extends any[], Root, Return, E extends AnyEff>(
-        target: (this: This, ...args: Args) => Generator<E, Return>,
+        target: (this: This, ...args: Args) => Generator<E | CommandEff<Root>, Return>,
         context: KokaClassMethodDecoratorContext<This, typeof target>,
     ): typeof target {
         const methodName = context.name
 
         function* replacementMethod(this: This, ...args: Args) {
-            // const parent = yield* Eff.ctx('commandStack').get<CommandStack>()
+            const parent = yield* Eff.ctx('commandStack').get<CommandStack | undefined>()
 
+            const name = `${(this as any).constructor?.name ?? 'UnknownDomain'}.${methodName}`
             const commandStack: CommandStack = {
-                // parent: parent,
-                name: methodName,
-                args: [],
+                name,
+                async: false,
+                args: args,
                 return: undefined,
                 states: [],
                 stacks: [],
             }
 
+            parent?.stacks.push(commandStack)
+
             const result = yield* Eff.try(target.call(this, ...args)).catch({
                 commandStack,
             })
+
+            commandStack.return = result
 
             return result
         }
@@ -255,14 +301,37 @@ export class Store<State> {
         input: MaybeFunction<Generator<E, T>>,
     ): Async extends E ? MaybePromise<Result<T, E>> : Result<T, E> {
         const command = typeof input === 'function' ? input() : input
+
+        const commandStack: CommandStack = {
+            name: '',
+            async: false,
+            args: [],
+            return: undefined,
+            states: [],
+            stacks: [],
+        }
+
         const withRoot = Eff.try(command as Generator<RootAccessor<State>, any>).catch({
             setRoot: this.setState,
             getRoot: this.getState,
             ...this.context,
+            commandStack: commandStack,
         })
 
         try {
-            return Eff.runResult(withRoot) as any
+            const result = Eff.runResult(withRoot) as any
+
+            const handleResult = (result: any) => {
+                commandStack.return = result
+                console.log(prettyPrintCommandStack(commandStack))
+                return result
+            }
+
+            if (result instanceof Promise) {
+                return result.then(handleResult) as any
+            }
+
+            return handleResult(result) as any
         } finally {
             this.publish()
         }

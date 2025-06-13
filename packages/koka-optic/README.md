@@ -1,5 +1,7 @@
 # koka-optic - Type-Safe Data Accessors
 
+**Warning: This library is in early development and may change significantly. Do not use in production yet.**
+
 koka-optic provides composable, type-safe data access patterns built on algebraic effects. It enables:
 
 -   **Bidirectional transformations**: Get and set values with type safety

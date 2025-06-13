@@ -86,8 +86,10 @@ class TodoListDomain<Root> extends Domain<Todo[], Root> {
 }
 
 class TodoAppDomain<Root> extends Domain<TodoApp, Root> {
-    todos = new TodoListDomain(this.$.prop('todos'));
+    todos = new TodoListDomain(this.$.prop('todos'))
+    input = new TextDomain(this.$.prop('input'));
 
+    @command()
     *addTodo() {
         const todoApp = yield* get(this)
         yield* this.todos.addTodo(todoApp.input)
@@ -95,12 +97,10 @@ class TodoAppDomain<Root> extends Domain<TodoApp, Root> {
         return 'Todo added'
     }
 
+    @command()
     *updateInput(input: string) {
         yield* Eff.await(Promise.resolve('test async'))
-        yield* set(this, (todoApp) => ({
-            ...todoApp,
-            input,
-        }))
+        yield* this.input.updateText(input)
         return 'Input updated'
     }
 }

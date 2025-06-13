@@ -1,5 +1,7 @@
 # Koka-Stack - AI-Oriented TypeScript Framework
 
+**Warning: This library is in early development and may change significantly. Do not use in production yet.**
+
 Koka-Stack is a monorepo containing several packages that provide algebraic effects and domain-driven development capabilities for TypeScript applications.
 
 ## Packages

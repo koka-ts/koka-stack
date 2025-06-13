@@ -4,7 +4,42 @@ import ghPages from 'gh-pages'
 import path from 'path'
 import fs from 'fs'
 
-async function main() {
+type Options = {
+    all?: boolean
+}
+
+async function publish(pkg: { name: string; path: string }, message?: string) {
+    const defaultMessage = `Publish ${pkg.name} from koka-stack repository`
+
+    // 4. Publish using gh-pages
+    const repo = `https://github.com/koka-ts/${pkg.name}.git`
+
+    console.log(`Publishing ${pkg.name}...`, {
+        path: pkg.path,
+        repo,
+    })
+
+    ghPages.clean()
+
+    await ghPages.publish(
+        pkg.path,
+        {
+            repo: repo,
+            branch: 'main',
+            message: message || defaultMessage,
+            dotfiles: true,
+        },
+        (err) => {
+            if (err) {
+                console.error('Publish failed:', err)
+                process.exit(1)
+            }
+            console.log(`${pkg.name} published successfully!`)
+        },
+    )
+}
+
+async function main(options?: Options) {
     // 1. Find all package.json files in packages/*
     const packageJsonPaths = await globby('packages/*/package.json')
 
@@ -20,6 +55,14 @@ async function main() {
     if (packages.length === 0) {
         console.error('No packages found in packages/* directory')
         process.exit(1)
+    }
+
+    if (options?.all) {
+        // If --all option is provided, publish all packages
+        console.log('Publishing all packages...')
+        await Promise.all(packages.map((pkg) => publish(pkg)))
+        console.log('All packages published successfully!')
+        return
     }
 
     // 3. Prompt user to select package
@@ -47,30 +90,16 @@ async function main() {
         initial: defaultMessage,
     })
 
-    // 4. Publish using gh-pages
-    const repo = `https://github.com/koka-ts/${pkg.name}.git`
-
-    console.log(`Publishing ${pkg.name}...`, {
-        path: pkg.path,
-        repo,
-    })
-
-    await ghPages.publish(
-        pkg.path,
-        {
-            repo: repo,
-            branch: 'main',
-            message: message || defaultMessage,
-            dotfiles: true,
-        },
-        (err) => {
-            if (err) {
-                console.error('Publish failed:', err)
-                process.exit(1)
-            }
-            console.log('Published successfully!')
-        },
-    )
+    await publish(pkg, message)
 }
 
-main().catch(console.error)
+const args = process.argv.slice(2)
+
+const options: Options = {
+    all: args.includes('--all'),
+}
+
+main(options).catch((err) => {
+    console.error('Error:', err)
+    process.exit(1)
+})
