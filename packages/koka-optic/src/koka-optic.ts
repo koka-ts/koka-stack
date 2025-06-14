@@ -135,7 +135,33 @@ export class Optic<State, Root> {
         })
     }
 
-    __type = 'KokaOptic' as const
+    static get<State, Root>(root: Root, optic: Optic<State, Root>): Generator<OpticErr, State> {
+        return optic.get(root)
+    }
+
+    static set<State, Root>(
+        root: Root,
+        optic: Optic<State, Root>,
+        stateOrUpdater: State | ((state: State) => State) | Updater<State>,
+    ): Generator<OpticErr, Root> {
+        if (typeof stateOrUpdater === 'function') {
+            const updater = stateOrUpdater as ((state: State) => State) | Updater<State>
+            return optic.set(function* (state) {
+                const newState = updater(state)
+
+                if (isGenerator(newState)) {
+                    return yield* newState
+                }
+
+                return newState
+            })(root)
+        } else {
+            const state = stateOrUpdater as State
+            return optic.set(function* () {
+                return state
+            })(root)
+        }
+    }
 
     get: Getter<State, Root>
     set: Setter<State, Root>
