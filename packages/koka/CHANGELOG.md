@@ -1,5 +1,11 @@
 # koka
 
+## 1.0.3
+
+### Patch Changes
+
+-   improve koka, add optic.proxy to koka-optic
+
 ## 1.0.2
 
 ### Patch Changes

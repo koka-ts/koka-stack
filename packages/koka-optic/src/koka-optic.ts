@@ -55,6 +55,63 @@ const setOpticCache = (object: object | unknown[], optic: AnyOptic, value: unkno
     opticMap.set(optic, value)
 }
 
+const OpticProxySymbol = Symbol.for('koka-optic-proxy')
+
+type OpticProxySymbol = typeof OpticProxySymbol
+
+export type LeafOpticProxy<State extends number | string | boolean> = {
+    [OpticProxySymbol]?: State
+}
+
+export type OpticProxy<State> = State extends object | unknown[]
+    ? {
+          [K in keyof State]: OpticProxy<State[K]>
+      }
+    : State extends number | string | boolean
+    ? LeafOpticProxy<State>
+    : never
+
+type OpticProxyPath = (string | number)[]
+
+const opticProxyPathWeakMap = new WeakMap<object, OpticProxyPath>()
+
+const getOpticProxyPath = (proxy: object): OpticProxyPath => {
+    const path = opticProxyPathWeakMap.get(proxy)
+
+    if (!path) {
+        throw new Error('[koka-optic] Optic proxy path not found')
+    }
+
+    return path
+}
+
+const opticProxyWeakMap = new WeakMap<OpticProxy<any>, OpticProxyPath>()
+
+export function createOpticProxy<State>(path: OpticProxyPath = []): OpticProxy<State> {
+    const proxy: OpticProxy<State> = new Proxy(
+        {},
+        {
+            get(_target, prop) {
+                if (typeof prop === 'symbol') {
+                    throw new Error('[koka-optic] Optic proxy does not support symbols')
+                }
+
+                const index = Number(prop)
+
+                if (!Number.isNaN(index)) {
+                    return createOpticProxy<State>([...path, index])
+                }
+
+                return createOpticProxy<State>([...path, prop])
+            },
+        },
+    ) as OpticProxy<State>
+
+    opticProxyPathWeakMap.set(proxy, path)
+
+    return proxy
+}
+
 export class Optic<State, Root> {
     static root<Root>(): Optic<Root, Root> {
         return new Optic({
@@ -524,5 +581,23 @@ export class Optic<State, Root> {
                 return newList as State
             },
         }).prop('filtered')
+    }
+
+    proxy<Transformed>(transformer: (proxy: OpticProxy<State>) => OpticProxy<Transformed>): Optic<Transformed, Root> {
+        const proxy = createOpticProxy<State>()
+        const transformed = transformer(proxy)
+        const path = getOpticProxyPath(transformed)
+
+        let optic: Optic<any, Root> = this
+
+        for (const key of path) {
+            if (typeof key === 'number') {
+                optic = optic.index(key)
+            } else {
+                optic = optic.prop(key)
+            }
+        }
+
+        return optic
     }
 }

@@ -51,15 +51,16 @@ const result = Eff.runResult(updateName) // { user: { profile: { name: 'New Name
 -   **Composable API**: Chain operations naturally
 -   **Smart caching**: Optimized performance for repeated accesses
 -   **Koka integration**: Works seamlessly with effects system
+-   **Proxy syntax**: Access nested properties with native dot/array notation
 
 ## Installation
 
 ```bash
-npm install koka-optic
+npm install koka koka-optic
 # or
-yarn add koka-optic
+yarn add koka koka-optic
 # or
-pnpm add koka-optic
+pnpm add koka koka-optic
 ```
 
 ## Getting Started
@@ -75,6 +76,7 @@ An **Optic** is a bidirectional path into your data structure that lets you:
 All while preserving immutability and type safety.
 
 ```typescript
+import { Eff } from 'koka'
 import { Optic } from 'koka-optic'
 
 // Create root optic
@@ -120,6 +122,59 @@ if (incrementedResult.type === 'ok') {
 ```
 
 ## Advanced Optics
+
+### Proxy Syntax
+
+Access nested properties using familiar dot/array notation:
+
+```typescript
+// Simple property access
+const simpleOptic = Optic.root<{ a: number }>().proxy(p => p.a)
+const result = Eff.runResult(Optic.get({ a: 42 }, simpleOptic))
+// result.value === 42
+
+// Array index access
+const arrayOptic = Optic.root<number[]>().proxy(p => p[0])
+const result = Eff.runResult(Optic.get([42], arrayOptic))
+// result.value === 42
+
+// Chained operations
+const chainedOptic = Optic.root<{ items: { value: number }[] }>()
+  .proxy(p => p.items[0].value)
+const result = Eff.runResult(Optic.get({ items: [{ value: 42 }] }, chainedOptic))
+// result.value === 42
+
+// Deeply nested access
+type ComplexState = {
+  a: {
+    b: {
+      c: {
+        e: {
+          f: {
+            g: { h: string }[]
+          }
+        }
+      }[]
+    }
+  }
+}
+
+const deepOptic = Optic.root<ComplexState>().proxy(p => p.a.b.c[1].e.f.g[2].h)
+
+const state = {
+  a: {
+    b: {
+      c: [
+        { e: { f: { g: [{ h: 'first' }] } },
+        { e: { f: { g: [{ h: 'second' }, { h: 'third' }, { h: 'target' }] } }
+      ]
+    }
+  }
+}
+
+const result = Eff.runResult(Optic.get(state, deepOptic))
+// result.value === 'target'
+```
 
 ### Object Composition
 
@@ -284,6 +339,7 @@ Common error cases:
 | `match(predicate)`  | Type narrow            |
 | `refine(predicate)` | Value validation       |
 | `select(selector)`  | Custom selector        |
+| `proxy(selector)`   | Proxy access           |
 
 ## Best Practices
 

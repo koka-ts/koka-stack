@@ -20,6 +20,20 @@ export type InferOpticRoot<T> = T extends Optic<any, infer Root> ? Root : never
 export type AnyOptic = Optic<any, any>
 export type NestedArray<T> = Array<T | NestedArray<T>>
 export type NestedReadonlyArray<T> = ReadonlyArray<T | NestedReadonlyArray<T>>
+declare const OpticProxySymbol: unique symbol
+type OpticProxySymbol = typeof OpticProxySymbol
+export type LeafOpticProxy<State extends number | string | boolean> = {
+    [OpticProxySymbol]?: State
+}
+export type OpticProxy<State> = State extends object | unknown[]
+    ? {
+          [K in keyof State]: OpticProxy<State[K]>
+      }
+    : State extends number | string | boolean
+    ? LeafOpticProxy<State>
+    : never
+type OpticProxyPath = (string | number)[]
+export declare function createOpticProxy<State>(path?: OpticProxyPath): OpticProxy<State>
 export declare class Optic<State, Root> {
     static root<Root>(): Optic<Root, Root>
     static object<T extends Record<string, AnyOptic>>(
@@ -64,5 +78,6 @@ export declare class Optic<State, Root> {
             | ((item: ArrayItem<State>, index: number) => boolean)
             | ((item: ArrayItem<State>, index: number) => item is Target),
     ): Optic<Target[], Root>
+    proxy<Transformed>(transformer: (proxy: OpticProxy<State>) => OpticProxy<Transformed>): Optic<Transformed, Root>
 }
 export {}

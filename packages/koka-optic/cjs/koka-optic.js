@@ -2,6 +2,7 @@
 Object.defineProperty(exports, '__esModule', { value: true })
 exports.Optic = void 0
 exports.getOpticValue = getOpticValue
+exports.createOpticProxy = createOpticProxy
 var tslib_1 = require('tslib')
 var koka_1 = require('koka')
 function getOpticValue(value) {
@@ -25,6 +26,42 @@ var setOpticCache = function (object, optic, value) {
         opticWeakMap.set(object, opticMap)
     }
     opticMap.set(optic, value)
+}
+var OpticProxySymbol = Symbol.for('koka-optic-proxy')
+var opticProxyPathWeakMap = new WeakMap()
+var getOpticProxyPath = function (proxy) {
+    var path = opticProxyPathWeakMap.get(proxy)
+    if (!path) {
+        throw new Error('[koka-optic] Optic proxy path not found')
+    }
+    return path
+}
+var opticProxyWeakMap = new WeakMap()
+function createOpticProxy(path) {
+    if (path === void 0) {
+        path = []
+    }
+    var proxy = new Proxy(
+        {},
+        {
+            get: function (_target, prop) {
+                if (typeof prop === 'symbol') {
+                    throw new Error('[koka-optic] Optic proxy does not support symbols')
+                }
+                var index = Number(prop)
+                if (!Number.isNaN(index)) {
+                    return createOpticProxy(
+                        tslib_1.__spreadArray(tslib_1.__spreadArray([], tslib_1.__read(path), false), [index], false),
+                    )
+                }
+                return createOpticProxy(
+                    tslib_1.__spreadArray(tslib_1.__spreadArray([], tslib_1.__read(path), false), [prop], false),
+                )
+            },
+        },
+    )
+    opticProxyPathWeakMap.set(proxy, path)
+    return proxy
 }
 var Optic = /** @class */ (function () {
     function Optic(options) {
@@ -687,6 +724,36 @@ var Optic = /** @class */ (function () {
                 })
             },
         }).prop('filtered')
+    }
+    Optic.prototype.proxy = function (transformer) {
+        var e_3, _a
+        var proxy = createOpticProxy()
+        var transformed = transformer(proxy)
+        var path = getOpticProxyPath(transformed)
+        var optic = this
+        try {
+            for (
+                var path_1 = tslib_1.__values(path), path_1_1 = path_1.next();
+                !path_1_1.done;
+                path_1_1 = path_1.next()
+            ) {
+                var key = path_1_1.value
+                if (typeof key === 'number') {
+                    optic = optic.index(key)
+                } else {
+                    optic = optic.prop(key)
+                }
+            }
+        } catch (e_3_1) {
+            e_3 = { error: e_3_1 }
+        } finally {
+            try {
+                if (path_1_1 && !path_1_1.done && (_a = path_1.return)) _a.call(path_1)
+            } finally {
+                if (e_3) throw e_3.error
+            }
+        }
+        return optic
     }
     return Optic
 })()

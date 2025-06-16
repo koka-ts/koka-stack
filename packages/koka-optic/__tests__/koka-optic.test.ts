@@ -1,4 +1,4 @@
-import { Optic } from '../src/koka-optic'
+import { Optic, OpticProxy } from '../src/koka-optic'
 import { Eff } from 'koka'
 
 describe('Optic', () => {
@@ -529,6 +529,109 @@ describe('Optic', () => {
             const result = Eff.runResult(Optic.set({ items: [{ value: 1 }, { value: 2 }] }, optic, { value: 100 }))
 
             expect(result.type).toBe('err')
+        })
+    })
+
+    describe('proxy()', () => {
+        it('should do nothing if no operations are provided', () => {
+            const rootOptic = Optic.root<number>()
+            const optic = rootOptic.proxy((p) => p)
+            const result = Eff.runResult(Optic.get(42, optic))
+
+            expect(optic === rootOptic).toBe(true)
+
+            if (result.type === 'err') {
+                throw new Error('Expected a number but got an error')
+            }
+
+            expect(result.value).toBe(42)
+        })
+
+        it('should create optic from property access', () => {
+            const optic = Optic.root<{ a: number }>().proxy((p) => p.a)
+
+            const result = Eff.runResult(Optic.get({ a: 42 }, optic))
+
+            if (result.type === 'err') {
+                throw new Error('Expected number but got error')
+            }
+
+            expect(result.value).toBe(42)
+        })
+
+        it('should create optic from index access', () => {
+            const optic = Optic.root<number[]>().proxy((p) => p[0])
+            const result = Eff.runResult(Optic.get([42], optic))
+
+            if (result.type === 'err') {
+                throw new Error('Expected number but got error')
+            }
+
+            expect(result.value).toBe(42)
+        })
+
+        it('should chain multiple operations', () => {
+            const optic = Optic.root<{ items: { value: number }[] }>().proxy((p) => p.items[0].value)
+
+            const result = Eff.runResult(Optic.get({ items: [{ value: 42 }] }, optic))
+
+            if (result.type === 'err') {
+                throw new Error('Expected number but got error')
+            }
+
+            expect(result.value).toBe(42)
+        })
+
+        it('should maintain type inference', () => {
+            const optic = Optic.root<{ a: { b: string } }>().proxy((p) => p.a.b)
+
+            const result = Eff.runResult(Optic.get({ a: { b: 'test' } }, optic))
+
+            if (result.type === 'err') {
+                throw new Error('Expected string but got error')
+            }
+
+            expect(result.value).toBe('test')
+        })
+
+        it('should support deep, nesting, mixed prop/index accessing', () => {
+            type State = {
+                a: {
+                    b: {
+                        c: {
+                            e: {
+                                f: {
+                                    g: {
+                                        h: string
+                                    }[]
+                                }
+                            }
+                        }[]
+                    }
+                }
+            }
+            const optic: Optic<string, State> = Optic.root<State>().proxy(
+                (p: OpticProxy<State>): OpticProxy<string> => p.a.b.c[1].e.f.g[2].h,
+            )
+
+            const state: State = {
+                a: {
+                    b: {
+                        c: [
+                            { e: { f: { g: [{ h: 'first' }] } } },
+                            { e: { f: { g: [{ h: 'second' }, { h: 'third' }, { h: 'target' }] } } },
+                        ],
+                    },
+                },
+            }
+
+            const result = Eff.runResult(Optic.get(state, optic)) // should return 'target'
+
+            if (result.type === 'err') {
+                throw new Error('Expected string but got error')
+            }
+
+            expect(result.value).toBe('target')
         })
     })
 })
