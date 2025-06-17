@@ -83,6 +83,25 @@ export type MaybePromise<T> = T extends Promise<any> ? T : T | Promise<T>
 
 export type MaybeFunction<T> = T | (() => T)
 
+function Ctx<const Name extends string>(name: Name) {
+    return class Eff<T> {
+        type = 'ctx' as const
+        name = name
+        context = ctxSymbol as CtxSymbol | T
+    }
+}
+
+function Err<const Name extends string>(name: Name) {
+    return class Eff<E = void> {
+        type = 'err' as const
+        name = name
+        error: E
+        constructor(error: E) {
+            this.error = error
+        }
+    }
+}
+
 export class Eff {
     static err = <const Name extends string>(name: Name) => {
         return {
@@ -98,16 +117,7 @@ export class Eff {
         }
     }
 
-    static Err = <const Name extends string>(name: Name) => {
-        return class ErrEff<E = void> {
-            type = 'err' as const
-            name = name
-            error: E
-            constructor(error: E) {
-                this.error = error
-            }
-        }
-    }
+    static Err = Err
 
     static *throw<E extends AnyErr>(err: E): Generator<E, never> {
         yield err
@@ -129,15 +139,7 @@ export class Eff {
         }
     }
 
-    static Ctx = <const Name extends string>(name: Name) => {
-        class CtxEff<T> {
-            type = 'ctx' as const
-            name = name
-            context = ctxSymbol as CtxSymbol | T
-        }
-
-        return CtxEff
-    }
+    static Ctx = Ctx
 
     static *get<C extends AnyCtx>(ctx: C): Generator<C, Exclude<C['context'], CtxSymbol>> {
         const context = yield ctx as C

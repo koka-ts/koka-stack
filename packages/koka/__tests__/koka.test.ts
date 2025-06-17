@@ -445,3 +445,56 @@ describe('helpers', () => {
         expect(isGenerator(notGen())).toBe(false)
     })
 })
+
+describe('design first approach', () => {
+    // predefined error effects
+    class UserNotFoundErr extends Eff.Err('UserNotFound')<string> {}
+    class UserInvalidErr extends Eff.Err('UserInvalid')<{ reason: string }> {}
+
+    // predefined context effects
+    class AuthTokenCtx extends Eff.Ctx('AuthToken')<string> {}
+    class UserIdCtx extends Eff.Ctx('UserId')<string> {}
+
+    // Helper functions using the defined types
+    function* requireUserId() {
+        const userId = yield* Eff.get(new UserIdCtx())
+
+        if (!userId) {
+            yield* Eff.throw(new UserInvalidErr({ reason: 'Missing user ID' }))
+        }
+
+        return userId
+    }
+
+    function* getUser() {
+        const userId = yield* requireUserId()
+
+        const authToken = yield* Eff.get(new AuthTokenCtx())
+
+        if (!authToken) {
+            yield* Eff.throw(new UserInvalidErr({ reason: 'Missing auth token' }))
+        }
+
+        // Simulate fetching user logic
+        const user: { id: string; name: string } | null = yield* Eff.await(null)
+
+        if (!user) {
+            yield* Eff.throw(new UserNotFoundErr(`User with ID ${userId} not found`))
+        }
+
+        return user
+    }
+
+    it('should support design first approach', async () => {
+        const program = Eff.try(getUser()).catch({
+            UserNotFound: (error) => `Error: ${error}`,
+            UserInvalid: (error) => `Invalid user: ${JSON.stringify(error)}`,
+            AuthToken: 'valid-token',
+            UserId: '12345',
+        })
+
+        const result = await Eff.run(program)
+
+        expect(result).toBe('Error: User with ID 12345 not found')
+    })
+})

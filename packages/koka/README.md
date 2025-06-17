@@ -151,23 +151,19 @@ const result = await Eff.run(
 Koka encourages a design-first approach where you define your error and context types upfront before using them in your application:
 
 ```typescript
-// Define error types
-const UserErrors = {
-    NotFound: Eff.Err('UserNotFound')<string>,
-    Invalid: Eff.Err('UserInvalid')<{ reason: string }>,
-}
+// predefined error effects
+class UserNotFoundErr extends Eff.Err('UserNotFound')<string> {}
+class UserInvalidErr extends Eff.Err('UserInvalid')<{ reason: string }> {}
 
-// Define context types
-const AppContext = {
-    UserId: Eff.Ctx('UserId')<string>,
-    AuthToken: Eff.Ctx('AuthToken')<string>,
-}
+// predefined context effects
+class AuthTokenCtx extends Eff.Ctx('AuthToken')<string> {}
+class UserIdCtx extends Eff.Ctx('UserId')<string> {}
 
 // Helper functions using the defined types
 function* requireUserId() {
-    const userId = yield* Eff.get(AppContext.UserId)
+    const userId = yield* Eff.get(new UserIdCtx())
     if (!userId) {
-        yield* Eff.throw(new UserErrors.Invalid({ reason: 'Missing user ID' }))
+        yield* Eff.throw(new UserInvalidErr({ reason: 'Missing user ID' }))
     }
     return userId
 }
