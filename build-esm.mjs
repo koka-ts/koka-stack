@@ -1,16 +1,18 @@
-const fs = require('fs/promises')
-const globby = require('globby')
-const path = require('path')
-const fsSync = require('fs')
+import { readFile, writeFile, unlink } from 'fs/promises'
+import { globby } from 'globby'
+import { join, dirname as _dirname } from 'path'
+import { statSync } from 'fs'
+
+export {}
 
 const IMPORT_EXPORT_REGEXP =
     /(import|export)\s+?(?:(?:(?:[\w*\s{},]*)\s+from\s+?)|)(?:(?:".*?")|(?:'.*?'))[\s]*?(?:;|$|)/g
 
 const getStat = (filename) => {
     try {
-        return fsSync.statSync(filename)
+        return statSync(filename)
     } catch (_) {
-        return fsSync.statSync(`${filename}.js`)
+        return statSync(`${filename}.js`)
     }
 }
 
@@ -21,7 +23,7 @@ const replaceImportStatement = (source, dirname) => {
             return `"${module}"`
         }
 
-        const pathname = path.join(dirname, module)
+        const pathname = join(dirname, module)
         const stat = getStat(pathname)
 
         // module is directory
@@ -50,10 +52,10 @@ const replaceFiles = async () => {
     await Promise.all(
         files.map(async (file) => {
             try {
-                const dirname = path.dirname(file)
-                const sourceCode = await fs.readFile(file, 'utf-8')
+                const dirname = _dirname(file)
+                const sourceCode = await readFile(file, 'utf-8')
                 const newSourceCode = replaceImportStatement(sourceCode, dirname)
-                await fs.writeFile(file.replace('.js', '.mjs'), newSourceCode, 'utf-8')
+                await writeFile(file.replace('.js', '.mjs'), newSourceCode, 'utf-8')
                 console.log(`done: ${file}`)
             } catch (error) {
                 console.log(`fail:${file}\n${error.stack || error.message}`)
@@ -64,7 +66,7 @@ const replaceFiles = async () => {
 
     await Promise.all(
         files.map(async (file) => {
-            await fs.unlink(file)
+            await unlink(file)
         }),
     )
 }

@@ -159,9 +159,14 @@ export class Eff {
                 const effect = result.value
 
                 if (effect.type === 'async') {
-                    return effect.value.then((value) => {
-                        return process(gen.next(value))
-                    }) as MaybePromise<Return>
+                    return effect.value.then(
+                        (value) => {
+                            return process(gen.next(value))
+                        },
+                        (error) => {
+                            return process(gen.throw(error))
+                        },
+                    ) as MaybePromise<Return>
                 } else {
                     throw new Error(`Expected async effect, but got: ${JSON.stringify(effect, null, 2)}`)
                 }

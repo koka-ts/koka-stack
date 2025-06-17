@@ -31,10 +31,14 @@
         "koka-optic": "^1.0.0"
     },
     "devDependencies": {
+        "@types/jest": "^27.5.0",
+        "jest": "^27.5.1",
+        "ts-jest": "^27.1.4",
         "rimraf": "^3.0.2",
-        "ts-node": "^10.9.2",
+        "shx": "^0.3.4",
         "tsx": "^4.7.0",
-        "typescript": "^5.0.0"
+        "typescript": "^5.0.0",
+        "npm-run-all": "^4.1.5"
     },
     "publishConfig": {
         "access": "public"

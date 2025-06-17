@@ -163,6 +163,25 @@ describe('Eff.run', () => {
         const result = await Eff.run(test())
         expect(result).toBe(42)
     })
+
+    it('should handle errors in async effects', async () => {
+        function* testThrow() {
+            yield* Eff.await(Promise.reject(new Error('Async error')))
+        }
+
+        function* test() {
+            try {
+                yield* testThrow()
+            } catch (err) {
+                if (err instanceof Error) {
+                    return `Caught: ${err.message}`
+                }
+            }
+        }
+
+        const result = await Eff.run(test())
+        expect(result).toBe('Caught: Async error')
+    })
 })
 
 describe('Eff.result', () => {

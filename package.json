@@ -10,7 +10,7 @@
     "scripts": {
         "build": "run-s clean:build build:source clean:tests",
         "build:cjs": "tsc -b ./tsconfig.cjs.json",
-        "build:esm": "tsc -b ./tsconfig.esm.json && node build.esm",
+        "build:esm": "tsc -b ./tsconfig.esm.json && node build-esm.mjs",
         "build:source": "run-s build:cjs build:esm",
         "build:all": "pnpm --filter \"./packages/**\" run build",
         "clean": "run-p clean:build",

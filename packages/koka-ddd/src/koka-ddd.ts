@@ -199,11 +199,11 @@ export function command() {
 
             const result = yield* Eff.try(target.call(this, ...args)).catch({
                 commandStack,
-            })
+            } as any)
 
             commandStack.return = result
 
-            return result
+            return result as Return
         }
 
         return replacementMethod

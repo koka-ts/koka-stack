@@ -11,10 +11,10 @@
         },
         {
             "path": "./packages/koka-optic/tsconfig.cjs.json"
-        },
-        {
-            "path": "./packages/koka-ddd/tsconfig.cjs.json"
         }
+        // {
+        //     "path": "./packages/koka-ddd/tsconfig.cjs.json"
+        // }
     ],
     "include": ["./packages"],
     "exclude": ["./packages/*/__tests__/*", "./packages/*/dist", "./packages/*/cjs", "./packages/*/esm"]
