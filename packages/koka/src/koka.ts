@@ -13,7 +13,7 @@ export type CtxSymbol = typeof ctxSymbol
 export type Ctx<Name extends string, T> = {
     type: 'ctx'
     name: Name
-    [ctxSymbol]?: T
+    context: CtxSymbol | T
 }
 
 export type AnyCtx = Ctx<string, any>
@@ -84,7 +84,7 @@ export type MaybePromise<T> = T extends Promise<any> ? T : T | Promise<T>
 export type MaybeFunction<T> = T | (() => T)
 
 export class Eff {
-    static err = <Name extends string>(name: Name) => {
+    static err = <const Name extends string>(name: Name) => {
         return {
             *throw<E = void>(...args: E extends void ? [] : [E]): Generator<Err<Name, E>, never> {
                 yield {
@@ -97,18 +97,54 @@ export class Eff {
             },
         }
     }
-    static ctx = <Name extends string>(name: Name) => {
+
+    static Err = <const Name extends string>(name: Name) => {
+        return class ErrEff<E = void> {
+            type = 'err' as const
+            name = name
+            error: E
+            constructor(error: E) {
+                this.error = error
+            }
+        }
+    }
+
+    static *throw<E extends AnyErr>(err: E): Generator<E, never> {
+        yield err
+        /* istanbul ignore next */
+        throw new Error(`Unexpected resumption of error effect [${err.name}]`)
+    }
+
+    static ctx = <const Name extends string>(name: Name) => {
         return {
             *get<T>(): Generator<Ctx<Name, T>, T> {
                 const context = yield {
                     type: 'ctx',
                     name,
+                    context: ctxSymbol,
                 }
 
                 return context as T
             },
         }
     }
+
+    static Ctx = <const Name extends string>(name: Name) => {
+        class CtxEff<T> {
+            type = 'ctx' as const
+            name = name
+            context = ctxSymbol as CtxSymbol | T
+        }
+
+        return CtxEff
+    }
+
+    static *get<C extends AnyCtx>(ctx: C): Generator<C, Exclude<C['context'], CtxSymbol>> {
+        const context = yield ctx as C
+
+        return context as Exclude<C['context'], CtxSymbol>
+    }
+
     static try = <Yield extends AnyEff, Return>(input: MaybeFunction<Generator<Yield, Return>>) => {
         return {
             *catch<Handlers extends Partial<EffectHandlers<Yield>>>(
