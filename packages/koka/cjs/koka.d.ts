@@ -9,7 +9,7 @@ export type CtxSymbol = typeof ctxSymbol
 export type Ctx<Name extends string, T> = {
     type: 'ctx'
     name: Name
-    [ctxSymbol]?: T
+    context: CtxSymbol | T
 }
 export type AnyCtx = Ctx<string, any>
 export type Async = {
@@ -49,17 +49,39 @@ export declare const Result: {
 type InferOkValue<T> = T extends Ok<infer U> ? U : never
 export type MaybePromise<T> = T extends Promise<any> ? T : T | Promise<T>
 export type MaybeFunction<T> = T | (() => T)
+declare function Ctx<const Name extends string>(
+    name: Name,
+): {
+    new <T>(): {
+        type: 'ctx'
+        name: Name
+        context: CtxSymbol | T
+    }
+}
+declare function Err<const Name extends string>(
+    name: Name,
+): {
+    new <E = void>(error: E): {
+        type: 'err'
+        name: Name
+        error: E
+    }
+}
 export declare class Eff {
-    static err: <Name extends string>(
+    static err: <const Name extends string>(
         name: Name,
     ) => {
         throw<E = void>(...args: E extends void ? [] : [E]): Generator<Err<Name, E>, never>
     }
-    static ctx: <Name extends string>(
+    static Err: typeof Err
+    static throw<E extends AnyErr>(err: E): Generator<E, never>
+    static ctx: <const Name extends string>(
         name: Name,
     ) => {
         get<T>(): Generator<Ctx<Name, T>, T>
     }
+    static Ctx: typeof Ctx
+    static get<C extends AnyCtx>(ctx: C): Generator<C, Exclude<C['context'], CtxSymbol>>
     static try: <Yield extends AnyEff, Return>(
         input: MaybeFunction<Generator<Yield, Return>>,
     ) => {

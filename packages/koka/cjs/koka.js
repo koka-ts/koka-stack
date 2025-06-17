@@ -18,16 +18,69 @@ exports.Result = {
         }
     },
 }
+function Ctx(name) {
+    return /** @class */ (function () {
+        function Eff() {
+            this.type = 'ctx'
+            this.name = name
+            this.context = exports.ctxSymbol
+        }
+        return Eff
+    })()
+}
+function Err(name) {
+    return /** @class */ (function () {
+        function Eff(error) {
+            this.type = 'err'
+            this.name = name
+            this.error = error
+        }
+        return Eff
+    })()
+}
 var Eff = /** @class */ (function () {
     function Eff() {}
+    Eff.throw = function (err) {
+        return tslib_1.__generator(this, function (_a) {
+            switch (_a.label) {
+                case 0:
+                    return [
+                        4 /*yield*/,
+                        err,
+                        /* istanbul ignore next */
+                    ]
+                case 1:
+                    _a.sent()
+                    /* istanbul ignore next */
+                    throw new Error('Unexpected resumption of error effect ['.concat(err.name, ']'))
+            }
+        })
+    }
+    Eff.get = function (ctx) {
+        var context
+        return tslib_1.__generator(this, function (_a) {
+            switch (_a.label) {
+                case 0:
+                    return [4 /*yield*/, ctx]
+                case 1:
+                    context = _a.sent()
+                    return [2 /*return*/, context]
+            }
+        })
+    }
     Eff.run = function (input) {
         var process = function (result) {
             if (!result.done) {
                 var effect = result.value
                 if (effect.type === 'async') {
-                    return effect.value.then(function (value) {
-                        return process(gen.next(value))
-                    })
+                    return effect.value.then(
+                        function (value) {
+                            return process(gen.next(value))
+                        },
+                        function (error) {
+                            return process(gen.throw(error))
+                        },
+                    )
                 } else {
                     throw new Error('Expected async effect, but got: '.concat(JSON.stringify(effect, null, 2)))
                 }
@@ -150,6 +203,7 @@ var Eff = /** @class */ (function () {
             },
         }
     }
+    Eff.Err = Err
     Eff.ctx = function (name) {
         return {
             get: function () {
@@ -162,6 +216,7 @@ var Eff = /** @class */ (function () {
                                 {
                                     type: 'ctx',
                                     name: name,
+                                    context: exports.ctxSymbol,
                                 },
                             ]
                         case 1:
@@ -172,6 +227,7 @@ var Eff = /** @class */ (function () {
             },
         }
     }
+    Eff.Ctx = Ctx
     Eff.try = function (input) {
         return {
             catch: function (handlers) {
