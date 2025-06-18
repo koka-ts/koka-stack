@@ -532,10 +532,10 @@ describe('Optic', () => {
         })
     })
 
-    describe('proxy()', () => {
+    describe('select()', () => {
         it('should do nothing if no operations are provided', () => {
             const rootOptic = Optic.root<number>()
-            const optic = rootOptic.proxy((p) => p)
+            const optic = rootOptic.select((p) => p)
             const result = Eff.runResult(Optic.get(42, optic))
 
             expect(optic === rootOptic).toBe(true)
@@ -548,7 +548,7 @@ describe('Optic', () => {
         })
 
         it('should create optic from property access', () => {
-            const optic = Optic.root<{ a: number }>().proxy((p) => p.a)
+            const optic = Optic.root<{ a: number }>().select((p) => p.a)
 
             const result = Eff.runResult(Optic.get({ a: 42 }, optic))
 
@@ -560,7 +560,7 @@ describe('Optic', () => {
         })
 
         it('should create optic from index access', () => {
-            const optic = Optic.root<number[]>().proxy((p) => p[0])
+            const optic = Optic.root<number[]>().select((p) => p[0])
             const result = Eff.runResult(Optic.get([42], optic))
 
             if (result.type === 'err') {
@@ -571,7 +571,7 @@ describe('Optic', () => {
         })
 
         it('should chain multiple operations', () => {
-            const optic = Optic.root<{ items: { value: number }[] }>().proxy((p) => p.items[0].value)
+            const optic = Optic.root<{ items: { value: number }[] }>().select((p) => p.items[0].value)
 
             const result = Eff.runResult(Optic.get({ items: [{ value: 42 }] }, optic))
 
@@ -583,7 +583,7 @@ describe('Optic', () => {
         })
 
         it('should maintain type inference', () => {
-            const optic = Optic.root<{ a: { b: string } }>().proxy((p) => p.a.b)
+            const optic = Optic.root<{ a: { b: string } }>().select((p) => p.a.b)
 
             const result = Eff.runResult(Optic.get({ a: { b: 'test' } }, optic))
 
@@ -610,7 +610,7 @@ describe('Optic', () => {
                     }
                 }
             }
-            const optic: Optic<string, State> = Optic.root<State>().proxy(
+            const optic: Optic<string, State> = Optic.root<State>().select(
                 (p: OpticProxy<State>): OpticProxy<string> => p.a.b.c[1].e.f.g[2].h,
             )
 

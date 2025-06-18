@@ -27,7 +27,7 @@ export function* getOpticValue<T>(value: MaybeOpticEff<T>): Generator<OpticErr, 
     }
 }
 
-export type Selector<Target, State> = {
+export type Transformer<Target, State> = {
     get: (state: State) => MaybeOpticEff<Target>
     set: (target: Target, state: State) => MaybeOpticEff<State>
 }
@@ -85,8 +85,6 @@ const getOpticProxyPath = (proxy: object): OpticProxyPath => {
     return path
 }
 
-const opticProxyWeakMap = new WeakMap<OpticProxy<any>, OpticProxyPath>()
-
 export function createOpticProxy<State>(path: OpticProxyPath = []): OpticProxy<State> {
     const proxy: OpticProxy<State> = new Proxy(
         {},
@@ -132,7 +130,7 @@ export class Optic<State, Root> {
         optics: T,
     ): Optic<{ [K in keyof T]: InferOpticState<T[K]> }, InferOpticRoot<T[keyof T]>> {
         return this.root<InferOpticRoot<T[keyof T]>>()
-            .select({
+            .transform({
                 *get(root) {
                     const object = {} as { [K in keyof T]: InferOpticState<T[K]> }
 
@@ -168,7 +166,7 @@ export class Optic<State, Root> {
     }
 
     static optional<State, Root>(optic: Optic<State, Root>): Optic<State | undefined, Root> {
-        return Optic.root<Root>().select<State | undefined>({
+        return Optic.root<Root>().transform<State | undefined>({
             *get(root) {
                 const result = yield* Eff.result(optic.get(root))
 
@@ -232,7 +230,7 @@ export class Optic<State, Root> {
         return undefined
     }
 
-    select<Target>(selector: Selector<Target, State>): Optic<Target, Root> {
+    transform<Target>(selector: Transformer<Target, State>): Optic<Target, Root> {
         const { get, set } = this
 
         const optic: Optic<Target, Root> = new Optic({
@@ -313,7 +311,7 @@ export class Optic<State, Root> {
     }
 
     prop<Key extends keyof State & string>(key: Key): Optic<State[Key], Root> {
-        return this.select({
+        return this.transform({
             get(state) {
                 return state[key]
             },
@@ -327,7 +325,7 @@ export class Optic<State, Root> {
     }
 
     index<Index extends keyof State & number>(index: Index): Optic<State[Index], Root> {
-        return this.select({
+        return this.transform({
             *get(state) {
                 if (!Array.isArray(state)) {
                     throw yield* Eff.err('OpticErr').throw(`[koka-optic] Index ${index} is not applied for an array`)
@@ -360,7 +358,7 @@ export class Optic<State, Root> {
             index: number
         }
 
-        return this.select<TargetInfo>({
+        return this.transform<TargetInfo>({
             *get(list) {
                 if (!Array.isArray(list)) {
                     throw yield* Eff.err('OpticErr').throw(`[koka-optic] Find ${predicate} is not applied for an array`)
@@ -389,7 +387,7 @@ export class Optic<State, Root> {
     }
 
     match<Matched extends State>(predicate: (state: State) => state is Matched): Optic<Matched, Root> {
-        return this.select({
+        return this.transform({
             *get(state) {
                 if (!predicate(state)) {
                     throw yield* Eff.err('OpticErr').throw(`[koka-optic] State does not match by ${predicate}`)
@@ -404,7 +402,7 @@ export class Optic<State, Root> {
     }
 
     refine(predicate: (state: State) => boolean): Optic<State, Root> {
-        return this.select({
+        return this.transform({
             *get(state) {
                 if (!predicate(state)) {
                     throw yield* Eff.err('OpticErr').throw(`[koka-optic] State does not match by ${predicate}`)
@@ -424,7 +422,7 @@ export class Optic<State, Root> {
 
     map<Target>(
         mapper:
-            | Selector<Target, ArrayItem<State>>
+            | Transformer<Target, ArrayItem<State>>
             | Optic<Target, ArrayItem<State>>
             | ((state: Optic<ArrayItem<State>, ArrayItem<State>>) => Optic<Target, ArrayItem<State>>),
     ): Optic<Target[], Root> {
@@ -437,10 +435,10 @@ export class Optic<State, Root> {
         } else if (mapper instanceof Optic) {
             mapper$ = mapper
         } else {
-            mapper$ = from.select(mapper)
+            mapper$ = from.transform(mapper)
         }
 
-        return this.select({
+        return this.transform({
             *get(state) {
                 const list = state as ArrayItem<State>[]
 
@@ -505,7 +503,7 @@ export class Optic<State, Root> {
             indexList?: IndexList
         }
 
-        return this.select<FilteredInfo>({
+        return this.transform<FilteredInfo>({
             *get(list) {
                 if (!Array.isArray(list)) {
                     throw yield* Eff.err('OpticErr').throw(
@@ -583,10 +581,10 @@ export class Optic<State, Root> {
         }).prop('filtered')
     }
 
-    proxy<Transformed>(transformer: (proxy: OpticProxy<State>) => OpticProxy<Transformed>): Optic<Transformed, Root> {
+    select<Selected>(selector: (proxy: OpticProxy<State>) => OpticProxy<Selected>): Optic<Selected, Root> {
         const proxy = createOpticProxy<State>()
-        const transformed = transformer(proxy)
-        const path = getOpticProxyPath(transformed)
+        const selected = selector(proxy)
+        const path = getOpticProxyPath(selected)
 
         let optic: Optic<any, Root> = this
 
