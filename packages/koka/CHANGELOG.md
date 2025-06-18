@@ -1,5 +1,11 @@
 # koka
 
+## 1.0.5
+
+### Patch Changes
+
+-   feat: Eff.all supports has been added
+
 ## 1.0.4
 
 ### Patch Changes
