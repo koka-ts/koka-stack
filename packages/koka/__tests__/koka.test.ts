@@ -70,7 +70,18 @@ describe('Eff.ctx', () => {
     })
 })
 
-describe('Eff.try/catch', () => {
+describe('Eff.try', () => {
+    it('should throw for unhandled effect types', () => {
+        function* test() {
+            yield { type: 'unknown' } as any
+            return 'should not reach here'
+        }
+
+        expect(() => {
+            Eff.run(Eff.try(test()).catch({}))
+        }).toThrow(/Unexpected effect/)
+    })
+
     it('should catch error effect', () => {
         function* test() {
             yield* Eff.err('TestError').throw('error')
@@ -181,6 +192,40 @@ describe('Eff.run', () => {
 
         const result = await Eff.run(test())
         expect(result).toBe('Caught: Async error')
+    })
+
+    it('should throw error for non-async effects in Eff.run', () => {
+        const TestErr = Eff.Err('TestErr')<string>
+
+        function* test(): Generator<Err<'TestErr', string>, string> {
+            yield* Eff.throw(new TestErr('error'))
+            return 'should not reach here'
+        }
+
+        expect(() => Eff.run(test() as Generator<Async, string>)).toThrow(/Expected async effect, but got: /)
+    })
+})
+
+describe('Eff.runSync', () => {
+    it('should run sync effects', () => {
+        function* test() {
+            return 42
+        }
+
+        const result = Eff.runSync(test())
+        expect(result).toBe(42)
+    })
+
+    it('should throw for async effects', () => {
+        function* test(): Generator<Async, number> {
+            yield* Eff.await(Promise.resolve(42))
+            return 42
+        }
+
+        // @ts-expect-error
+        const result = Eff.runSync(test())
+
+        expect(result).toBeInstanceOf(Promise)
     })
 })
 
