@@ -111,6 +111,33 @@ function* main(discount?: number) {
 const total = Eff.run(main(0.1)) // Returns 90
 ```
 
+### Optional Values
+
+```typescript
+function* getUserPreferences() {
+    // Get optional value without default (returns T | undefined)
+    const theme = yield* Eff.opt('Theme').get<string>()
+
+    // Get optional value with default (returns T)
+    const fontSize = yield* Eff.opt('FontSize').get(14)
+
+    return { theme, fontSize }
+}
+
+function* main() {
+    const prefs = yield* Eff.try(getUserPreferences()).catch({
+        // Provide optional values
+        Theme: 'dark',
+        FontSize: 16,
+    })
+
+    return prefs
+}
+
+const prefs = Eff.run(main())
+// Returns { theme: 'dark', fontSize: 16 }
+```
+
 ### Async Operations
 
 ```typescript
@@ -159,9 +186,13 @@ class UserInvalidErr extends Eff.Err('UserInvalid')<{ reason: string }> {}
 class AuthTokenCtx extends Eff.Ctx('AuthToken')<string> {}
 class UserIdCtx extends Eff.Ctx('UserId')<string> {}
 
+// predefined optional effects
+class ThemeOpt extends Eff.Opt('Theme')<string> {}
+class FontSizeOpt extends Eff.Opt('FontSize')<number> {}
+
 // Helper functions using the defined types
 function* requireUserId() {
-    const userId = yield* Eff.get(new UserIdCtx())
+    const userId = yield* Eff.get(UserIdCtx)
     if (!userId) {
         yield* Eff.throw(new UserInvalidErr({ reason: 'Missing user ID' }))
     }
@@ -229,6 +260,7 @@ if (finalResult.type === 'ok') {
 
 -   `Eff.err(name).throw(error?)`: Throws an error effect
 -   `Eff.ctx(name).get<T>()`: Gets a context value
+-   `Eff.ctx(name).opt<T>()`: Gets an optional context value (returns T | undefined)
 -   `Eff.await<T>(Promise<T> | T)`: Handles async operations
 -   `Eff.try(generator).catch(handlers)`: Handles effects
 -   `Eff.run(generator)`: Runs a generator (handles async)
@@ -240,16 +272,27 @@ if (finalResult.type === 'ok') {
 
 -   `Eff.Err(name)<Error>`: Creates an error effect class
     ```typescript
-    const MyError = Eff.Err('MyError')<string>
+    class MyError extends Eff.Err('MyError')<string> {}
     const error = new MyError('message')
     ```
 -   `Eff.Ctx(name)<Context>`: Creates a context effect class
     ```typescript
-    const MyContext = Eff.Ctx('MyContext')<number>
+    class MyContext extends Eff.Ctx('MyContext')<string> {}
     const ctx = new MyContext()
+    ```
+-   `Eff.Opt(name)<T>`: Creates an optional effect class
+    ```typescript
+    class MyOpt extends Eff.Opt('MyOpt')<string> {}
+    const opt = new MyOpt()
     ```
 
 ### Effect Operations
+
+-   `Eff.ctx(name).opt()`: Creates an optional effect from context
+
+    ```typescript
+    const theme = yield * Eff.ctx('Theme').opt().get<string>()
+    ```
 
 -   `Eff.throw(err: Err)`: Throws a predefined error effect
 
@@ -259,7 +302,7 @@ if (finalResult.type === 'ok') {
 
 -   `Eff.get(ctx: Ctx)`: Gets a value from predefined context
     ```typescript
-    const value = yield * Eff.get(new MyContext())
+    const value = yield * Eff.get(MyContext)
     ```
 
 ### Result
