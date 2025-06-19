@@ -4,20 +4,25 @@ export type Err<Name extends string, T> = {
     error: T
 }
 export type AnyErr = Err<string, any>
-export declare const ctxSymbol: unique symbol
-export type CtxSymbol = typeof ctxSymbol
+export declare const EffSymbol: unique symbol
+export type EffSymbol = typeof EffSymbol
 export type Ctx<Name extends string, T> = {
     type: 'ctx'
     name: Name
-    context: CtxSymbol | T
+    context: EffSymbol | T
+    optional?: true
+}
+export type Opt<Name extends string, T> = Ctx<Name, T> & {
+    optional: true
 }
 export type AnyCtx = Ctx<string, any>
 export type Async = {
     type: 'async'
     name?: undefined
-    value: Promise<unknown>
+    promise: Promise<unknown>
 }
-export type EffType<T> = Err<string, T> | Ctx<string, T> | Async
+export type AnyOpt = Opt<string, any>
+export type EffType<T> = Err<string, T> | Ctx<string, T> | Opt<string, T> | Async
 export type AnyEff = EffType<any>
 type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (k: infer I) => void ? I : never
 type ToHandler<Effect> = Effect extends Err<infer Name, infer U>
@@ -70,7 +75,8 @@ declare function Ctx<const Name extends string>(
     new <T>(): {
         type: 'ctx'
         name: Name
-        context: CtxSymbol | T
+        context: EffSymbol | T
+        optional?: true
     }
 }
 declare function Err<const Name extends string>(
@@ -82,6 +88,19 @@ declare function Err<const Name extends string>(
         error: E
     }
 }
+declare function Opt<const Name extends string>(
+    name: Name,
+): {
+    new <T>(): {
+        optional: true
+        type: 'ctx'
+        name: Name
+        context: EffSymbol | T_1
+    }
+}
+export type CtxValue<C extends AnyCtx> = C['optional'] extends true
+    ? Exclude<C['context'], EffSymbol> | undefined
+    : Exclude<C['context'], EffSymbol>
 export declare class Eff {
     static err: <const Name extends string>(
         name: Name,
@@ -94,9 +113,11 @@ export declare class Eff {
         name: Name,
     ) => {
         get<T>(): Generator<Ctx<Name, T>, T>
+        opt<T>(): Generator<Opt<Name, T>, T | undefined>
     }
     static Ctx: typeof Ctx
-    static get<C extends AnyCtx>(ctx: C): Generator<C, Exclude<C['context'], CtxSymbol>>
+    static Opt: typeof Opt
+    static get<C extends AnyCtx>(ctx: C | (new () => C)): Generator<C, CtxValue<C>>
     static all<const Effects extends MaybeGenerator<AnyEff, unknown>[]>(
         effects: Effects,
     ): Generator<ExtractEff<Effects>, ExtractReturn<Effects>>
@@ -115,10 +136,10 @@ export declare class Eff {
             Return | ExtractErrorHandlerReturn<Handlers, Yield>
         >
     }
-    static run<Return>(input: MaybeFunction<Generator<never, Return>>): Return
-    static run<Return>(input: MaybeFunction<Generator<Async, Return>>): MaybePromise<Return>
-    static runSync<Return>(effect: MaybeFunction<Generator<never, Return>>): Return
-    static runAsync<Return>(input: MaybeFunction<Generator<Async, Return>>): MaybePromise<Return>
+    static run<Return>(input: MaybeFunction<Generator<AnyOpt, Return>>): Return
+    static run<Return>(input: MaybeFunction<Generator<Async | AnyOpt, Return>>): MaybePromise<Return>
+    static runSync<Return>(effect: MaybeFunction<Generator<AnyOpt, Return>>): Return
+    static runAsync<Return>(input: MaybeFunction<Generator<Async | AnyOpt, Return>>): Promise<Return>
     static runResult<Yield, Return>(
         input: MaybeFunction<Generator<Yield, Return>>,
     ): Async extends Yield ? MaybePromise<Ok<Return> | ExtractErr<Yield>> : Ok<Return> | ExtractErr<Yield>

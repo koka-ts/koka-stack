@@ -1,8 +1,8 @@
 'use strict'
 Object.defineProperty(exports, '__esModule', { value: true })
-exports.isGenerator = exports.Eff = exports.Result = exports.ctxSymbol = void 0
+exports.isGenerator = exports.Eff = exports.Result = exports.EffSymbol = void 0
 var tslib_1 = require('tslib')
-exports.ctxSymbol = Symbol('ctx')
+exports.EffSymbol = Symbol('ctx')
 exports.Result = {
     ok: function (value) {
         return {
@@ -23,7 +23,7 @@ function Ctx(name) {
         function Eff() {
             this.type = 'ctx'
             this.name = name
-            this.context = exports.ctxSymbol
+            this.context = exports.EffSymbol
         }
         return Eff
     })()
@@ -37,6 +37,17 @@ function Err(name) {
         }
         return Eff
     })()
+}
+function Opt(name) {
+    return /** @class */ (function (_super) {
+        tslib_1.__extends(Eff, _super)
+        function Eff() {
+            var _this = _super.apply(this, tslib_1.__spreadArray([], tslib_1.__read(arguments), false)) || this
+            _this.optional = true
+            return _this
+        }
+        return Eff
+    })(Ctx(name))
 }
 var Eff = /** @class */ (function () {
     function Eff() {}
@@ -61,7 +72,7 @@ var Eff = /** @class */ (function () {
         return tslib_1.__generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
-                    return [4 /*yield*/, ctx]
+                    return [4 /*yield*/, typeof ctx === 'function' ? new ctx() : ctx]
                 case 1:
                     context = _a.sent()
                     return [2 /*return*/, context]
@@ -79,7 +90,7 @@ var Eff = /** @class */ (function () {
                         if (!!result.done) return [3 /*break*/, 4]
                         effect = result.value
                         if (!(effect.type === 'async')) return [3 /*break*/, 1]
-                        wrapPromise(effect.value, item)
+                        wrapPromise(effect.promise, item)
                         return [2 /*return*/]
                     case 1:
                         _c = (_b = item.gen).next
@@ -159,10 +170,10 @@ var Eff = /** @class */ (function () {
     Eff.run = function (input) {
         var gen = typeof input === 'function' ? input() : input
         var process = function (result) {
-            if (!result.done) {
+            while (!result.done) {
                 var effect = result.value
                 if (effect.type === 'async') {
-                    return effect.value.then(
+                    return effect.promise.then(
                         function (value) {
                             return process(gen.next(value))
                         },
@@ -170,6 +181,13 @@ var Eff = /** @class */ (function () {
                             return process(gen.throw(error))
                         },
                     )
+                } else if (effect.type === 'ctx') {
+                    if (!effect.optional) {
+                        throw new Error(
+                            'Expected optional ctx, but got non-optional ctx: '.concat(JSON.stringify(effect, null, 2)),
+                        )
+                    }
+                    result = gen.next()
                 } else {
                     throw new Error('Expected async effect, but got: '.concat(JSON.stringify(effect, null, 2)))
                 }
@@ -179,10 +197,14 @@ var Eff = /** @class */ (function () {
         return process(gen.next())
     }
     Eff.runSync = function (effect) {
-        return this.run(effect)
+        var result = this.run(effect)
+        if (result instanceof Promise) {
+            throw new Error('Expected synchronous effect, but got asynchronous effect')
+        }
+        return result
     }
     Eff.runAsync = function (input) {
-        return this.run(input)
+        return Promise.resolve(this.run(input))
     }
     Eff.runResult = function (input) {
         var gen = typeof input === 'function' ? input() : input
@@ -201,7 +223,7 @@ var Eff = /** @class */ (function () {
                         4 /*yield*/,
                         {
                             type: 'async',
-                            value: value,
+                            promise: value,
                         },
                     ]
                 case 1:
@@ -304,7 +326,27 @@ var Eff = /** @class */ (function () {
                                 {
                                     type: 'ctx',
                                     name: name,
-                                    context: exports.ctxSymbol,
+                                    context: exports.EffSymbol,
+                                },
+                            ]
+                        case 1:
+                            context = _a.sent()
+                            return [2 /*return*/, context]
+                    }
+                })
+            },
+            opt: function () {
+                var context
+                return tslib_1.__generator(this, function (_a) {
+                    switch (_a.label) {
+                        case 0:
+                            return [
+                                4 /*yield*/,
+                                {
+                                    type: 'ctx',
+                                    name: name,
+                                    context: exports.EffSymbol,
+                                    optional: true,
                                 },
                             ]
                         case 1:
@@ -316,6 +358,7 @@ var Eff = /** @class */ (function () {
         }
     }
     Eff.Ctx = Ctx
+    Eff.Opt = Opt
     Eff.try = function (input) {
         return {
             catch: function (handlers) {
@@ -343,8 +386,8 @@ var Eff = /** @class */ (function () {
                             return [3 /*break*/, 12]
                         case 5:
                             if (!(effect.type === 'ctx')) return [3 /*break*/, 9]
-                            if (!handlers.hasOwnProperty(effect.name)) return [3 /*break*/, 6]
                             context = handlers[effect.name]
+                            if (!(context !== undefined)) return [3 /*break*/, 6]
                             result = gen.next(context)
                             return [3 /*break*/, 8]
                         case 6:
