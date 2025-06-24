@@ -110,6 +110,7 @@ export type MaybeFunction<T> = T | (() => T)
 
 function Ctx<const Name extends string>(name: Name) {
     return class Eff<T> {
+        static field: Name = name
         type = 'ctx' as const
         name = name
         context = EffSymbol as EffSymbol | T
@@ -119,6 +120,7 @@ function Ctx<const Name extends string>(name: Name) {
 
 function Err<const Name extends string>(name: Name) {
     return class Eff<E = void> {
+        static field: Name = name
         type = 'err' as const
         name = name
         error: E
@@ -131,6 +133,7 @@ function Err<const Name extends string>(name: Name) {
 function Opt<const Name extends string>(name: Name) {
     return class Eff<T> extends Ctx(name)<T> {
         optional = true as const
+        context = EffSymbol as EffSymbol | T
     }
 }
 

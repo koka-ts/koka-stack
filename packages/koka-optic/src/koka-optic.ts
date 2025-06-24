@@ -1,6 +1,6 @@
-import { Eff, Err, isGenerator } from 'koka'
+import { Eff, isGenerator } from 'koka'
 
-export type OpticErr = Err<'OpticErr', string>
+export class OpticErr extends Eff.Err('koka-optic/optic-err')<string> {}
 
 export type Getter<State, Root> = (root: Root) => Generator<OpticErr, State, unknown>
 
@@ -328,12 +328,12 @@ export class Optic<State, Root> {
         return this.transform({
             *get(state) {
                 if (!Array.isArray(state)) {
-                    throw yield* Eff.err('OpticErr').throw(`[koka-optic] Index ${index} is not applied for an array`)
+                    throw yield* Eff.throw(new OpticErr(`[koka-optic] Index ${index} is not applied for an array`))
                 }
 
                 if (index < 0 || index >= state.length) {
-                    throw yield* Eff.err('OpticErr').throw(
-                        `[koka-optic] Index ${index} is out of bounds: ${state.length}`,
+                    throw yield* Eff.throw(
+                        new OpticErr(`[koka-optic] Index ${index} is out of bounds: ${state.length}`),
                     )
                 }
 
@@ -361,13 +361,13 @@ export class Optic<State, Root> {
         return this.transform<TargetInfo>({
             *get(list) {
                 if (!Array.isArray(list)) {
-                    throw yield* Eff.err('OpticErr').throw(`[koka-optic] Find ${predicate} is not applied for an array`)
+                    throw yield* Eff.throw(new OpticErr(`[koka-optic] Find ${predicate} is not applied for an array`))
                 }
 
                 const index = list.findIndex(predicate)
 
                 if (index === -1) {
-                    throw yield* Eff.err('OpticErr').throw(`[koka-optic] Item not found`)
+                    throw yield* Eff.throw(new OpticErr(`[koka-optic] Item not found`))
                 }
 
                 const target = list[index]
@@ -390,7 +390,7 @@ export class Optic<State, Root> {
         return this.transform({
             *get(state) {
                 if (!predicate(state)) {
-                    throw yield* Eff.err('OpticErr').throw(`[koka-optic] State does not match by ${predicate}`)
+                    throw yield* Eff.throw(new OpticErr(`[koka-optic] State does not match by ${predicate}`))
                 }
 
                 return state
@@ -405,7 +405,7 @@ export class Optic<State, Root> {
         return this.transform({
             *get(state) {
                 if (!predicate(state)) {
-                    throw yield* Eff.err('OpticErr').throw(`[koka-optic] State does not match by ${predicate}`)
+                    throw yield* Eff.throw(new OpticErr(`[koka-optic] State does not match by ${predicate}`))
                 }
 
                 return state
@@ -458,8 +458,8 @@ export class Optic<State, Root> {
                 const newList = [] as ArrayItem<State>[]
 
                 if (list.length !== targetList.length) {
-                    throw yield* Eff.err('OpticErr').throw(
-                        `[koka-optic] List length mismatch: ${list.length} !== ${targetList.length}`,
+                    throw yield* Eff.throw(
+                        new OpticErr(`[koka-optic] List length mismatch: ${list.length} !== ${targetList.length}`),
                     )
                 }
 
@@ -506,9 +506,7 @@ export class Optic<State, Root> {
         return this.transform<FilteredInfo>({
             *get(list) {
                 if (!Array.isArray(list)) {
-                    throw yield* Eff.err('OpticErr').throw(
-                        `[koka-optic] Filter ${predicate} is not applied for an array`,
-                    )
+                    throw yield* Eff.throw(new OpticErr(`[koka-optic] Filter ${predicate} is not applied for an array`))
                 }
 
                 let indexRecord: IndexRecord | undefined

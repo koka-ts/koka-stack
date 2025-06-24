@@ -1,5 +1,7 @@
 import { Eff } from 'koka'
 import { Store, Domain, get, set, query, command, Optic } from '../src/koka-ddd'
+import { PrettyPrinter } from '../src/pretty-printer'
+import { PrettyLogger as CliPrettyLogger } from '../src/pretty-cli-logger'
 
 type Todo = {
     id: number
@@ -40,6 +42,7 @@ class TodoDomain<Root> extends Domain<Todo, Root> {
 
     @command()
     *updateTodoText(text: string) {
+        const done = yield* get(this.done)
         yield* this.text.updateText(text)
         return 'todo updated'
     }
@@ -117,6 +120,7 @@ describe('TodoAppDomain', () => {
                 filter: 'all',
                 input: '',
             },
+            enhancers: [PrettyPrinter(), CliPrettyLogger()],
         })
     })
 
@@ -291,6 +295,7 @@ describe('TodoAppDomain', () => {
 
 describe('Custom Context in Store', () => {
     class StoreWithCustomContext extends Store<number> {
+        enhancers = [PrettyPrinter(), CliPrettyLogger()]
         context = {
             a: 1,
             b: (n: number) => n + 1,

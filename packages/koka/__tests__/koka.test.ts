@@ -224,7 +224,7 @@ describe('Eff.run', () => {
         expect(
             Eff.run(
                 Eff.try(testOpt()).catch({
-                    TestOpt: 'custom value',
+                    [TestOpt.field]: 'custom value',
                 }),
             ),
         ).toBe('custom value')
@@ -782,12 +782,12 @@ describe('Eff.opt', () => {
 
 describe('design first approach', () => {
     // predefined error effects
-    class UserNotFoundErr extends Eff.Err('UserNotFound')<string> {}
-    class UserInvalidErr extends Eff.Err('UserInvalid')<{ reason: string }> {}
+    class UserNotFoundE extends Eff.Err('UserNotFound')<string> {}
+    class UserInvalid extends Eff.Err('UserInvalid')<{ reason: string }> {}
 
     // predefined context effects
-    class AuthTokenCtx extends Eff.Ctx('AuthToken')<string> {}
-    class UserIdCtx extends Eff.Ctx('UserId')<string> {}
+    class AuthToken extends Eff.Ctx('AuthToken')<string> {}
+    class UserId extends Eff.Ctx('UserId')<string> {}
 
     // predefined option effects
     class LoggerOpt extends Eff.Opt('Logger')<(message: string) => void> {}
@@ -795,11 +795,11 @@ describe('design first approach', () => {
     // Helper functions using the defined types
     function* requireUserId() {
         const logger = yield* Eff.get(LoggerOpt)
-        const userId = yield* Eff.get(UserIdCtx)
+        const userId = yield* Eff.get(UserId)
 
         if (!userId) {
             logger?.('User ID is missing, throwing UserInvalidErr')
-            throw yield* Eff.throw(new UserInvalidErr({ reason: 'Missing user ID' }))
+            throw yield* Eff.throw(new UserInvalid({ reason: 'Missing user ID' }))
         }
 
         logger?.(`User ID: ${userId}`)
@@ -810,17 +810,17 @@ describe('design first approach', () => {
     function* getUser() {
         const userId = yield* requireUserId()
 
-        const authToken = yield* Eff.get(AuthTokenCtx)
+        const authToken = yield* Eff.get(AuthToken)
 
         if (!authToken) {
-            yield* Eff.throw(new UserInvalidErr({ reason: 'Missing auth token' }))
+            yield* Eff.throw(new UserInvalid({ reason: 'Missing auth token' }))
         }
 
         // Simulate fetching user logic
         const user: { id: string; name: string } | null = yield* Eff.await(null)
 
         if (!user) {
-            yield* Eff.throw(new UserNotFoundErr(`User with ID ${userId} not found`))
+            yield* Eff.throw(new UserNotFoundE(`User with ID ${userId} not found`))
         }
 
         return user
@@ -828,10 +828,10 @@ describe('design first approach', () => {
 
     it('should support design first approach', async () => {
         const program = Eff.try(getUser()).catch({
-            UserNotFound: (error) => `Error: ${error}`,
-            UserInvalid: (error) => `Invalid user: ${JSON.stringify(error)}`,
-            AuthToken: 'valid-token',
-            UserId: '12345',
+            [UserNotFoundE.field]: (error) => `Error: ${error}`,
+            [UserInvalid.field]: (error) => `Invalid user: ${JSON.stringify(error)}`,
+            [AuthToken.field]: 'valid-token',
+            [UserId.field]: '12345',
         })
 
         const result = await Eff.run(program)

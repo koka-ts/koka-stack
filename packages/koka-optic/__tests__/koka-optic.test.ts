@@ -1,4 +1,4 @@
-import { Optic, OpticProxy } from '../src/koka-optic'
+import { Optic, OpticErr, OpticProxy } from '../src/koka-optic'
 import { Eff } from 'koka'
 
 describe('Optic', () => {
@@ -80,13 +80,14 @@ describe('Optic', () => {
         })
 
         it('should throw when index out of bounds', () => {
-            const result = Eff.runResult(Optic.get([], indexOptic))
-
-            if (result.type === 'ok') {
-                throw new Error('Expected an error but got a number')
-            }
-
-            expect(result.type).toBe('err')
+            const result = Eff.run(
+                Eff.try(Optic.get([], indexOptic)).catch({
+                    [OpticErr.field]: (message) => {
+                        return message
+                    },
+                }),
+            )
+            expect(result).toMatch(/out of bounds/)
         })
     })
 
