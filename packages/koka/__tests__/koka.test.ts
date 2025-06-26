@@ -40,11 +40,11 @@ describe('Eff.ctx', () => {
             return value * 2
         }
 
-        const program0 = Eff.try(test()).catch({
+        const program0 = Eff.try(test()).handle({
             Num: 2,
         })
 
-        const program1 = Eff.try(program0).catch({
+        const program1 = Eff.try(program0).handle({
             TestCtx: 21,
         })
 
@@ -61,7 +61,7 @@ describe('Eff.ctx', () => {
             return yield* inner()
         }
 
-        const program = Eff.try(outer()).catch({
+        const program = Eff.try(outer()).handle({
             TestCtx: 42,
         })
 
@@ -78,7 +78,7 @@ describe('Eff.try', () => {
         }
 
         expect(() => {
-            Eff.run(Eff.try(test()).catch({}))
+            Eff.run(Eff.try(test()).handle({}))
         }).toThrow(/Unexpected effect/)
     })
 
@@ -88,7 +88,7 @@ describe('Eff.try', () => {
             return 'should not reach here'
         }
 
-        const program = Eff.try(test()).catch({
+        const program = Eff.try(test()).handle({
             TestError: (error) => `Caught: ${error}`,
         })
 
@@ -102,10 +102,10 @@ describe('Eff.try', () => {
             return 'should not reach here'
         }
 
-        const program = Eff.try(test()).catch({})
+        const program = Eff.try(test()).handle({})
 
         const result = Eff.run(
-            Eff.try(program).catch({
+            Eff.try(program).handle({
                 UnhandledError: (error) => ({ error }),
             }),
         )
@@ -123,7 +123,7 @@ describe('Eff.try', () => {
             return 'should not reach here'
         }
 
-        const program = Eff.try(test()).catch({
+        const program = Eff.try(test()).handle({
             FirstError: (error) => `Caught first: ${error}`,
             SecondError: (error) => `Caught second: ${error}`,
             TestCtx: () => 1,
@@ -144,7 +144,7 @@ describe('Eff.try', () => {
         }
 
         const result = Eff.run(
-            Eff.try(outer()).catch({
+            Eff.try(outer()).handle({
                 InnerError: (error) => `Caught inner: ${error}`,
             }),
         )
@@ -223,7 +223,7 @@ describe('Eff.run', () => {
 
         expect(
             Eff.run(
-                Eff.try(testOpt()).catch({
+                Eff.try(testOpt()).handle({
                     [TestOpt.field]: 'custom value',
                 }),
             ),
@@ -273,7 +273,7 @@ describe('Eff.result', () => {
         })
 
         const failureResult = Eff.run(
-            Eff.try(Eff.result(failure())).catch({
+            Eff.try(Eff.result(failure())).handle({
                 TestCtx: 'error',
             }),
         )
@@ -331,7 +331,7 @@ describe('Eff.ok', () => {
         }
 
         const failureResult = Eff.run(
-            Eff.try(testFailure).catch({
+            Eff.try(testFailure).handle({
                 TestError: (error) => `Caught: ${error}`,
             }),
         )
@@ -385,7 +385,7 @@ describe('Complex scenarios', () => {
         }
 
         const result = await Eff.run(
-            Eff.try(program()).catch({
+            Eff.try(program()).handle({
                 TestCtx: 21,
             }),
         )
@@ -403,7 +403,7 @@ describe('Complex scenarios', () => {
         }
 
         const result = await Eff.run(
-            Eff.try(program()).catch({
+            Eff.try(program()).handle({
                 TestCtx: 0,
                 e: 1,
                 ZeroError: (error) => `Handled: ${error}`,
@@ -476,7 +476,7 @@ describe('Eff.get', () => {
             return value * 2
         }
 
-        const program = Eff.try(test()).catch({
+        const program = Eff.try(test()).handle({
             TestCtx: 42,
         })
 
@@ -495,7 +495,7 @@ describe('Eff.get', () => {
             return yield* inner()
         }
 
-        const program = Eff.try(outer()).catch({
+        const program = Eff.try(outer()).handle({
             TestCtx: 42,
         })
 
@@ -860,7 +860,7 @@ describe('Eff.opt', () => {
             return optValue ?? 42
         }
 
-        const result = Eff.run(Eff.try(test()).catch({ TestOpt: 21 }))
+        const result = Eff.run(Eff.try(test()).handle({ TestOpt: 21 }))
         expect(result).toBe(21)
     })
 
@@ -881,7 +881,7 @@ describe('Eff.opt', () => {
             return optValue ?? 100
         }
 
-        const result = Eff.run(Eff.try(test()).catch({ TestOpt: undefined }))
+        const result = Eff.run(Eff.try(test()).handle({ TestOpt: undefined }))
         expect(result).toBe(100)
     })
 })
@@ -933,7 +933,7 @@ describe('design first approach', () => {
     }
 
     it('should support design first approach', async () => {
-        const program = Eff.try(getUser()).catch({
+        const program = Eff.try(getUser()).handle({
             [UserNotFound.field]: (error) => `Error: ${error}`,
             [UserInvalid.field]: (error) => `Invalid user: ${JSON.stringify(error)}`,
             [AuthToken.field]: 'valid-token',
@@ -951,21 +951,21 @@ describe('design first approach', () => {
             logs.push(message)
         }
 
-        let result = await Eff.run(
-            Eff.try(getUser()).catch({
-                UserNotFound: (error) => `Error: ${error}`,
-                UserInvalid: (error) => `Invalid user: ${JSON.stringify(error, null, 2)}`,
-                AuthToken: 'valid-token',
-                UserId: '12345',
-                Logger: logger,
-            }),
-        )
+        const program = Eff.try(getUser()).handle({
+            UserNotFound: (error) => `Error: ${error}`,
+            UserInvalid: (error) => `Invalid user: ${JSON.stringify(error, null, 2)}`,
+            AuthToken: 'valid-token',
+            UserId: '12345',
+            Logger: logger,
+        })
+
+        let result = await Eff.run(program)
 
         expect(result).toBe('Error: User with ID 12345 not found')
         expect(logs).toEqual(['User ID: 12345'])
 
         result = await Eff.run(
-            Eff.try(getUser()).catch({
+            Eff.try(getUser()).handle({
                 UserNotFound: (error) => `Error: ${error}`,
                 UserInvalid: (error) => `Invalid user: ${JSON.stringify(error, null, 2)}`,
                 AuthToken: 'valid-token',
