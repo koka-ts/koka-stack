@@ -84,24 +84,46 @@ export const Result = {
     },
 }
 
-type InferOkValue<T> = T extends Ok<infer U> ? U : never
+export type InferOkValue<T> = T extends Ok<infer U> ? U : never
 
-type MaybeGenerator<T, R> = Generator<T, R> | (() => Generator<T, R>)
+export type MaybeGenerator<T, R> = Generator<T, R, any> | (() => Generator<T, R, any>)
 
-type ExtractEff<Effects> = Effects extends []
+type ExtractEffFromObject<Gens extends object> = {
+    [K in keyof Gens]: Gens[K] extends MaybeGenerator<infer E, any> ? E : never
+}[keyof Gens]
+
+type ExtractEffFromTuple<Gens> = Gens extends []
     ? never
-    : Effects extends [infer First, ...infer Rest]
-    ? First extends MaybeFunction<Generator<infer E, any>>
-        ? E | ExtractEff<Rest>
+    : Gens extends [infer Head, ...infer Tail]
+    ? Head extends MaybeGenerator<infer E, any>
+        ? E | ExtractEffFromTuple<Tail>
         : never
     : never
 
-type ExtractReturn<Effects> = Effects extends []
+type ExtractEff<Gens> = Gens extends unknown[]
+    ? ExtractEffFromTuple<Gens>
+    : Gens extends object
+    ? ExtractEffFromObject<Gens>
+    : never
+
+type ExtractReturnFromTuple<Gens> = Gens extends []
     ? []
-    : Effects extends [infer First, ...infer Rest]
-    ? First extends MaybeFunction<Generator<any, infer R>>
-        ? [R, ...ExtractReturn<Rest>]
-        : never
+    : Gens extends [infer Head, ...infer Tail]
+    ? Head extends MaybeFunction<Generator<any, infer R>>
+        ? [R, ...ExtractReturnFromTuple<Tail>]
+        : [Head, ...ExtractReturnFromTuple<Tail>]
+    : never
+
+type ExtractReturnFromObject<Gens extends object> = {
+    [K in keyof Gens]: Gens[K] extends MaybeGenerator<any, infer R> ? R : Gens[K]
+}
+
+type ExtractReturn<Gens> = Gens extends unknown[]
+    ? ExtractReturnFromTuple<Gens>
+    : Gens extends object
+    ? {
+          [key in keyof ExtractReturnFromObject<Gens>]: ExtractReturnFromObject<Gens>[key]
+      }
     : never
 
 export type MaybePromise<T> = T extends Promise<any> ? T : T | Promise<T>
@@ -197,9 +219,44 @@ export class Eff {
         return context as CtxValue<C>
     }
 
-    static *all<const Effects extends MaybeGenerator<AnyEff, unknown>[]>(
-        effects: Effects,
-    ): Generator<ExtractEff<Effects>, ExtractReturn<Effects>> {
+    static *of<T>(value: T) {
+        return value
+    }
+
+    static *stream<const Effects extends MaybeGenerator<AnyEff, unknown>[]>(effects: Effects) {}
+
+    static *combine<T extends unknown[] | {} | readonly unknown[]>(
+        inputs: T,
+    ): Generator<ExtractEff<T>, ExtractReturn<T>> {
+        if (Array.isArray(inputs)) {
+            return yield* Eff.all(inputs as any) as Generator<ExtractEff<T>, ExtractReturn<T>>
+        } else {
+            const result: Record<string, unknown> = {}
+            const gens = [] as Generator[]
+            const keys = [] as string[]
+
+            for (const [key, value] of Object.entries(inputs)) {
+                if (typeof value === 'function') {
+                    gens.push(value())
+                } else if (isGenerator(value)) {
+                    gens.push(value)
+                } else {
+                    gens.push(Eff.of(value))
+                }
+                keys.push(key)
+            }
+
+            const values = (yield* Eff.all(gens as any) as any) as unknown[]
+
+            for (let i = 0; i < values.length; i++) {
+                result[keys[i]] = values[i]
+            }
+
+            return result as ExtractReturn<T>
+        }
+    }
+
+    static *all<T, E extends AnyEff>(inputs: Iterable<MaybeGenerator<E, T>>): Generator<E, T[]> {
         type ProcessingItem = {
             gen: Generator<AnyEff, unknown>
             index: number
@@ -212,8 +269,8 @@ export class Eff {
 
         const results: unknown[] = []
 
-        const items = effects.map((effect, index): ProcessingItem => {
-            const gen = typeof effect === 'function' ? effect() : effect
+        const items = Array.from(inputs).map((input, index): ProcessingItem => {
+            const gen = typeof input === 'function' ? input() : input
             return {
                 gen,
                 index,
@@ -277,7 +334,7 @@ export class Eff {
             }
         }
 
-        return results as ExtractReturn<Effects>
+        return results as T[]
     }
 
     static try = <Yield extends AnyEff, Return>(input: MaybeFunction<Generator<Yield, Return>>) => {

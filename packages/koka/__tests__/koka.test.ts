@@ -1,4 +1,4 @@
-import { Eff, Err, Ctx, Result, isGenerator, Async } from '../src/koka'
+import { Eff, Err, Result, isGenerator, Async } from '../src/koka'
 
 describe('Result', () => {
     it('should create ok result', () => {
@@ -514,8 +514,8 @@ describe('helpers', () => {
     })
 })
 
-describe('Eff.all', () => {
-    it('should handle sync effects', () => {
+describe('Eff.combine', () => {
+    it('should handle sync effects with array input', () => {
         function* effect1() {
             return 1
         }
@@ -525,7 +525,7 @@ describe('Eff.all', () => {
         }
 
         function* program() {
-            const combined: Generator<never, [number, string]> = Eff.all([effect1(), effect2()])
+            const combined: Generator<never, [number, string]> = Eff.combine([effect1(), effect2()])
             const results = yield* combined
             return results[0] + Number(results[1])
         }
@@ -534,7 +534,7 @@ describe('Eff.all', () => {
         expect(result).toBe(3)
     })
 
-    it('should handle async effects', async () => {
+    it('should handle async effects with array input', async () => {
         function* effect1() {
             return yield* Eff.await(Promise.resolve(1))
         }
@@ -544,11 +544,8 @@ describe('Eff.all', () => {
         }
 
         function* program() {
-            const combined: Generator<Async, [number, string]> = Eff.all([effect1(), effect2()])
+            const combined: Generator<Async, [number, string]> = Eff.combine([effect1(), effect2()])
             const results = yield* combined
-
-            console.log('results', results)
-
             return results[0] + Number(results[1])
         }
 
@@ -556,7 +553,7 @@ describe('Eff.all', () => {
         expect(result).toBe(3)
     })
 
-    it('should handle mixed sync/async effects', async () => {
+    it('should handle mixed sync/async effects with array input', async () => {
         function* syncEffect() {
             return 1
         }
@@ -566,7 +563,7 @@ describe('Eff.all', () => {
         }
 
         function* program() {
-            const combined: Generator<Async, [number, number]> = Eff.all([syncEffect(), asyncEffect()])
+            const combined: Generator<Async, [number, number]> = Eff.combine([syncEffect(), asyncEffect()] as const)
             const results = yield* combined
             return results[0] + results[1]
         }
@@ -575,7 +572,55 @@ describe('Eff.all', () => {
         expect(result).toBe(3)
     })
 
-    it('should handle errors in effects', () => {
+    it('should handle object input with generators', () => {
+        function* effect1() {
+            return 1
+        }
+
+        function* effect2() {
+            return 2
+        }
+
+        function* program() {
+            const results: {
+                a: number
+                b: number
+                c: number
+            } = yield* Eff.combine({
+                a: effect1(),
+                b: effect2(),
+                c: 3,
+            })
+            return results.a + results.b + results.c
+        }
+
+        const result = Eff.run(program())
+        expect(result).toBe(6)
+    })
+
+    it('should handle mixed object input with generators and values', () => {
+        function* effect1() {
+            return 1
+        }
+
+        function* program() {
+            const results: {
+                a: number
+                b: number
+                c: number
+            } = yield* Eff.combine({
+                a: effect1(),
+                b: 2,
+                c: () => effect1(),
+            })
+            return results.a + results.b + results.c
+        }
+
+        const result = Eff.run(program())
+        expect(result).toBe(4)
+    })
+
+    it('should handle errors in object input', () => {
         class TestErr extends Eff.Err('TestErr')<string> {}
 
         function* effect1() {
@@ -588,18 +633,32 @@ describe('Eff.all', () => {
         }
 
         function* program() {
-            const combined: Generator<TestErr, [number, number]> = Eff.all([effect1(), effect2()])
-            const results = yield* combined
-            return results[0] + results[1]
+            const results: {
+                a: number
+                b: number
+            } = yield* Eff.combine({
+                a: effect1(),
+                b: effect2(),
+            })
+            return results.a + results.b
         }
 
         const result = Eff.run(Eff.result(program()))
-
         expect(result).toEqual({
             type: 'err',
             name: 'TestErr',
             error: 'error',
         })
+    })
+
+    it('should handle empty object input', () => {
+        function* program(): Generator<never, {}> {
+            const results: {} = yield* Eff.combine({})
+            return results
+        }
+
+        const result = Eff.run(program())
+        expect(result).toEqual({})
     })
 
     it('should handle multiple async effects and run concurrently', async () => {
@@ -618,7 +677,7 @@ describe('Eff.all', () => {
         }
 
         function* program() {
-            const combined: Generator<Async | Err<'DelayError', string>, [number, string, boolean]> = Eff.all([
+            const combined: Generator<Async | Err<'DelayError', string>, [number, string, boolean]> = Eff.combine([
                 delayedEffect(1, 30),
                 delayedEffect('2', 20),
                 delayedEffect(false, 10),
@@ -643,7 +702,7 @@ describe('Eff.all', () => {
 
     it('should handle empty array', () => {
         function* program(): Generator<never, []> {
-            const results = yield* Eff.all([])
+            const results = yield* Eff.combine([])
             return results
         }
 
@@ -661,7 +720,7 @@ describe('Eff.all', () => {
         }
 
         function* program(): Generator<never, number> {
-            const results = yield* Eff.all([() => effect1(), () => effect2()])
+            const results = yield* Eff.combine([() => effect1(), () => effect2()])
             return results[0] + results[1]
         }
 
@@ -677,7 +736,7 @@ describe('Eff.all', () => {
 
         function* program() {
             try {
-                const results = yield* Eff.all([effectWithError(), Eff.await(Promise.resolve(2))])
+                const results = yield* Eff.combine([effectWithError(), Eff.await(Promise.resolve(2))])
                 return results[0] + results[1]
             } catch (err: unknown) {
                 return err as Error
@@ -698,7 +757,7 @@ describe('Eff.all', () => {
         }
 
         function* program(): Generator<Async, number> {
-            const results = yield* Eff.all([failingEffect(), Eff.await(Promise.resolve(2))])
+            const results = yield* Eff.combine([failingEffect(), Eff.await(Promise.resolve(2))])
             return results[0] + results[1]
         }
 
@@ -723,7 +782,7 @@ describe('Eff.all', () => {
 
         function* program(): Generator<Async, number> {
             try {
-                const results = yield* Eff.all([effectWithThrow(), Eff.await(Promise.resolve(2))])
+                const results = yield* Eff.combine([effectWithThrow(), Eff.await(Promise.resolve(2))])
                 return results[0] + results[1]
             } catch (err) {
                 if (err instanceof Error) {
@@ -735,6 +794,53 @@ describe('Eff.all', () => {
 
         const result = await Eff.run(program())
         expect(result).toBe(-100)
+    })
+})
+
+describe('Eff.all', () => {
+    it('should handle errors in effects', () => {
+        class TestErr extends Eff.Err('TestErr')<string> {}
+
+        function* effect1() {
+            return 1
+        }
+
+        function* effect2() {
+            yield* Eff.throw(new TestErr('error'))
+            return 2
+        }
+
+        function* program() {
+            const results = yield* Eff.all([effect1(), effect2()])
+            return results[0] + results[1]
+        }
+
+        const result = Eff.run(Eff.result(program()))
+        expect(result).toEqual({
+            type: 'err',
+            name: 'TestErr',
+            error: 'error',
+        })
+    })
+
+    it('should handle effect list with the same item type', async () => {
+        function* effect1(): Generator<Async, number> {
+            yield* Eff.await(Promise.resolve(1))
+            return 1
+        }
+
+        function* effect2(): Generator<never, number> {
+            return 2
+        }
+
+        function* program() {
+            const list = [effect1(), effect2()]
+            const results = yield* Eff.all(list)
+            return results
+        }
+
+        const result = await Eff.run(program())
+        expect(result).toEqual([1, 2])
     })
 })
 
@@ -782,7 +888,7 @@ describe('Eff.opt', () => {
 
 describe('design first approach', () => {
     // predefined error effects
-    class UserNotFoundE extends Eff.Err('UserNotFound')<string> {}
+    class UserNotFound extends Eff.Err('UserNotFound')<string> {}
     class UserInvalid extends Eff.Err('UserInvalid')<{ reason: string }> {}
 
     // predefined context effects
@@ -820,7 +926,7 @@ describe('design first approach', () => {
         const user: { id: string; name: string } | null = yield* Eff.await(null)
 
         if (!user) {
-            yield* Eff.throw(new UserNotFoundE(`User with ID ${userId} not found`))
+            yield* Eff.throw(new UserNotFound(`User with ID ${userId} not found`))
         }
 
         return user
@@ -828,7 +934,7 @@ describe('design first approach', () => {
 
     it('should support design first approach', async () => {
         const program = Eff.try(getUser()).catch({
-            [UserNotFoundE.field]: (error) => `Error: ${error}`,
+            [UserNotFound.field]: (error) => `Error: ${error}`,
             [UserInvalid.field]: (error) => `Invalid user: ${JSON.stringify(error)}`,
             [AuthToken.field]: 'valid-token',
             [UserId.field]: '12345',
