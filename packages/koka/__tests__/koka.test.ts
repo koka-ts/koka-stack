@@ -1,4 +1,6 @@
-import { Eff, Err, Result, isGenerator, Async } from '../src/koka'
+import { Eff, Err, Result, isGenerator, Async, StreamResult, StreamResults } from '../src/koka'
+
+const delayTime = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 describe('Result', () => {
     it('should create ok result', () => {
@@ -214,9 +216,9 @@ describe('Eff.run', () => {
             return opt ?? 'default'
         }
 
-        // @ts-expect-error
+        // @ts-expect-error for test
         expect(() => Eff.run(testErr())).toThrow(/\w+/)
-        // @ts-expect-error
+        // @ts-expect-error for test
         expect(() => Eff.run(testCtx())).toThrow(/\w+/)
 
         expect(Eff.run(testOpt())).toBe('default')
@@ -247,7 +249,7 @@ describe('Eff.runSync', () => {
             return 42
         }
 
-        // @ts-expect-error
+        // @ts-expect-error for test
         expect(() => Eff.runSync(test())).toThrow(/Expected synchronous effect, but got asynchronous effect/)
     })
 })
@@ -515,7 +517,7 @@ describe('helpers', () => {
 })
 
 describe('Eff.combine', () => {
-    it('should handle sync effects with array input', () => {
+    it('should handle sync effects with array input', async () => {
         function* effect1() {
             return 1
         }
@@ -525,12 +527,12 @@ describe('Eff.combine', () => {
         }
 
         function* program() {
-            const combined: Generator<never, [number, string]> = Eff.combine([effect1(), effect2()])
+            const combined: Generator<Async, [number, string]> = Eff.combine([effect1(), effect2()])
             const results = yield* combined
             return results[0] + Number(results[1])
         }
 
-        const result = Eff.run(program())
+        const result = await Eff.runAsync(program())
         expect(result).toBe(3)
     })
 
@@ -572,7 +574,7 @@ describe('Eff.combine', () => {
         expect(result).toBe(3)
     })
 
-    it('should handle object input with generators', () => {
+    it('should handle object input with generators', async () => {
         function* effect1() {
             return 1
         }
@@ -594,11 +596,11 @@ describe('Eff.combine', () => {
             return results.a + results.b + results.c
         }
 
-        const result = Eff.run(program())
+        const result = await Eff.run(program())
         expect(result).toBe(6)
     })
 
-    it('should handle mixed object input with generators and values', () => {
+    it('should handle mixed object input with generators and values', async () => {
         function* effect1() {
             return 1
         }
@@ -616,7 +618,7 @@ describe('Eff.combine', () => {
             return results.a + results.b + results.c
         }
 
-        const result = Eff.run(program())
+        const result = await Eff.run(program())
         expect(result).toBe(4)
     })
 
@@ -651,21 +653,17 @@ describe('Eff.combine', () => {
         })
     })
 
-    it('should handle empty object input', () => {
-        function* program(): Generator<never, {}> {
+    it('should handle empty object input', async () => {
+        function* program(): Generator<Async, {}> {
             const results: {} = yield* Eff.combine({})
             return results
         }
 
-        const result = Eff.run(program())
+        const result = await Eff.run(program())
         expect(result).toEqual({})
     })
 
     it('should handle multiple async effects and run concurrently', async () => {
-        async function delayTime(ms: number): Promise<void> {
-            return new Promise((resolve) => setTimeout(resolve, ms))
-        }
-
         function* delayedEffect<T>(value: T, delay: number) {
             if (delay === 0) {
                 yield* Eff.err('DelayError').throw('Delay cannot be zero')
@@ -700,17 +698,17 @@ describe('Eff.combine', () => {
         expect(duration).toBeLessThan(50) // Should complete in less than 50ms
     })
 
-    it('should handle empty array', () => {
-        function* program(): Generator<never, []> {
+    it('should handle empty array', async () => {
+        function* program(): Generator<Async, []> {
             const results = yield* Eff.combine([])
             return results
         }
 
-        const result = Eff.run(program())
+        const result = await Eff.run(program())
         expect(result).toEqual([])
     })
 
-    it('should handle function effects', () => {
+    it('should handle function effects', async () => {
         function* effect1(): Generator<never, number> {
             return 1
         }
@@ -719,12 +717,12 @@ describe('Eff.combine', () => {
             return 2
         }
 
-        function* program(): Generator<never, number> {
+        function* program(): Generator<Async, number> {
             const results = yield* Eff.combine([() => effect1(), () => effect2()])
             return results[0] + results[1]
         }
 
-        const result = Eff.run(program())
+        const result = await Eff.run(program())
         expect(result).toBe(3)
     })
 
@@ -794,6 +792,31 @@ describe('Eff.combine', () => {
 
         const result = await Eff.run(program())
         expect(result).toBe(-100)
+    })
+})
+
+describe('Eff.race', () => {
+    it('should interrupt other effects when one resolves', async () => {
+        let cleanupCalled = false
+
+        function* slowEffect() {
+            try {
+                yield* Eff.await(new Promise((resolve) => setTimeout(resolve, 100)))
+                return 'slow'
+            } finally {
+                cleanupCalled = true
+            }
+        }
+
+        function* fastEffect() {
+            return 'fast'
+        }
+
+        const inputs = [slowEffect(), fastEffect()]
+        const result = await Eff.run(Eff.race(inputs))
+
+        expect(result).toBe('fast')
+        expect(cleanupCalled).toBe(true)
     })
 })
 
@@ -883,6 +906,218 @@ describe('Eff.opt', () => {
 
         const result = Eff.run(Eff.try(test()).handle({ TestOpt: undefined }))
         expect(result).toBe(100)
+    })
+})
+
+describe('Eff.stream', () => {
+    it('should clean up pending effects on early return', async () => {
+        const cleanUp = jest.fn()
+        const returnFn = jest.fn()
+
+        function* valueGen(n: number) {
+            try {
+                yield* Eff.await(Promise.resolve(1))
+                returnFn()
+                return 1
+            } finally {
+                cleanUp(n)
+            }
+        }
+
+        const inputs = [valueGen(0), valueGen(1), valueGen(2), valueGen(3)]
+        const handler = async (_stream: StreamResults<number>) => {
+            // Early return without consuming all results
+            return 42
+        }
+
+        const result = await Eff.run(Eff.stream(inputs, handler))
+        expect(result).toBe(42)
+        expect(returnFn).toHaveBeenCalledTimes(0)
+        expect(cleanUp).toHaveBeenCalledTimes(4)
+    })
+
+    it('should clean up pending effects on early return in for-await-of block', async () => {
+        const cleanUp = jest.fn()
+        const returnFn = jest.fn()
+
+        function* produce(n: number) {
+            try {
+                yield* Eff.await(delayTime(n))
+                returnFn()
+                return n
+            } finally {
+                cleanUp(n)
+            }
+        }
+
+        const inputs = [produce(40), produce(20), produce(30), produce(10)]
+
+        const handler = async (stream: StreamResults<number>) => {
+            const results = [] as StreamResult<number>[]
+
+            for await (const result of stream) {
+                results.push(result)
+
+                if (results.length === 2) {
+                    return results
+                }
+            }
+
+            throw new Error('Early return')
+        }
+
+        const results = await Eff.run(Eff.stream(inputs, handler))
+
+        expect(results).toEqual([
+            { index: 3, value: 10 },
+            { index: 1, value: 20 },
+        ])
+
+        expect(returnFn).toHaveBeenCalledTimes(2)
+        expect(cleanUp).toHaveBeenCalledTimes(4)
+    })
+
+    it('should process stream of values', async () => {
+        function* valueGen(value: number) {
+            return value
+        }
+
+        const inputs = [valueGen(1), valueGen(2), valueGen(3)]
+
+        const program = Eff.stream(inputs, async (stream) => {
+            const results = [] as number[]
+
+            for await (const { index, value } of stream) {
+                results[index] = value * 2
+            }
+
+            return results
+        })
+
+        const result = await Eff.run(program)
+        expect(result).toEqual([2, 4, 6])
+    })
+
+    it('should handle empty input stream', async () => {
+        const program = Eff.stream([] as Generator<never, number>[], async (stream) => {
+            const results = [] as number[]
+
+            for await (const { index, value } of stream) {
+                results[index] = value * 2
+            }
+            return results
+        })
+
+        const result = await Eff.runAsync(program)
+
+        expect(result).toEqual([])
+    })
+
+    it('should handle async effects in stream', async () => {
+        function* asyncValueGen(value: number) {
+            const asyncValue = yield* Eff.await(Promise.resolve(value))
+            return asyncValue
+        }
+
+        const inputs = [asyncValueGen(1), asyncValueGen(2), asyncValueGen(3)]
+
+        const handler = async (stream: StreamResults<number>) => {
+            const results = [] as number[]
+            for await (const { index, value } of stream) {
+                results[index] = value * 2
+            }
+            return results
+        }
+
+        const program = Eff.stream(inputs, handler)
+
+        const result = await Eff.run(program)
+        expect(result).toEqual([2, 4, 6])
+    })
+
+    it('should propagate errors from stream items', async () => {
+        class StreamError extends Eff.Err('StreamError')<string> {}
+
+        function* failingGen() {
+            yield* Eff.throw(new StreamError('stream error'))
+            return 1
+        }
+
+        const inputs = [failingGen()]
+        const handler = async (stream: StreamResults<number>) => {
+            const results = [] as number[]
+            for await (const { value } of stream) {
+                results.push(value)
+            }
+            return results
+        }
+
+        const result = await Eff.runResult(Eff.stream(inputs, handler))
+
+        expect(result).toEqual({
+            type: 'err',
+            name: 'StreamError',
+            error: 'stream error',
+        })
+    })
+
+    it('should handle mixed sync/async stream items', async () => {
+        function* syncGen() {
+            return 1
+        }
+
+        function* asyncGen() {
+            return yield* Eff.await(Promise.resolve(2))
+        }
+
+        const inputs = [syncGen(), asyncGen()]
+        const handler = async (stream: StreamResults<number>) => {
+            const results = [] as number[]
+
+            for await (const { index, value } of stream) {
+                results[index] = value * 2
+            }
+
+            return results
+        }
+
+        const result = await Eff.run(Eff.stream(inputs, handler))
+
+        expect(result).toEqual([2, 4])
+    })
+
+    it('should clean up generators on error', async () => {
+        class CleanupError extends Eff.Err('CleanupError')<string> {}
+
+        let cleanupCalled = false
+        function* failingGen() {
+            try {
+                yield* Eff.throw(new CleanupError('cleanup error'))
+                return 1
+            } finally {
+                cleanupCalled = true
+            }
+        }
+
+        const inputs = [failingGen()]
+        const handler = async (stream: StreamResults<number>) => {
+            try {
+                for await (const { value } of stream) {
+                    return value
+                }
+                return 0
+            } catch {
+                return -1
+            }
+        }
+
+        const result = await Eff.run(Eff.result(Eff.stream(inputs, handler)))
+        expect(result).toEqual({
+            type: 'err',
+            name: 'CleanupError',
+            error: 'cleanup error',
+        })
+        expect(cleanupCalled).toBe(true)
     })
 })
 
