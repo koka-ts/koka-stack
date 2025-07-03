@@ -1213,3 +1213,386 @@ describe('design first approach', () => {
         expect(logs).toEqual(['User ID: 12345', 'User ID is missing, throwing UserInvalidErr'])
     })
 })
+
+describe('Eff.communicate', () => {
+    it('should handle basic message send and receive', () => {
+        function* sender() {
+            yield* Eff.msg('Greeting').send('Hello, World!')
+            return 'sent'
+        }
+
+        function* receiver() {
+            const message = yield* Eff.msg('Greeting').wait<string>()
+            return `received: ${message}`
+        }
+
+        const result = Eff.run(
+            Eff.communicate({
+                sender,
+                receiver,
+            }),
+        )
+
+        expect(result).toEqual({
+            sender: 'sent',
+            receiver: 'received: Hello, World!',
+        })
+    })
+
+    it('should handle Eff.send and Eff.recv syntax', () => {
+        class DataMsg extends Eff.Msg('Data')<{ id: number; value: string }> {}
+
+        function* producer() {
+            yield* Eff.send(new DataMsg({ id: 1, value: 'test data' }))
+            return 'produced'
+        }
+
+        function* consumer() {
+            const data = yield* Eff.wait(DataMsg)
+            return `consumed: ${data.id} - ${data.value}`
+        }
+
+        const result = Eff.runSync(
+            Eff.communicate({
+                producer,
+                consumer,
+            }),
+        )
+
+        expect(result).toEqual({
+            producer: 'produced',
+            consumer: 'consumed: 1 - test data',
+        })
+    })
+
+    it('should handle multiple messages between generators', () => {
+        function* client() {
+            yield* Eff.msg('Request').send('get user data')
+            const response = yield* Eff.msg('Response').wait<string>()
+            return `client: ${response}`
+        }
+
+        function* server() {
+            const request = yield* Eff.msg('Request').wait<string>()
+            yield* Eff.msg('Response').send(`processed: ${request}`)
+            return `server: handled ${request}`
+        }
+
+        const result = Eff.runSync(
+            Eff.communicate({
+                client,
+                server,
+            }),
+        )
+
+        expect(result).toEqual({
+            client: 'client: processed: get user data',
+            server: 'server: handled get user data',
+        })
+    })
+
+    it('should handle complex message passing scenarios', () => {
+        class UserRequest extends Eff.Msg('UserRequest')<{ userId: string }> {}
+        class UserResponse extends Eff.Msg('UserResponse')<{ user: { id: string; name: string } }> {}
+
+        function* apiClient() {
+            yield* Eff.send(new UserRequest({ userId: '123' }))
+            const userResponse = yield* Eff.wait(UserResponse)
+            yield* Eff.msg('Log').send(`Retrieved user: ${userResponse.user.name}`)
+            return `API client: ${userResponse.user.name}`
+        }
+
+        function* apiServer() {
+            const request = yield* Eff.wait(UserRequest)
+            yield* Eff.msg('Log').send(`Processing request for user: ${request.userId}`)
+            yield* Eff.send(new UserResponse({ user: { id: request.userId, name: 'John Doe' } }))
+            return `API server: processed ${request.userId}`
+        }
+
+        function* logger() {
+            const log1 = yield* Eff.msg('Log').wait<string>()
+            const log2 = yield* Eff.msg('Log').wait<string>()
+            return `Logger: ${log1}, ${log2}`
+        }
+
+        const result = Eff.runSync(
+            Eff.communicate({
+                apiClient,
+                apiServer,
+                logger,
+            }),
+        )
+
+        expect(result).toEqual({
+            apiClient: 'API client: John Doe',
+            apiServer: 'API server: processed 123',
+            logger: 'Logger: Processing request for user: 123, Retrieved user: John Doe',
+        })
+    })
+
+    it('should handle mixed message passing syntax', () => {
+        class StatusMsg extends Eff.Msg('Status')<{ status: string; timestamp: number }> {}
+
+        function* worker1() {
+            yield* Eff.msg('Status').send({ status: 'working', timestamp: Date.now() })
+            const status = yield* Eff.wait(StatusMsg)
+            return `worker1: saw ${status.status}`
+        }
+
+        function* worker2() {
+            const status = yield* Eff.msg('Status').wait<{ status: string; timestamp: number }>()
+            yield* Eff.send(new StatusMsg({ status: 'done', timestamp: Date.now() }))
+            return `worker2: processed ${status.status}`
+        }
+
+        const result = Eff.runSync(
+            Eff.communicate({
+                worker1,
+                worker2,
+            }),
+        )
+
+        expect(result.worker1).toMatch(/worker1: saw done/)
+        expect(result.worker2).toMatch(/worker2: processed working/)
+    })
+
+    it('should handle async message passing', async () => {
+        function* asyncProducer() {
+            const data = yield* Eff.await(Promise.resolve('async data'))
+            yield* Eff.msg('AsyncData').send(data)
+            return 'async produced'
+        }
+
+        function* asyncConsumer() {
+            const data = yield* Eff.msg('AsyncData').wait<string>()
+            const processed = yield* Eff.await(Promise.resolve(`processed: ${data}`))
+            return processed
+        }
+
+        const result = await Eff.runAsync(
+            Eff.communicate({
+                asyncProducer,
+                asyncConsumer,
+            }),
+        )
+
+        expect(result).toEqual({
+            asyncProducer: 'async produced',
+            asyncConsumer: 'processed: async data',
+        })
+    })
+
+    it('should throw error for unmatched messages', () => {
+        function* sender() {
+            yield* Eff.msg('Test').send('message')
+            return 'sent'
+        }
+
+        function* receiver() {
+            return 'received'
+        }
+
+        expect(() =>
+            Eff.runSync(
+                Eff.communicate({
+                    sender,
+                    receiver,
+                }),
+            ),
+        ).toThrow(/Some messages were not received/)
+    })
+
+    it('should throw error for unsent messages', () => {
+        function* sender() {
+            return 'sent'
+        }
+
+        function* receiver() {
+            yield* Eff.msg('Test').wait<string>()
+            return 'received'
+        }
+
+        expect(() =>
+            Eff.runSync(
+                Eff.communicate({
+                    sender,
+                    receiver,
+                }),
+            ),
+        ).toThrow(/Some messages were not sent/)
+    })
+
+    it('should handle generator inputs', () => {
+        const sender = function* () {
+            yield* Eff.msg('Greeting').send('Hello')
+            return 'sent'
+        }
+
+        const receiver = function* () {
+            const msg = yield* Eff.msg('Greeting').wait<string>()
+            return `received: ${msg}`
+        }
+
+        const result = Eff.runSync(
+            Eff.communicate({
+                sender: sender(),
+                receiver: receiver(),
+            }),
+        )
+
+        expect(result).toEqual({
+            sender: 'sent',
+            receiver: 'received: Hello',
+        })
+    })
+
+    it('should handle mixed function and generator inputs', () => {
+        function* producer() {
+            yield* Eff.msg('Data').send({ value: 100 })
+            return 'produced'
+        }
+
+        const consumer = function* () {
+            const data = yield* Eff.msg('Data').wait<{ value: number }>()
+            return `consumed: ${data.value}`
+        }
+
+        const result = Eff.runSync(
+            Eff.communicate({
+                producer: producer(),
+                consumer,
+            }),
+        )
+
+        expect(result).toEqual({
+            producer: 'produced',
+            consumer: 'consumed: 100',
+        })
+    })
+
+    it('should handle complex nested message passing', () => {
+        class CommandMsg extends Eff.Msg('Command')<{ cmd: string; args: string[] }> {}
+        class ResultMsg extends Eff.Msg('Result')<{ success: boolean; data: any }> {}
+
+        function* commandProcessor() {
+            const command = yield* Eff.wait(CommandMsg)
+            yield* Eff.msg('Log').send(`Processing command: ${command.cmd}`)
+
+            if (command.cmd === 'calculate') {
+                const result = command.args.reduce((sum, arg) => sum + parseInt(arg, 10), 0)
+                yield* Eff.send(new ResultMsg({ success: true, data: result }))
+            } else {
+                yield* Eff.send(new ResultMsg({ success: false, data: 'Unknown command' }))
+            }
+
+            return `processed: ${command.cmd}`
+        }
+
+        function* commandClient() {
+            yield* Eff.send(new CommandMsg({ cmd: 'calculate', args: ['1', '2', '3'] }))
+            const result = yield* Eff.wait(ResultMsg)
+            yield* Eff.msg('Log').send(`Command result: ${result.success ? result.data : result.data}`)
+            return `client: ${result.data}`
+        }
+
+        function* logger() {
+            const log1 = yield* Eff.msg('Log').wait<string>()
+            const log2 = yield* Eff.msg('Log').wait<string>()
+            return `Logger: ${log1} | ${log2}`
+        }
+
+        const result = Eff.runSync(
+            Eff.communicate({
+                commandProcessor,
+                commandClient,
+                logger,
+            }),
+        )
+
+        expect(result).toEqual({
+            commandProcessor: 'processed: calculate',
+            commandClient: 'client: 6',
+            logger: 'Logger: Processing command: calculate | Command result: 6',
+        })
+    })
+
+    it('should handle message passing with context', () => {
+        class UserCtx extends Eff.Ctx('User')<{ id: string; name: string }> {}
+
+        function* configProvider() {
+            yield* Eff.msg('Config').send({ apiKey: 'secret-key' })
+            return 'config provided'
+        }
+
+        function* service() {
+            const config = yield* Eff.msg('Config').wait<{ apiKey: string }>()
+            const user = yield* Eff.get(UserCtx)
+            return `service: ${user.name} with key ${config.apiKey.slice(0, 5)}...`
+        }
+
+        const program = Eff.try(
+            Eff.communicate({
+                configProvider,
+                service,
+            }),
+        ).handle({
+            User: { id: '1', name: 'Alice' },
+        })
+
+        const result = Eff.runSync(program)
+
+        expect(result).toEqual({
+            configProvider: 'config provided',
+            service: expect.stringContaining('Alice'),
+        })
+    })
+
+    it('should handle message passing with error handling', () => {
+        class ValidationError extends Eff.Err('ValidationError')<string> {}
+
+        class RequestMsg extends Eff.Msg('Request')<{ id: string }> {}
+        class ResponseMsg extends Eff.Msg('Response')<{ success: boolean; data?: any; error?: string }> {}
+
+        function* validator() {
+            const request = yield* Eff.wait(RequestMsg)
+
+            if (!request.id || request.id.length < 3) {
+                yield* Eff.send(
+                    new ResponseMsg({
+                        success: false,
+                        error: 'Invalid ID',
+                    }),
+                )
+                yield* Eff.throw(new ValidationError('ID validation failed'))
+                return 'validation failed'
+            }
+
+            yield* Eff.send(
+                new ResponseMsg({
+                    success: true,
+                    data: { id: request.id, status: 'valid' },
+                }),
+            )
+            return 'validation passed'
+        }
+
+        function* client() {
+            yield* Eff.msg('Request').send({ id: 'ab' })
+            const response = yield* Eff.wait(ResponseMsg)
+            return `client: ${response.success ? response.data?.status : response.error}`
+        }
+
+        const program = Eff.try(
+            Eff.communicate({
+                validator,
+                client,
+            }),
+        ).handle({
+            ValidationError: (error) => `Handled: ${error}`,
+        })
+
+        const result = Eff.runSync(program)
+
+        expect(result).toEqual('Handled: ID validation failed')
+    })
+})

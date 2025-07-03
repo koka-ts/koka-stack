@@ -177,6 +177,7 @@
       "extends": ["plugin:jest/recommended"],
       "rules": {
         "jest/expect-expect": "off",
+        "jest/no-focused-tests": "off",
         "@typescript-eslint/ban-ts-comment": [
           "error",
           {

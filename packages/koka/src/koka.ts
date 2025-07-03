@@ -17,7 +17,7 @@ export type Ctx<Name extends string, T> = {
     optional?: true
 }
 
-export type Opt<Name extends string, T> = Ctx<Name, T> & {
+export interface Opt<Name extends string, T> extends Ctx<Name, T> {
     optional: true
 }
 
@@ -31,7 +31,23 @@ export type Async = {
 
 export type AnyOpt = Opt<string, any>
 
-export type EffType<T> = Err<string, T> | Ctx<string, T> | Opt<string, T> | Async
+export type Msg<Name extends string, T> = {
+    type: 'msg'
+    name: Name
+    message?: T
+}
+
+export type AnyMsg = Msg<string, any>
+
+export interface SendMsg<Name extends string, T> extends Msg<Name, T> {
+    message: T
+}
+
+export interface WaitMsg<Name extends string, T> extends Msg<Name, T> {
+    message?: undefined
+}
+
+export type EffType<T> = Err<string, T> | Ctx<string, T> | Opt<string, T> | Async | Msg<string, T>
 
 export type AnyEff = EffType<any>
 
@@ -159,9 +175,34 @@ function Opt<const Name extends string>(name: Name) {
     }
 }
 
+abstract class AbstractMsg<T> {
+    static field: string = ''
+    type = 'msg' as const
+    abstract name: string
+    message: T
+    constructor(message: T) {
+        this.message = message
+    }
+}
+
+function Msg<const Name extends string>(name: Name) {
+    return class Eff<T> extends AbstractMsg<T> {
+        static field: Name = name
+        name = name
+    }
+}
+
+interface Wait<T extends AbstractMsg<any>> {
+    type: 'msg'
+    name: T['name']
+    message?: undefined
+}
+
 export type CtxValue<C extends AnyCtx> = C['optional'] extends true
     ? Exclude<C['context'], EffSymbol> | undefined
     : Exclude<C['context'], EffSymbol>
+
+export type MsgValue<M extends AnyMsg> = M extends Msg<string, infer T> ? T : never
 
 const cleanUpGen = <Yield, Return, Next>(gen: Generator<Yield, Return, Next>) => {
     const result = (gen as Generator<Yield, Return | undefined, Next>).return(undefined)
@@ -249,6 +290,130 @@ export class Eff {
         const context = yield typeof ctx === 'function' ? new ctx() : ctx
 
         return context as CtxValue<C>
+    }
+
+    static msg = <const Name extends string>(name: Name) => {
+        return {
+            *send<T>(message: T): Generator<SendMsg<Name, T>, void> {
+                yield { type: 'msg', name, message }
+            },
+            *wait<T>(): Generator<WaitMsg<Name, T>, T> {
+                const message = yield { type: 'msg', name }
+                return message as T
+            },
+        }
+    }
+
+    static Msg = Msg
+
+    static *send<T extends SendMsg<string, unknown>>(message: T): Generator<T, void> {
+        yield message
+    }
+
+    static *wait<MsgCtor extends typeof AbstractMsg<unknown>>(
+        msg: MsgCtor,
+    ): Generator<Wait<InstanceType<MsgCtor>>, InstanceType<MsgCtor>['message']> {
+        const message = yield {
+            type: 'msg',
+            name: msg.field,
+        } as Wait<InstanceType<MsgCtor>>
+
+        return message as InstanceType<MsgCtor>['message']
+    }
+
+    static *communicate<const T extends {}>(
+        inputs: T,
+    ): Generator<Exclude<ExtractYield<T>, { type: 'msg' }>, ExtractReturn<T>> {
+        const gens = {} as Record<string, Generator<AnyEff, unknown>>
+        const results = {} as Record<string, unknown>
+
+        for (const [key, value] of Object.entries(inputs)) {
+            if (typeof value === 'function') {
+                gens[key] = value()
+            } else if (isGenerator(value)) {
+                gens[key] = value as Generator<AnyEff, unknown>
+            } else {
+                gens[key] = Eff.of(value)
+            }
+        }
+
+        type SendStorageValue = { key: string; gen: Generator<AnyEff, unknown>; message: unknown }
+        type WaitStorageValue = { key: string; gen: Generator<AnyEff, unknown> }
+
+        const sendStorage = {} as Record<string, SendStorageValue>
+        const waitStorage = {} as Record<string, WaitStorageValue>
+
+        const process = function* (
+            key: string,
+            gen: Generator<AnyEff, unknown>,
+            result: IteratorResult<AnyEff, unknown>,
+        ): Generator<AnyEff, void> {
+            while (!result.done) {
+                const effect = result.value
+
+                if (effect.type === 'msg') {
+                    // Send a message
+                    if (effect.message !== undefined) {
+                        if (effect.name in waitStorage) {
+                            const waitItem = waitStorage[effect.name]
+                            delete waitStorage[effect.name]
+                            yield* process(waitItem.key, waitItem.gen, waitItem.gen.next(effect.message))
+                            result = gen.next()
+                        } else {
+                            sendStorage[effect.name] = {
+                                key,
+                                gen,
+                                message: effect.message,
+                            }
+                            return
+                        }
+                    } else {
+                        // Receive a message
+                        if (effect.name in sendStorage) {
+                            const sendedItem = sendStorage[effect.name]
+                            delete sendStorage[effect.name]
+                            yield* process(key, gen, gen.next(sendedItem.message))
+                            yield* process(sendedItem.key, sendedItem.gen, sendedItem.gen.next())
+                            return
+                        } else {
+                            waitStorage[effect.name] = {
+                                key,
+                                gen,
+                            }
+                        }
+                        return
+                    }
+                } else {
+                    result = gen.next(yield effect)
+                }
+            }
+
+            results[key] = result.value
+        }
+
+        try {
+            for (const [key, gen] of Object.entries(gens)) {
+                yield* process(key, gen, gen.next()) as any
+            }
+
+            if (Object.keys(waitStorage).length > 0) {
+                throw new Error(`Some messages were not sent: ${JSON.stringify(Object.keys(waitStorage))}`)
+            }
+
+            if (Object.keys(sendStorage).length > 0) {
+                throw new Error(`Some messages were not received: ${JSON.stringify(Object.keys(sendStorage))}`)
+            }
+
+            if (Object.keys(results).length !== Object.keys(gens).length) {
+                throw new Error(`Some messages were not processed: ${JSON.stringify(Object.keys(gens))}`)
+            }
+
+            return results as ExtractReturn<T>
+        } finally {
+            for (const gen of Object.values(gens)) {
+                cleanUpGen(gen)
+            }
+        }
     }
 
     static *of<T>(value: T) {
@@ -580,6 +745,8 @@ export class Eff {
                                 result = gen.next(yield effect as any)
                             }
                         } else if (effect.type === 'async') {
+                            result = gen.next(yield effect as any)
+                        } else if (effect.type === 'msg') {
                             result = gen.next(yield effect as any)
                         } else {
                             effect satisfies never
