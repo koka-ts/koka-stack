@@ -1995,6 +1995,84 @@ describe('Eff.communicate', () => {
         expect(result.producer2).toBe('producer2 done')
     })
 
+    it('should implement shared resources and cleanup correctly', () => {
+        type Resource = {
+            open: () => void
+            get: () => number
+            close: () => void
+        }
+
+        function* resourceProvider() {
+            const resource = yield* Eff.ctx('Resource').get<Resource>()
+            let count = 0
+            try {
+                resource.open()
+                while (true) {
+                    yield* Eff.msg('Resource').send(resource)
+                    count++
+                }
+            } finally {
+                resource.close()
+                // eslint-disable-next-line no-unsafe-finally
+                return count
+            }
+        }
+
+        function* getResource() {
+            const resource = yield* Eff.msg('Resource').wait<Resource>()
+            return resource.get()
+        }
+
+        function* consumer1() {
+            const n = yield* getResource()
+
+            return n
+        }
+
+        function* consumer2() {
+            const n = yield* getResource()
+
+            return n
+        }
+
+        function* consumer3() {
+            const n = yield* getResource()
+
+            return n
+        }
+
+        const logs = [] as string[]
+        let count = 0
+
+        const program = Eff.try(
+            Eff.communicate({
+                resource: resourceProvider,
+                consumer1,
+                consumer2,
+                consumer3,
+            }),
+        ).handle({
+            Resource: {
+                open: () => logs.push('Resource: open'),
+                get: () => {
+                    logs.push('Resource: get')
+                    return count++
+                },
+                close: () => logs.push('Resource: close'),
+            },
+        })
+
+        const result = Eff.runSync(program)
+
+        expect(logs).toEqual(['Resource: open', 'Resource: get', 'Resource: get', 'Resource: get', 'Resource: close'])
+        expect(result).toEqual({
+            resource: 3,
+            consumer1: 0,
+            consumer2: 1,
+            consumer3: 2,
+        })
+    })
+
     it('should handle mixed error recovery and log collection', () => {
         function* logger() {
             const logs = []
