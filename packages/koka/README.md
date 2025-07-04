@@ -1,319 +1,119 @@
-# Koka - Lightweight 3kB Effect-TS alternative library based on Algebraic Effects
+# Koka - 基于代数效应的轻量级 TypeScript 效果管理库
 
-**Warning: This library is in early development and may change significantly. Do not use in production yet.**
+**警告：此库处于早期开发阶段，可能会发生重大变化。请勿在生产环境中使用。**
 
-Koka is a minimal yet powerful effects library for TypeScript that provides structured error handling, context management, and async operations in a composable, type-safe manner.
+Koka 是一个基于代数效应的轻量级 TypeScript 效果管理库，提供结构化错误处理、上下文管理和异步操作，具有可组合性和类型安全性。
 
-Inspired by algebraic effects from [koka-lang](https://github.com/koka-lang/koka), it offers a pragmatic alternative to traditional error handling. Compared to comprehensive solutions like [Effect-TS](https://github.com/Effect-TS/effect), Koka focuses on delivering essential effect management with minimal overhead.
+## 📚 文档导航
 
-## Key Features
+-   **[文档首页](./docs/README.md)** - 完整的文档导航
+-   **[教程](./docs/tutorials.md)** - 从零开始学习 Koka
+-   **[操作指南](./docs/how-to-guides.md)** - 解决具体问题的步骤
+-   **[API 参考](./docs/reference.md)** - 完整的 API 文档
+-   **[概念解释](./docs/explanations.md)** - 深入理解 Koka 的设计理念
 
--   **Typed Effects**: Handle errors, context, and async operations with full type safety
--   **Composition**: Effects naturally compose across function boundaries
--   **Minimal API**: Just 7 core functions cover most use cases
--   **Async Ready**: Seamless Promise integration
--   **Tiny Footprint**: Only ~3kB gzipped
+## 🚀 快速开始
 
-## Comparison with Effect-TS
-
-While Effect-TS provides a more comprehensive effect management toolkit, Koka focuses on simplicity and minimalism. Here’s a quick comparison:
-
-| Feature             | Koka | Effect-TS |
-| ------------------- | ---- | --------- |
-| **Error Effects**   | ✅   | ✅        |
-| **Context Effects** | ✅   | ✅        |
-| **Async Effects**   | ✅   | ✅        |
-| **Composability**   | ✅   | ✅        |
-| **Type Safety**     | ✅   | ✅        |
-| **Minimal API**     | ✅   | ❌        |
-| **Full Ecosystem**  | ❌   | ✅        |
-| **Learning Curve**  | Low  | High      |
-| **Size**            | ~3kb | ~50kb     |
-
-Koka is ideal when you need lightweight effect management without the full complexity of a larger library like Effect-TS. It provides the essential building blocks for managing effects in a type-safe and composable way.
-
-Just like the relationship between immer and immutable-js, Koka is a minimalistic alternative to Effect-TS.
-
-[Koka vs Effect-TS: Detailed Comparison](./docs/comparison-with-effect-ts.md)
-
-## Installation
+### 安装
 
 ```bash
 npm install koka
-# or
+# 或
 yarn add koka
-# or
+# 或
 pnpm add koka
 ```
 
-## Core Concepts
-
-Effects are represented as generator functions yielding different effect types:
-
-```typescript
-type Effect<T, E, C> = Generator<
-    T, // Return type
-    | Err<E> // Error effects
-    | Ctx<C> // Context effects
-    | Async // Async operations
->
-```
-
-## Basic Usage
-
-### Handling Errors
+### 基本使用
 
 ```typescript
 import { Eff } from 'koka'
 
+// 错误处理
 function* getUser(id: string) {
     if (!id) {
-        // Throw an error effect in a type-safe way
-        throw yield* Eff.err('ValidationError').throw('ID is required')
+        yield* Eff.err('ValidationError').throw('ID is required')
     }
-    // Simulate fetching user data
     return { id, name: 'John Doe' }
 }
 
-function* main(id: string) {
-    // Handle the error effect just like try/catch
-    const user = yield* Eff.try(getUser(id)).catch({
-        ValidationError: (error) => {
-            console.error('Validation error:', error)
-            return null
-        },
-    })
-
-    return user // null if error occurred
-}
-
-const result = Eff.run(main('')) // null
-```
-
-### Working with Context
-
-```typescript
+// 上下文管理
 function* calculateTotal() {
-    // Get a context value in a type-safe way
     const discount = yield* Eff.ctx('Discount').get<number>()
     return 100 * (1 - discount)
 }
 
-function* main(discount?: number) {
-    const total = yield* Eff.try(calculateTotal()).catch({
-        // catch Discount context effect, and provide value for it
-        Discount: discount ?? 0,
-    })
-
-    return total
-}
-
-const total = Eff.run(main(0.1)) // Returns 90
-```
-
-### Optional Values
-
-```typescript
-function* getUserPreferences() {
-    // Get optional value without default (returns T | undefined)
-    const theme = yield* Eff.ctx('Theme').opt<string>()
-
-    // Get optional value with default (returns T)
-    const fontSize = (yield* Eff.ctx('FontSize').opt<number>()) ?? 14
-
-    return { theme, fontSize }
-}
-
-function* main() {
-    const prefs = yield* Eff.try(getUserPreferences()).catch({
-        // Provide optional values
-        Theme: 'dark',
-        FontSize: 16,
-    })
-
-    return prefs
-}
-
-const prefs = Eff.run(main())
-// Returns { theme: 'dark', fontSize: 16 }
-```
-
-### Async Operations
-
-```typescript
+// 异步操作
 async function* fetchData() {
-    // Use Eff.await to handle async operations just like async/await
     const response = yield* Eff.await(fetch('/api/data'))
     return response.json()
 }
 
-const data = await Eff.run(fetchData())
-```
-
-### Combining Effects
-
-```typescript
-// multiple effects can be combined in a single function or nested functions
-function* complexOperation() {
-    const userId = yield* Eff.ctx('UserId').get<string>()
-    const user = yield* getUser(userId)
-    const data = yield* fetchUserData(user.id)
-    return processData(data)
-}
-
+// 运行效果
 const result = await Eff.run(
-    // Using Eff.try to handle multiple effects without caring about nesting
-    Eff.try(complexOperation()).catch({
-        UserId: '123', // Context Effect
-        ValidationError: (error) => ({ error }), // Error Effect
-        NotFound: () => ({ message: 'Not found' }), // Another Error Effect
+    Eff.try(getUser('123')).catch({
+        ValidationError: (error) => ({ error }),
     }),
 )
 ```
 
-## Advanced Usage
+## ✨ 核心特性
 
-### Design-First Effect Definition
+-   **类型安全** - 完整的 TypeScript 支持
+-   **轻量级** - 仅 ~3kB gzipped
+-   **可组合** - 效果自然组合
+-   **异步就绪** - 无缝 Promise 集成
+-   **设计优先** - 支持预定义效果类型
 
-Koka encourages a design-first approach where you define your error and context types upfront before using them in your application:
+## 🔄 与 Effect-TS 对比
 
-```typescript
-// predefined error effects
-class UserNotFoundErr extends Eff.Err('UserNotFound')<string> {}
-class UserInvalidErr extends Eff.Err('UserInvalid')<{ reason: string }> {}
+| 特性       | Koka | Effect-TS |
+| ---------- | ---- | --------- |
+| 错误效果   | ✅   | ✅        |
+| 上下文效果 | ✅   | ✅        |
+| 异步效果   | ✅   | ✅        |
+| 可组合性   | ✅   | ✅        |
+| 类型安全   | ✅   | ✅        |
+| 最小 API   | ✅   | ❌        |
+| 完整生态   | ❌   | ✅        |
+| 学习曲线   | 低   | 高        |
+| 包大小     | ~3kB | ~50kB     |
 
-// predefined context effects
-class AuthTokenCtx extends Eff.Ctx('AuthToken')<string> {}
-class UserIdCtx extends Eff.Ctx('UserId')<string> {}
+Koka 是 Effect-TS 的轻量级替代方案，专注于提供核心的效果管理功能，而无需完整的生态系统。
 
-// predefined optional effects
-class ThemeOpt extends Eff.Opt('Theme')<string> {}
-class FontSizeOpt extends Eff.Opt('FontSize')<number> {}
+## 📖 文档结构
 
-// Helper functions using the defined types
-function* requireUserId() {
-    const userId = yield* Eff.get(UserIdCtx)
-    if (!userId) {
-        yield* Eff.throw(new UserInvalidErr({ reason: 'Missing user ID' }))
-    }
-    return userId
-}
+### 教程 (Tutorials)
 
-function* getUser() {
-    const userId = yield* requireUserId()
-    // ... fetch user logic
-}
+-   [从零开始](./docs/tutorials.md#getting-started) - 创建你的第一个 Koka 程序
+-   [错误处理基础](./docs/tutorials.md#error-handling) - 学习如何处理错误效果
+-   [上下文管理](./docs/tutorials.md#context-management) - 理解上下文效果的使用
+-   [异步编程](./docs/tutorials.md#async-programming) - 掌握异步效果的处理
 
-// Usage
-const result = Eff.run(
-    Eff.try(getUser()).catch({
-        UserId: '123',
-        AuthToken: 'abc',
-        UserInvalid: (error) => console.error('Invalid user:', error),
-        UserNotFound: (error) => console.error('User not found:', error),
-    }),
-)
-```
+### 操作指南 (How-to Guides)
 
-### interpolating between error effects and result types
+-   [处理特定错误类型](./docs/how-to-guides.md#handle-specific-errors)
+-   [组合多个效果](./docs/how-to-guides.md#combine-multiple-effects)
+-   [使用设计优先方法](./docs/how-to-guides.md#design-first-approach)
+-   [消息传递](./docs/how-to-guides.md#message-passing)
+-   [流式处理](./docs/how-to-guides.md#stream-processing)
 
-You can move all error effects in a generator function from `effect position` to `return position` via using `Eff.result`.
+### 参考文档 (Reference)
 
-You can convert any Result type back to a generator function using `Eff.ok`
+-   [Eff API](./docs/reference.md#eff-api) - 完整的 Eff 类 API
+-   [效果类型](./docs/reference.md#effect-types) - 所有效果类型的定义
+-   [工具函数](./docs/reference.md#utility-functions) - 辅助函数和类型
 
-You can run a generator function that returns a Result type using `Eff.runResult`.
+### 解释文档 (Explanations)
 
-```typescript
-import { Eff, Result } from 'koka'
+-   [代数效应](./docs/explanations.md#algebraic-effects) - 代数效应的概念
+-   [效果系统设计](./docs/explanations.md#effect-system-design) - Koka 的设计理念
+-   [与 Effect-TS 的详细对比](./docs/explanations.md#comparison-with-effect-ts)
 
-function* fetchData() {
-    const data = yield* Eff.await(fetch('/api/data'))
-    if (!data.ok) {
-        throw yield* Eff.err('FetchError').throw('Failed to fetch data')
-    }
-    return data.json()
-}
+## 🤝 贡献
 
-const result = Eff.run(Eff.result(fetchData()))
+欢迎提交 PR！请确保测试通过，新功能包含适当的测试覆盖。
 
-if (result.type === 'ok') {
-    console.log('Data:', result.value)
-} else {
-    console.error('Error:', result.error)
-}
-
-// Convert Result back to error effect
-const generator = Eff.ok(Eff.result(fetchData()))
-
-const finalResult = Eff.runResult(generator)
-
-if (finalResult.type === 'ok') {
-    console.log('Data:', finalResult.value)
-} else {
-    console.error('Error:', finalResult.error)
-}
-```
-
-## API Reference
-
-### Eff
-
--   `Eff.err(name).throw(error?)`: Throws an error effect
--   `Eff.ctx(name).get<T>()`: Gets a context value
--   `Eff.ctx(name).opt<T>()`: Gets an optional context value (returns T | undefined)
--   `Eff.await<T>(Promise<T> | T)`: Handles async operations
--   `Eff.try(generator).catch(handlers)`: Handles effects
--   `Eff.run(generator)`: Runs a generator (handles async)
--   `Eff.result(generator)`:
--   `Eff.ok(generator)`: Unwraps Ok results
--   `Eff.runResult(generator)`: Runs a generator and returns a Result type
-
-### Effect Classes
-
--   `Eff.Err(name)<Error>`: Creates an error effect class
-    ```typescript
-    class MyError extends Eff.Err('MyError')<string> {}
-    const error = new MyError('message')
-    ```
--   `Eff.Ctx(name)<Context>`: Creates a context effect class
-    ```typescript
-    class MyContext extends Eff.Ctx('MyContext')<string> {}
-    const ctx = new MyContext()
-    ```
--   `Eff.Opt(name)<T>`: Creates an optional effect class
-    ```typescript
-    class MyOpt extends Eff.Opt('MyOpt')<string> {}
-    const opt = new MyOpt()
-    ```
-
-### Effect Operations
-
--   `Eff.ctx(name).opt()`: Creates an optional effect from context
-
-    ```typescript
-    const theme = yield * Eff.ctx('Theme').opt().get<string>()
-    ```
-
--   `Eff.throw(err: Err)`: Throws a predefined error effect
-
-    ```typescript
-    yield * Eff.throw(new MyError('error'))
-    ```
-
--   `Eff.get(ctx: Ctx)`: Gets a value from predefined context
-    ```typescript
-    const value = yield * Eff.get(MyContext)
-    ```
-
-### Result
-
--   `Result.ok(value: T): Ok<T>`
--   `Result.err(name: Name, error: T): Err<Name, T>`
-
-## Contributing
-
-PRs are welcome! Please ensure tests pass and new features include appropriate test coverage.
-
-## License
+## 📄 许可证
 
 MIT
