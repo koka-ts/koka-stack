@@ -1,5 +1,11 @@
 # koka
 
+## 1.0.9
+
+### Patch Changes
+
+-   fix: Promise.withResolvers should bind promise or it will throw error
+
 ## 1.0.8
 
 ### Patch Changes

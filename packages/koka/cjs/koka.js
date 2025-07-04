@@ -1,5 +1,5 @@
 'use strict'
-var _a
+var _a, _b
 Object.defineProperty(exports, '__esModule', { value: true })
 exports.isGenerator = exports.Eff = exports.Result = exports.EffSymbol = void 0
 var tslib_1 = require('tslib')
@@ -92,8 +92,8 @@ var cleanUpGen = function (gen) {
     }
 }
 var withResolvers =
-    (_a = Promise.withResolvers) !== null && _a !== void 0
-        ? _a
+    (_b = (_a = Promise.withResolvers) === null || _a === void 0 ? void 0 : _a.bind(Promise)) !== null && _b !== void 0
+        ? _b
         : function () {
               var resolve
               var reject
