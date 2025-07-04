@@ -1,55 +1,55 @@
-# Koka Tutorials
+# Koka 教程
 
-This tutorial will guide you through learning Koka from scratch, mastering the basic concepts of effect management through practical examples.
+本教程将带你从零开始学习 Koka，通过实际示例掌握效果管理的基本概念。
 
-## 📋 Table of Contents
+## 📋 目录
 
--   [Getting Started](#getting-started)
-    -   [What is Koka?](#what-is-koka)
-    -   [Installation and Setup](#installation-and-setup)
-    -   [Your First Koka Program](#your-first-koka-program)
--   [Error Handling Basics](#error-handling-basics)
-    -   [Understanding Error Effects](#understanding-error-effects)
-    -   [Error Propagation](#error-propagation)
--   [Context Management](#context-management)
-    -   [Understanding Context Effects](#understanding-context-effects)
-    -   [Optional Context](#optional-context)
--   [Async Programming](#async-programming)
-    -   [Handling Async Operations](#handling-async-operations)
-    -   [Combining Sync and Async Operations](#combining-sync-and-async-operations)
--   [Design-First Approach](#design-first-approach)
-    -   [Predefined Effect Types](#predefined-effect-types)
-    -   [Effect Composition](#effect-composition)
--   [Next Steps](#next-steps)
+-   [从零开始](#从零开始)
+    -   [什么是 Koka？](#什么是-koka)
+    -   [安装和设置](#安装和设置)
+    -   [你的第一个 Koka 程序](#你的第一个-koka-程序)
+-   [错误处理基础](#错误处理基础)
+    -   [理解错误效果](#理解错误效果)
+    -   [错误传播](#错误传播)
+-   [上下文管理](#上下文管理)
+    -   [理解上下文效果](#理解上下文效果)
+    -   [可选上下文](#可选上下文)
+-   [异步编程](#异步编程)
+    -   [处理异步操作](#处理异步操作)
+    -   [组合同步和异步操作](#组合同步和异步操作)
+-   [设计优先方法](#设计优先方法)
+    -   [预定义效果类型](#预定义效果类型)
+    -   [效果组合](#效果组合)
+-   [下一步](#下一步)
 
-## Getting Started
+## 从零开始
 
-### What is Koka?
+### 什么是 Koka？
 
-Koka is a TypeScript effect management library based on algebraic effects. It allows you to handle errors, manage context, and execute asynchronous operations in a type-safe manner.
+Koka 是一个基于代数效应的 TypeScript 效果管理库。它让你能够以类型安全的方式处理错误、管理上下文和执行异步操作。
 
-### Installation and Setup
+### 安装和设置
 
-First, install Koka:
+首先安装 Koka：
 
 ```bash
 npm install koka
 ```
 
-Create a new TypeScript project and import Koka:
+创建一个新的 TypeScript 项目并导入 Koka：
 
 ```typescript
 import { Eff } from 'koka'
 ```
 
-### Your First Koka Program
+### 你的第一个 Koka 程序
 
-Let's start with a simple example:
+让我们从一个简单的示例开始：
 
 ```typescript
 import { Eff } from 'koka'
 
-// Define a simple effect function
+// 定义一个简单的效果函数
 function* greet(name: string) {
     if (!name) {
         yield* Eff.err('ValidationError').throw('Name is required')
@@ -57,28 +57,28 @@ function* greet(name: string) {
     return `Hello, ${name}!`
 }
 
-// Run the effect
+// 运行效果
 const result = Eff.run(
     Eff.try(greet('World')).handle({
         ValidationError: (error) => `Error: ${error}`,
     }),
 )
 
-console.log(result) // Output: "Hello, World!"
+console.log(result) // 输出: "Hello, World!"
 ```
 
-This simple example demonstrates Koka's core concepts:
+这个简单的例子展示了 Koka 的核心概念：
 
--   Use generator functions to define effects
--   Use `Eff.err()` to throw error effects
--   Use `Eff.try().handle()` to handle effects
--   Use `Eff.run()` to run effects
+-   使用生成器函数定义效果
+-   使用 `Eff.err()` 抛出错误效果
+-   使用 `Eff.try().handle()` 处理效果
+-   使用 `Eff.run()` 运行效果
 
-## Error Handling Basics
+## 错误处理基础
 
-### Understanding Error Effects
+### 理解错误效果
 
-In Koka, errors are represented as "effects" rather than exceptions. This means errors are type-safe and can be checked at compile time.
+在 Koka 中，错误被表示为"效果"而不是异常。这意味着错误是类型安全的，并且可以在编译时检查。
 
 ```typescript
 function* divide(a: number, b: number) {
@@ -88,7 +88,7 @@ function* divide(a: number, b: number) {
     return a / b
 }
 
-// Handle the error
+// 处理错误
 const result = Eff.run(
     Eff.try(divide(10, 0)).handle({
         DivisionByZero: (error) => {
@@ -98,12 +98,12 @@ const result = Eff.run(
     }),
 )
 
-console.log(result) // Output: null
+console.log(result) // 输出: null
 ```
 
-### Error Propagation
+### 错误传播
 
-Error effects propagate through the function call chain until they are handled:
+错误效果会在函数调用链中传播，直到被处理：
 
 ```typescript
 function* calculate(a: number, b: number) {
@@ -116,21 +116,21 @@ function* main() {
     return result
 }
 
-// Error propagates to the top level
+// 错误会传播到顶层
 const result = Eff.run(
     Eff.try(main()).handle({
         DivisionByZero: (error) => `Handled: ${error}`,
     }),
 )
 
-console.log(result) // Output: "Handled: Cannot divide by zero"
+console.log(result) // 输出: "Handled: Cannot divide by zero"
 ```
 
-## Context Management
+## 上下文管理
 
-### Understanding Context Effects
+### 理解上下文效果
 
-Context effects allow you to access externally provided values, similar to dependency injection:
+上下文效果允许你访问外部提供的值，类似于依赖注入：
 
 ```typescript
 function* getUserInfo() {
@@ -140,7 +140,7 @@ function* getUserInfo() {
     return `User ${userId} with API key ${apiKey.slice(0, 5)}...`
 }
 
-// Provide context values
+// 提供上下文值
 const result = Eff.run(
     Eff.try(getUserInfo()).handle({
         UserId: '12345',
@@ -148,12 +148,12 @@ const result = Eff.run(
     }),
 )
 
-console.log(result) // Output: "User 12345 with API key secre..."
+console.log(result) // 输出: "User 12345 with API key secre..."
 ```
 
-### Optional Context
+### 可选上下文
 
-Use the `opt()` method to get optional context values:
+使用 `opt()` 方法可以获取可选的上下文值：
 
 ```typescript
 function* getUserPreferences() {
@@ -166,24 +166,24 @@ function* getUserPreferences() {
     }
 }
 
-// Don't provide any context values
+// 不提供任何上下文值
 const result = Eff.run(getUserPreferences())
-console.log(result) // Output: { theme: 'light', fontSize: 14 }
+console.log(result) // 输出: { theme: 'light', fontSize: 14 }
 
-// Provide partial context values
+// 提供部分上下文值
 const result2 = Eff.run(
     Eff.try(getUserPreferences()).handle({
         Theme: 'dark',
     }),
 )
-console.log(result2) // Output: { theme: 'dark', fontSize: 14 }
+console.log(result2) // 输出: { theme: 'dark', fontSize: 14 }
 ```
 
-## Async Programming
+## 异步编程
 
-### Handling Async Operations
+### 处理异步操作
 
-Koka uses `Eff.await()` to handle asynchronous operations:
+Koka 使用 `Eff.await()` 来处理异步操作：
 
 ```typescript
 async function* fetchUserData(userId: string) {
@@ -196,7 +196,7 @@ async function* fetchUserData(userId: string) {
     return response.json()
 }
 
-// Run async effect
+// 运行异步效果
 const result = await Eff.run(
     Eff.try(fetchUserData('123')).handle({
         FetchError: (error) => ({ error }),
@@ -204,24 +204,24 @@ const result = await Eff.run(
 )
 ```
 
-### Combining Sync and Async Operations
+### 组合同步和异步操作
 
-You can mix synchronous and asynchronous operations in the same generator function:
+你可以在同一个生成器函数中混合使用同步和异步操作：
 
 ```typescript
 async function* processUser(userId: string) {
-    // Synchronous validation
+    // 同步验证
     if (!userId) {
         yield* Eff.err('ValidationError').throw('User ID is required')
     }
 
-    // Get configuration (synchronous context)
+    // 获取配置（同步上下文）
     const apiUrl = yield* Eff.ctx('ApiUrl').get<string>()
 
-    // Asynchronous data fetching
+    // 异步获取数据
     const userData = yield* Eff.await(fetch(`${apiUrl}/users/${userId}`))
 
-    // Handle response
+    // 处理响应
     if (!userData.ok) {
         yield* Eff.err('ApiError').throw('API request failed')
     }
@@ -229,7 +229,7 @@ async function* processUser(userId: string) {
     return userData.json()
 }
 
-// Run combined effects
+// 运行组合效果
 const result = await Eff.run(
     Eff.try(processUser('123')).handle({
         ValidationError: (error) => ({ error }),
@@ -239,22 +239,22 @@ const result = await Eff.run(
 )
 ```
 
-## Design-First Approach
+## 设计优先方法
 
-### Predefined Effect Types
+### 预定义效果类型
 
-Koka encourages you to predefine effect types, which provides better type safety and code organization:
+Koka 鼓励你预先定义效果类型，这样可以获得更好的类型安全性和代码组织：
 
 ```typescript
-// Predefine error effects
+// 预定义错误效果
 class UserNotFound extends Eff.Err('UserNotFound')<string> {}
 class ValidationError extends Eff.Err('ValidationError')<{ field: string; message: string }> {}
 
-// Predefine context effects
+// 预定义上下文效果
 class DatabaseConnection extends Eff.Ctx('Database')<{ query: (sql: string) => Promise<any> }> {}
 class Logger extends Eff.Opt('Logger')<(level: string, message: string) => void> {}
 
-// Use predefined effects
+// 使用预定义的效果
 function* getUser(userId: string) {
     const logger = yield* Eff.get(Logger)
     const db = yield* Eff.get(DatabaseConnection)
@@ -275,7 +275,7 @@ function* getUser(userId: string) {
     return user
 }
 
-// Run the program
+// 运行程序
 const result = await Eff.run(
     Eff.try(getUser('123')).handle({
         UserNotFound: (error) => ({ error }),
@@ -286,16 +286,16 @@ const result = await Eff.run(
 )
 ```
 
-### Effect Composition
+### 效果组合
 
-You can compose multiple effects to create complex programs:
+你可以组合多个效果来创建复杂的程序：
 
 ```typescript
 function* createUser(userData: { name: string; email: string }) {
     const db = yield* Eff.get(DatabaseConnection)
     const logger = yield* Eff.get(Logger)
 
-    // Validate user data
+    // 验证用户数据
     if (!userData.name) {
         yield* Eff.throw(new ValidationError({ field: 'name', message: 'Required' }))
     }
@@ -306,14 +306,14 @@ function* createUser(userData: { name: string; email: string }) {
 
     logger?.('info', `Creating user ${userData.name}`)
 
-    // Check if email already exists
+    // 检查邮箱是否已存在
     const existingUser = yield* Eff.await(db.query(`SELECT id FROM users WHERE email = '${userData.email}'`))
 
     if (existingUser) {
         yield* Eff.throw(new ValidationError({ field: 'email', message: 'Already exists' }))
     }
 
-    // Create user
+    // 创建用户
     const newUser = yield* Eff.await(
         db.query(`INSERT INTO users (name, email) VALUES ('${userData.name}', '${userData.email}') RETURNING *`),
     )
@@ -322,7 +322,7 @@ function* createUser(userData: { name: string; email: string }) {
     return newUser
 }
 
-// Run user creation program
+// 运行用户创建程序
 const result = await Eff.run(
     Eff.try(createUser({ name: 'Jane Doe', email: 'jane@example.com' })).handle({
         ValidationError: (error) => ({ error }),
@@ -332,17 +332,17 @@ const result = await Eff.run(
 )
 ```
 
-## Next Steps
+## 下一步
 
-Now you've mastered the basics of Koka! Next you can:
+现在你已经掌握了 Koka 的基础知识！接下来你可以：
 
-1. Check out the [How-to Guides](./how-to-guides.md) to learn how to solve specific problems
-2. Read the [API Reference](./reference.md) to understand the complete API
-3. Dive into [Explanations](./explanations.md) to understand Koka's design philosophy
+1. 查看 [操作指南](./how-to-guides.zh_CN.md) 学习解决具体问题的方法
+2. 阅读 [API 参考](./reference.zh_CN.md) 了解完整的 API
+3. 深入 [概念解释](./explanations.zh_CN.md) 理解 Koka 的设计理念
 
-Remember, Koka's core advantages are:
+记住，Koka 的核心优势在于：
 
--   **Type Safety**: All effects are checked at compile time
--   **Composability**: Effects can be naturally composed and nested
--   **Simplicity**: Minimal API design
--   **Flexibility**: Support for both synchronous and asynchronous operations
+-   **类型安全**：所有效果都在编译时检查
+-   **可组合性**：效果可以自然地组合和嵌套
+-   **简洁性**：最小化的 API 设计
+-   **灵活性**：支持同步和异步操作

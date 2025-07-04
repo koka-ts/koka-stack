@@ -1,89 +1,89 @@
-# Koka 文档
+# Koka Documentation
 
-欢迎来到 Koka 文档！本文档按照 Diátaxis 文档规范组织，帮助你快速找到所需的信息。
+Welcome to the Koka documentation! This documentation is organized according to the Diátaxis documentation framework to help you quickly find the information you need.
 
-## 📚 文档导航
+## 📚 Documentation Navigation
 
-### 🎓 教程 (Tutorials)
+### 🎓 Tutorials
 
-**学习如何使用 Koka**
+**Learn how to use Koka**
 
--   **[从零开始](./tutorials.md#从零开始)** - 创建你的第一个 Koka 程序
--   **[错误处理基础](./tutorials.md#错误处理基础)** - 学习如何处理错误效果
--   **[上下文管理](./tutorials.md#上下文管理)** - 理解上下文效果的使用
--   **[异步编程](./tutorials.md#异步编程)** - 掌握异步效果的处理
--   **[设计优先方法](./tutorials.md#设计优先方法)** - 学习预定义效果类型
+-   **[Getting Started](./tutorials.md#getting-started)** - Create your first Koka program
+-   **[Error Handling Basics](./tutorials.md#error-handling-basics)** - Learn how to handle error effects
+-   **[Context Management](./tutorials.md#context-management)** - Understand how to use context effects
+-   **[Async Programming](./tutorials.md#async-programming)** - Master async effect handling
+-   **[Design-First Approach](./tutorials.md#design-first-approach)** - Learn predefined effect types
 
-### 🔧 操作指南 (How-to Guides)
+### 🔧 How-to Guides
 
-**解决具体问题的步骤**
+**Step-by-step solutions to specific problems**
 
--   **[处理特定错误类型](./how-to-guides.md#处理特定错误类型)** - 定义和使用自定义错误
--   **[组合多个效果](./how-to-guides.md#组合多个效果)** - 并行执行和组合效果
--   **[使用设计优先方法](./how-to-guides.md#使用设计优先方法)** - 组织效果定义
--   **[消息传递](./how-to-guides.md#消息传递)** - 实现生成器间通信
--   **[流式处理](./how-to-guides.md#流式处理)** - 处理流式数据
--   **[错误恢复和重试](./how-to-guides.md#错误恢复和重试)** - 实现重试机制
--   **[测试效果](./how-to-guides.md#测试效果)** - 为效果编写测试
+-   **[Handle Specific Error Types](./how-to-guides.md#handle-specific-error-types)** - Define and use custom errors
+-   **[Combine Multiple Effects](./how-to-guides.md#combine-multiple-effects)** - Execute and combine effects in parallel
+-   **[Use Design-First Approach](./how-to-guides.md#use-design-first-approach)** - Organize effect definitions
+-   **[Message Passing](./how-to-guides.md#message-passing)** - Implement communication between generators
+-   **[Stream Processing](./how-to-guides.md#stream-processing)** - Handle streaming data
+-   **[Error Recovery and Retry](./how-to-guides.md#error-recovery-and-retry)** - Implement retry mechanisms
+-   **[Testing Effects](./how-to-guides.md#testing-effects)** - Write tests for effects
 
-### 📖 参考文档 (Reference)
+### 📖 Reference
 
-**完整的 API 文档**
+**Complete API documentation**
 
--   **[Eff API](./reference.md#eff-api)** - 完整的 Eff 类 API
--   **[效果类型](./reference.md#效果类型)** - 所有效果类型的定义
--   **[Result 类型](./reference.md#result-类型)** - 结果类型和工具函数
--   **[工具函数](./reference.md#工具函数)** - 辅助函数和类型
--   **[类型工具](./reference.md#类型工具)** - 高级类型定义
+-   **[Eff API](./reference.md#eff-api)** - Complete Eff class API
+-   **[Effect Types](./reference.md#effect-types)** - Definitions of all effect types
+-   **[Result Types](./reference.md#result-types)** - Result types and utility functions
+-   **[Utility Functions](./reference.md#utility-functions)** - Helper functions and types
+-   **[Type Utilities](./reference.md#type-utilities)** - Advanced type definitions
 
-### 💡 解释文档 (Explanations)
+### 💡 Explanations
 
-**深入理解 Koka 的设计理念**
+**Deep understanding of Koka's design philosophy**
 
--   **[代数效应](./explanations.md#代数效应)** - 代数效应的概念和原理
--   **[效果系统设计](./explanations.md#效果系统设计)** - Koka 的效果类型系统
--   **[生成器与效果](./explanations.md#生成器与效果)** - 为什么使用生成器
--   **[类型系统设计](./explanations.md#类型系统设计)** - 高级类型工具
--   **[与 Effect-TS 的详细对比](./explanations.md#与-effect-ts-的详细对比)** - 深入对比分析
--   **[最佳实践](./explanations.md#最佳实践)** - 效果设计和代码组织
+-   **[Algebraic Effects](./explanations.md#algebraic-effects)** - Concepts and principles of algebraic effects
+-   **[Effect System Design](./explanations.md#effect-system-design)** - Koka's effect type system
+-   **[Generators and Effects](./explanations.md#generators-and-effects)** - Why use generators
+-   **[Type System Design](./explanations.md#type-system-design)** - Advanced type utilities
+-   **[Detailed Comparison with Effect-TS](./explanations.md#detailed-comparison-with-effect-ts)** - In-depth comparison analysis
+-   **[Best Practices](./explanations.md#best-practices)** - Effect design and code organization
 
-## 🚀 快速开始
+## 🚀 Quick Start
 
-如果你是新用户，建议按以下顺序阅读：
+If you're a new user, we recommend reading in the following order:
 
-1. **[教程](./tutorials.md)** - 从零开始学习 Koka
-2. **[操作指南](./how-to-guides.md)** - 学习解决具体问题
-3. **[参考文档](./reference.md)** - 查阅 API 详情
-4. **[解释文档](./explanations.md)** - 深入理解设计理念
+1. **[Tutorials](./tutorials.md)** - Learn Koka from scratch
+2. **[How-to Guides](./how-to-guides.md)** - Learn to solve specific problems
+3. **[Reference](./reference.md)** - Look up API details
+4. **[Explanations](./explanations.md)** - Deep understanding of design philosophy
 
-## 📋 文档规范
+## 📋 Documentation Standards
 
-本文档遵循 [Diátaxis 文档规范](https://diataxis.fr/)，包含四种文档类型：
+This documentation follows the [Diátaxis documentation framework](https://diataxis.fr/), which includes four types of documentation:
 
--   **教程 (Tutorials)** - 学习导向，教你如何完成特定任务
--   **操作指南 (How-to Guides)** - 问题导向，解决具体问题
--   **参考文档 (Reference)** - 信息导向，提供完整的 API 信息
--   **解释文档 (Explanations)** - 理解导向，解释概念和设计理念
+-   **Tutorials** - Learning-oriented, teaching you how to complete specific tasks
+-   **How-to Guides** - Problem-oriented, solving specific problems
+-   **Reference** - Information-oriented, providing complete API information
+-   **Explanations** - Understanding-oriented, explaining concepts and design philosophy
 
-## 🤝 贡献文档
+## 🤝 Contributing to Documentation
 
-我们欢迎社区贡献文档改进：
+We welcome community contributions to improve documentation:
 
-1. **报告问题** - 在 GitHub Issues 中报告文档问题
-2. **提交改进** - 通过 Pull Request 提交文档改进
-3. **分享经验** - 分享使用 Koka 的经验和最佳实践
+1. **Report Issues** - Report documentation issues in GitHub Issues
+2. **Submit Improvements** - Submit documentation improvements via Pull Request
+3. **Share Experience** - Share experiences and best practices using Koka
 
-## 📞 获取帮助
+## 📞 Getting Help
 
-如果你在使用 Koka 时遇到问题：
+If you encounter problems while using Koka:
 
-1. **查看文档** - 首先查看相关文档
-2. **搜索 Issues** - 在 GitHub Issues 中搜索类似问题
-3. **创建 Issue** - 如果找不到答案，创建新的 Issue
-4. **社区讨论** - 参与 GitHub Discussions
+1. **Check Documentation** - First check the relevant documentation
+2. **Search Issues** - Search for similar issues in GitHub Issues
+3. **Create Issue** - If you can't find an answer, create a new issue
+4. **Community Discussion** - Participate in GitHub Discussions
 
-## 🔗 相关链接
+## 🔗 Related Links
 
--   **[GitHub 仓库](https://github.com/koka-lang/koka-stack)** - 源代码和 Issues
--   **[npm 包](https://www.npmjs.com/package/koka)** - 安装和使用
--   **[在线示例](https://github.com/koka-lang/koka-stack/tree/main/examples)** - 实际使用示例
+-   **[GitHub Repository](https://github.com/koka-lang/koka-stack)** - Source code and issues
+-   **[npm Package](https://www.npmjs.com/package/koka)** - Installation and usage
+-   **[Online Examples](https://github.com/koka-lang/koka-stack/tree/main/examples)** - Real-world usage examples

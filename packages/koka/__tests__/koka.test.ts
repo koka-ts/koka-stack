@@ -1872,7 +1872,7 @@ describe('Eff.communicate', () => {
                 yield* Eff.msg('Test1').send('message1')
                 return 'sent1 successfully'
             } catch (error) {
-                // 捕获错误后继续发送其他消息
+                // Continue sending other messages after catching error
                 yield* Eff.msg('Test2').send('message2')
                 return 'sent2 after error'
             }
@@ -1883,7 +1883,7 @@ describe('Eff.communicate', () => {
                 const msg1 = yield* Eff.msg('Test1').wait<string>()
                 return `received1: ${msg1}`
             } catch (error) {
-                // 捕获错误后继续等待其他消息
+                // Continue waiting for other messages after catching error
                 const msg2 = yield* Eff.msg('Test2').wait<string>()
                 return `received2: ${msg2}`
             }
@@ -1896,7 +1896,7 @@ describe('Eff.communicate', () => {
             }),
         )
 
-        // 由于消息成功匹配，不会抛出错误
+        // Since messages match successfully, no error is thrown
         expect(result).toEqual({
             sender: 'sent1 successfully',
             receiver: 'received1: message1',
@@ -1910,7 +1910,7 @@ describe('Eff.communicate', () => {
                 yield* Eff.msg('Test2').send('message2')
                 return 'sent both successfully'
             } catch (error) {
-                // 捕获错误后发送多个消息
+                // Send multiple messages after catching error
                 yield* Eff.msg('Test3').send('message3')
                 yield* Eff.msg('Test4').send('message4')
                 yield* Eff.msg('Test5').send('message5')
@@ -1927,7 +1927,7 @@ describe('Eff.communicate', () => {
                 messages.push(msg2)
                 return `received: ${messages.join(', ')}`
             } catch (error) {
-                // 捕获错误后等待多个消息
+                // Wait for multiple messages after catching error
                 const msg3 = yield* Eff.msg('Test3').wait<string>()
                 messages.push(msg3)
                 const msg4 = yield* Eff.msg('Test4').wait<string>()
@@ -1945,7 +1945,7 @@ describe('Eff.communicate', () => {
             }),
         )
 
-        // 由于消息成功匹配，不会抛出错误
+        // Since messages match successfully, no error is thrown
         expect(result).toEqual({
             sender: 'sent both successfully',
             receiver: 'received: message1, message2',
@@ -1956,7 +1956,7 @@ describe('Eff.communicate', () => {
         function* logger() {
             const logs = []
             try {
-                // 不断等待日志消息，无需匹配数量
+                // Continuously wait for log messages without matching count
                 while (true) {
                     const log = yield* Eff.msg('Log').wait<string>()
                     logs.push(log)
@@ -2015,7 +2015,7 @@ describe('Eff.communicate', () => {
                 yield* Eff.msg('Log').send('Sender: Message sent successfully')
                 return 'sent successfully'
             } catch (error) {
-                // 捕获错误后继续发送日志
+                // Continue sending logs after catching error
                 yield* Eff.msg('Log').send('Sender: Message failed, but continuing')
                 yield* Eff.msg('Log').send('Sender: Recovery completed')
                 return 'sent after error'
@@ -2041,7 +2041,7 @@ describe('Eff.communicate', () => {
             }),
         )
 
-        // 由于消息成功匹配，不会抛出错误
+        // Since messages match successfully, no error is thrown
         expect(result.logger).toContain('Sender: Message sent successfully')
         expect(result.logger).toContain('Receiver: Message received')
         expect(result.sender).toBe('sent successfully')
@@ -2054,7 +2054,7 @@ describe('Eff.communicate', () => {
                 yield* Eff.msg('Test1').send('message1')
                 return 'sent1 successfully'
             } catch (error) {
-                // 捕获错误后发送其他消息
+                // Send other messages after catching error
                 yield* Eff.msg('Test2').send('message2')
                 return 'sent2 after error'
             }
@@ -2087,7 +2087,7 @@ describe('Eff.communicate', () => {
             }),
         )
 
-        // sender1 会成功发送 Test1，然后捕获 Test3 的错误，再发送 Test2
+        // sender1 will successfully send Test1, then catch Test3's error, then send Test2
         expect(result.sender1).toBe('sent2 after error')
         expect(result.sender2).toBe('sent3 successfully')
         expect(result.receiver).toBe('received: message2, message3')

@@ -1,28 +1,62 @@
-# Koka 概念解释
+# Koka Concept Explanations
 
-本文档深入解释 Koka 的核心概念和设计理念。
+This document provides in-depth explanations of Koka's core concepts and design philosophy.
 
-## 代数效应
+## 📋 Table of Contents
 
-### 什么是代数效应？
+-   [Algebraic Effects](#algebraic-effects)
+    -   [What are Algebraic Effects?](#what-are-algebraic-effects)
+    -   [Core Ideas of Algebraic Effects](#core-ideas-of-algebraic-effects)
+    -   [Differences from Traditional Error Handling](#differences-from-traditional-error-handling)
+-   [Effect System Design](#effect-system-design)
+    -   [Koka's Effect Type System](#kokas-effect-type-system)
+    -   [Effect Composition Principles](#effect-composition-principles)
+    -   [Effect Handling Mechanism](#effect-handling-mechanism)
+-   [Generators and Effects](#generators-and-effects)
+    -   [Why Use Generators?](#why-use-generators)
+    -   [Generator Effect Pattern](#generator-effect-pattern)
+    -   [Effect Runner](#effect-runner)
+-   [Type System Design](#type-system-design)
+    -   [Advanced Type Tools](#advanced-type-tools)
+    -   [Type Inference](#type-inference)
+-   [Detailed Comparison with Effect-TS](#detailed-comparison-with-effect-ts)
+    -   [Design Philosophy](#design-philosophy)
+    -   [Type System Comparison](#type-system-comparison)
+    -   [Error Handling Comparison](#error-handling-comparison)
+    -   [Context Management Comparison](#context-management-comparison)
+    -   [Performance Comparison](#performance-comparison)
+    -   [Applicability](#applicability)
+-   [Best Practices](#best-practices)
+    -   [Effect Design Principles](#effect-design-principles)
+    -   [Code Organization](#code-organization)
+    -   [Error Handling Strategy](#error-handling-strategy)
+    -   [Performance Optimization](#performance-optimization)
+-   [Future Development Directions](#future-development-directions)
+    -   [Planned Features](#planned-features)
+    -   [Community Contributions](#community-contributions)
+    -   [Learning Resources](#learning-resources)
 
-代数效应（Algebraic Effects）是一种编程语言特性，允许程序在运行时暂停执行，将控制权交给调用者，然后从暂停的地方继续执行。这种机制提供了一种结构化、类型安全的方式来处理副作用。
+## Algebraic Effects
 
-### 代数效应的核心思想
+### What are Algebraic Effects?
 
-1. **效果抽象**：将副作用（如错误、I/O、状态）抽象为"效果"
-2. **效果处理**：在程序的不同层次处理这些效果
-3. **效果组合**：效果可以自然地组合和嵌套
-4. **类型安全**：所有效果都在编译时检查
+Algebraic Effects are a programming language feature that allows programs to suspend execution at runtime, transfer control to the caller, and then resume execution from where it was suspended. This mechanism provides a structured, type-safe way to handle side effects.
 
-### 与传统错误处理的区别
+### Core Ideas of Algebraic Effects
 
-**传统异常处理：**
+1. **Effect Abstraction**: Abstract side effects (such as errors, I/O, state) as "effects"
+2. **Effect Handling**: Handle these effects at different levels of the program
+3. **Effect Composition**: Effects can be naturally composed and nested
+4. **Type Safety**: All effects are checked at compile time
+
+### Differences from Traditional Error Handling
+
+**Traditional Exception Handling:**
 
 ```typescript
 function getUser(id: string) {
     if (!id) {
-        throw new Error('ID is required') // 抛出错误，中断执行
+        throw new Error('ID is required') // Throw error, interrupt execution
     }
     return fetchUser(id)
 }
@@ -30,37 +64,37 @@ function getUser(id: string) {
 try {
     const user = getUser('')
 } catch (error) {
-    // error 为 unknown 类型，缺少类型安全
+    // error is of unknown type, lacks type safety
     console.error(error)
 }
 ```
 
-**代数效应处理：**
+**Algebraic Effect Handling:**
 
 ```typescript
 function* getUser(id: string) {
     if (!id) {
-        yield* Eff.err('ValidationError').throw('ID is required') // 抛出错误，中断执行
+        yield* Eff.err('ValidationError').throw('ID is required') // Throw error, interrupt execution
     }
     return yield* Eff.await(fetchUser(id))
 }
 
 const result = Eff.run(
     Eff.try(getUser('')).handle({
-        ValidationError: (error) => ({ error }), // 结构化处理，error 为 ValidationError 所 throw 的类型
+        ValidationError: (error) => ({ error }), // Structured handling, error is the type thrown by ValidationError
     }),
 )
 ```
 
-## 效果系统设计
+## Effect System Design
 
-### Koka 的效果类型系统
+### Koka's Effect Type System
 
-Koka 定义了四种基本的效果类型：
+Koka defines four basic effect types:
 
-#### 1. 错误效果 (Err)
+#### 1. Error Effects (Err)
 
-表示程序可能失败的情况：
+Represent situations where a program might fail:
 
 ```typescript
 type Err<Name extends string, T> = {
@@ -70,15 +104,15 @@ type Err<Name extends string, T> = {
 }
 ```
 
-错误效果的特点：
+Characteristics of error effects:
 
--   **类型安全**：错误类型在编译时检查
--   **结构化**：错误包含名称和详细信息
--   **可组合**：错误可以在函数调用链中传播
+-   **Type Safety**: Error types are checked at compile time
+-   **Structured**: Errors contain names and detailed information
+-   **Composable**: Errors can propagate through function call chains
 
-#### 2. 上下文效果 (Ctx)
+#### 2. Context Effects (Ctx)
 
-表示程序需要的依赖或配置：
+Represent dependencies or configuration that programs need:
 
 ```typescript
 type Ctx<Name extends string, T> = {
@@ -89,15 +123,15 @@ type Ctx<Name extends string, T> = {
 }
 ```
 
-上下文效果的特点：
+Characteristics of context effects:
 
--   **依赖注入**：在运行时提供依赖
--   **可选性**：支持可选的上下文值
--   **类型安全**：上下文类型在编译时检查
+-   **Dependency Injection**: Provide dependencies at runtime
+-   **Optionality**: Support optional context values
+-   **Type Safety**: Context types are checked at compile time
 
-#### 3. 异步效果 (Async)
+#### 3. Async Effects (Async)
 
-表示异步操作：
+Represent asynchronous operations:
 
 ```typescript
 type Async = {
@@ -107,15 +141,15 @@ type Async = {
 }
 ```
 
-异步效果的特点：
+Characteristics of async effects:
 
--   **无缝集成**：与 Promise 无缝集成
--   **自动推断**：自动推断同步/异步操作
--   **错误传播**：异步错误可以 try-catch 捕获
+-   **Seamless Integration**: Seamless integration with Promises
+-   **Automatic Inference**: Automatically infer sync/async operations
+-   **Error Propagation**: Async errors can be caught with try-catch
 
-#### 4. 消息效果 (Msg)
+#### 4. Message Effects (Msg)
 
-表示生成器之间的通信：
+Represent communication between generators:
 
 ```typescript
 type Msg<Name extends string, T> = {
@@ -125,34 +159,34 @@ type Msg<Name extends string, T> = {
 }
 ```
 
-消息效果的特点：
+Characteristics of message effects:
 
--   **双向通信**：支持发送和接收消息
--   **解耦设计**：生成器之间松耦合
+-   **Bidirectional Communication**: Support sending and receiving messages
+-   **Decoupled Design**: Loose coupling between generators
 
-### 效果组合原理
+### Effect Composition Principles
 
-Koka 使用 TypeScript 的高级类型系统来实现效果组合：
+Koka uses TypeScript's advanced type system to implement effect composition:
 
 ```typescript
-// 效果联合类型
+// Effect union type
 type AnyEff = Err<string, any> | Ctx<string, any> | Opt<string, any> | Async | Msg<string, any>
 
-// 生成器类型
+// Generator type
 type Effect<T, E, C> = Generator<
-    T, // 返回类型
-    | Err<E> // 错误效果
-    | Ctx<C> // 上下文效果
-    | Async // 异步操作
-    | Msg<M> // 消息效果
+    T, // Return type
+    | Err<E> // Error effects
+    | Ctx<C> // Context effects
+    | Async // Async operations
+    | Msg<M> // Message effects
 >
 ```
 
-### 效果处理机制
+### Effect Handling Mechanism
 
-#### 效果传播
+#### Effect Propagation
 
-效果在函数调用链中自然传播：
+Effects naturally propagate through function call chains:
 
 ```typescript
 function* inner() {
@@ -161,10 +195,10 @@ function* inner() {
 }
 
 function* outer() {
-    return yield* inner() // 错误效果会传播到外层
+    return yield* inner() // Error effects propagate to outer layer
 }
 
-// 在顶层处理效果
+// Handle effects at the top level
 const result = Eff.run(
     Eff.try(outer()).handle({
         InnerError: (error) => `Handled: ${error}`,
@@ -172,50 +206,50 @@ const result = Eff.run(
 )
 ```
 
-#### 效果处理
+#### Effect Handling
 
-使用 `Eff.try().handle()` 处理效果：
+Use `Eff.try().handle()` to handle effects:
 
 ```typescript
 const result = Eff.run(
     Eff.try(getUser('123')).handle({
-        // 错误处理
+        // Error handling
         ValidationError: (error) => ({ error }),
         UserNotFound: (error) => ({ error }),
 
-        // 上下文提供
+        // Context provision
         UserId: '123',
         ApiKey: 'secret-key',
 
-        // 可选上下文
+        // Optional context
         Logger: (level, message) => console.log(`[${level}] ${message}`),
     }),
 )
 ```
 
-## 生成器与效果
+## Generators and Effects
 
-### 为什么使用生成器？
+### Why Use Generators?
 
-生成器函数是 JavaScript 中实现代数效应的理想选择：
+Generator functions are the ideal choice for implementing algebraic effects in JavaScript:
 
-1. **暂停和恢复**：生成器可以暂停执行并恢复
-2. **值传递**：可以在暂停和恢复之间传递值
-3. **错误传播**：错误可以自然传播
-4. **类型安全**：TypeScript 提供完整的类型检查
+1. **Pause and Resume**: Generator functions can pause execution and resume
+2. **Value Passing**: Values can be passed between pauses and resumes
+3. **Error Propagation**: Errors can naturally propagate
+4. **Type Safety**: TypeScript provides complete type checking
 
-### 生成器效果模式
+### Generator Effect Pattern
 
 ```typescript
 function* effectFunction() {
-    // 1. 产生效果
+    // 1. Produce effect
     const value = yield {
         type: 'ctx',
         name: 'SomeContext',
         context: EffSymbol,
     }
 
-    // 2. 处理效果结果
+    // 2. Handle effect result
     if (value === null) {
         yield {
             type: 'err',
@@ -224,14 +258,14 @@ function* effectFunction() {
         }
     }
 
-    // 3. 返回最终结果
+    // 3. Return final result
     return `Processed: ${value}`
 }
 ```
 
-### 效果运行器
+### Effect Runner
 
-Koka 提供了智能的效果运行器：
+Koka provides a smart effect runner:
 
 ```typescript
 function runEffect<T>(generator: Generator<any, T>): T | Promise<T> {
@@ -246,7 +280,7 @@ function runEffect<T>(generator: Generator<any, T>): T | Promise<T> {
                         (error) => process(generator.throw(error)),
                     )
                 case 'ctx':
-                    // 处理可选的上下文效果
+                    // Handle optional context effects
                     result = generator.next(undefined)
                     break
                 default:
@@ -261,26 +295,26 @@ function runEffect<T>(generator: Generator<any, T>): T | Promise<T> {
 }
 ```
 
-## 类型系统设计
+## Type System Design
 
-### 高级类型工具
+### Advanced Type Tools
 
-Koka 使用 TypeScript 的高级类型特性：
+Koka uses TypeScript's advanced type features:
 
-#### 条件类型
+#### Conditional Types
 
 ```typescript
-// 提取错误类型
+// Extract error type
 type ExtractErr<T> = T extends AnyErr ? T : never
 
-// 排除错误类型
+// Exclude error type
 type ExcludeErr<T> = T extends AnyErr ? never : T
 ```
 
-#### 映射类型
+#### Mapping Types
 
 ```typescript
-// 将效果转换为处理器类型
+// Convert effect to handler type
 type ToHandler<Effect> = Effect extends Err<infer Name, infer U>
     ? Record<Name, (error: U) => unknown>
     : Effect extends Ctx<infer Name, infer U>
@@ -288,70 +322,70 @@ type ToHandler<Effect> = Effect extends Err<infer Name, infer U>
     : never
 ```
 
-#### 交叉类型
+#### Intersection Types
 
 ```typescript
-// 合并多个处理器类型
+// Merge multiple handler types
 type EffectHandlers<Effect> = UnionToIntersection<ToHandler<Effect>>
 ```
 
-### 类型推断
+### Type Inference
 
-Koka 提供强大的类型推断：
+Koka provides powerful type inference:
 
 ```typescript
-// 自动推断效果类型
+// Automatically infer effect type
 function* getUser(userId: string) {
     if (!userId) {
         yield* Eff.err('ValidationError').throw('ID required')
-        // TypeScript 知道这里会产生 ValidationError 效果
+        // TypeScript knows this will produce ValidationError effect
     }
 
     const user = yield* Eff.await(fetchUser(userId))
-    // TypeScript 知道这里会产生 Async 效果
+    // TypeScript knows this will produce Async effect
 
     return user
 }
 
-// 类型安全的处理器
+// Type-safe handler
 const result = Eff.run(
     Eff.try(getUser('123')).handle({
-        ValidationError: (error: string) => ({ error }), // 类型检查
-        // TypeScript 会检查是否处理了所有可能的效果
+        ValidationError: (error: string) => ({ error }), // Type checking
+        // TypeScript checks if all possible effects are handled
     }),
 )
 ```
 
-## 与 Effect-TS 的详细对比
+## Detailed Comparison with Effect-TS
 
-### 设计哲学
+### Design Philosophy
 
-| 方面           | Koka         | Effect-TS      |
-| -------------- | ------------ | -------------- |
-| **设计目标**   | 轻量级、简单 | 完整、功能丰富 |
-| **学习曲线**   | 低           | 高             |
-| **API 复杂度** | 最小化       | 全面           |
-| **类型系统**   | 简单直接     | 复杂强大       |
+| Aspect             | Koka                | Effect-TS              |
+| ------------------ | ------------------- | ---------------------- |
+| **Design Goal**    | Lightweight, Simple | Complete, Feature-Rich |
+| **Learning Curve** | Low                 | High                   |
+| **API Complexity** | Minimal             | Comprehensive          |
+| **Type System**    | Simple Direct       | Complex Powerful       |
 
-### 类型系统对比
+### Type System Comparison
 
-**Effect-TS 类型：**
+**Effect-TS Type:**
 
 ```typescript
-// Effect-TS 使用复杂的类型系统
+// Effect-TS uses complex type system
 Effect<Success, Error, Requirements>
 ```
 
-**Koka 类型：**
+**Koka Type:**
 
 ```typescript
-// Koka 使用简单的生成器类型
+// Koka uses simple generator type
 Generator<T, Err | Ctx | Async>
 ```
 
-### 错误处理对比
+### Error Handling Comparison
 
-**Effect-TS：**
+**Effect-TS:**
 
 ```typescript
 import { Effect, pipe } from 'effect'
@@ -372,7 +406,7 @@ const result = await Effect.runPromise(
 )
 ```
 
-**Koka：**
+**Koka:**
 
 ```typescript
 import { Eff } from 'koka'
@@ -391,9 +425,9 @@ const result = await Eff.run(
 )
 ```
 
-### 上下文管理对比
+### Context Management Comparison
 
-**Effect-TS：**
+**Effect-TS:**
 
 ```typescript
 import { Effect, Context } from 'effect'
@@ -413,7 +447,7 @@ const runnable = Effect.provideService(program, Random, {
 const result = await Effect.runPromise(runnable)
 ```
 
-**Koka：**
+**Koka:**
 
 ```typescript
 import { Eff } from 'koka'
@@ -430,54 +464,54 @@ const result = Eff.run(
 )
 ```
 
-### 性能对比
+### Performance Comparison
 
-| 指标           | Koka | Effect-TS |
-| -------------- | ---- | --------- |
-| **包大小**     | ~3kB | ~50kB     |
-| **运行时开销** | 低   | 中等      |
-| **内存使用**   | 低   | 中等      |
-| **启动时间**   | 快   | 中等      |
+| Metric               | Koka | Effect-TS |
+| -------------------- | ---- | --------- |
+| **Package Size**     | ~3kB | ~50kB     |
+| **Runtime Overhead** | Low  | Medium    |
+| **Memory Usage**     | Low  | Medium    |
+| **Startup Time**     | Fast | Medium    |
 
-### 适用场景
+### Applicability
 
-**选择 Koka 当：**
+**Choose Koka When:**
 
 -   需要轻量级的效果管理
 -   项目对包大小敏感
 -   团队对函数式编程不熟悉
 -   需要快速集成
 
-**选择 Effect-TS 当：**
+**Choose Effect-TS When:**
 
 -   需要完整的效果生态系统
 -   项目需要高级的类型系统
 -   团队有函数式编程经验
 -   需要企业级功能
 
-## 最佳实践
+## Best Practices
 
-### 效果设计原则
+### Effect Design Principles
 
-1. **单一职责**：每个效果应该有一个明确的职责
-2. **类型安全**：充分利用 TypeScript 的类型系统
-3. **可组合性**：设计可以组合的效果
-4. **可测试性**：效果应该易于测试和模拟
+1. **Single Responsibility**: Each effect should have a clear purpose
+2. **Type Safety**: Utilize TypeScript's type system
+3. **Composability**: Design effects that can be composed
+4. **Testability**: Effects should be easy to test and simulate
 
-### 代码组织
+### Code Organization
 
 ```typescript
-// effects/user.ts - 定义效果类型
+// effects/user.ts - Define effect types
 export class UserNotFound extends Eff.Err('UserNotFound')<string> {}
 export class UserDatabase extends Eff.Ctx('UserDatabase')<Database> {}
 
-// services/user-service.ts - 实现业务逻辑
+// services/user-service.ts - Implement business logic
 export function* getUserService(userId: string) {
     const db = yield* Eff.get(UserDatabase)
-    // 业务逻辑
+    // Business logic
 }
 
-// main.ts - 组合和运行
+// main.ts - Combine and run
 const result = await Eff.run(
     Eff.try(getUserService('123')).handle({
         UserNotFound: (error) => ({ error }),
@@ -486,41 +520,41 @@ const result = await Eff.run(
 )
 ```
 
-### 错误处理策略
+### Error Handling Strategy
 
-1. **分层处理**：在适当的层次处理错误
-2. **错误转换**：将低级错误转换为高级错误
-3. **错误恢复**：提供错误恢复机制
-4. **错误日志**：记录错误信息用于调试
+1. **Layered Handling**: Handle errors at the appropriate level
+2. **Error Transformation**: Transform low-level errors into high-level errors
+3. **Error Recovery**: Provide error recovery mechanism
+4. **Error Logging**: Record error information for debugging
 
-### 性能优化
+### Performance Optimization
 
-1. **效果合并**：合并多个效果减少开销
-2. **懒加载**：延迟加载不必要的效果
-3. **缓存**：缓存重复的效果结果
-4. **并发处理**：使用 `Eff.combine` 和 `Eff.all` 进行并发处理
+1. **Effect Merging**: Merge multiple effects to reduce overhead
+2. **Lazy Loading**: Delay loading unnecessary effects
+3. **Caching**: Cache repeated effect results
+4. **Concurrency Handling**: Use `Eff.combine` and `Eff.all` for concurrency handling
 
-## 未来发展方向
+## Future Development Directions
 
-### 计划中的功能
+### Planned Features
 
-1. **更强大的类型推断**：改进 TypeScript 类型推断
-2. **性能优化**：进一步减少运行时开销
-3. **开发工具**：提供更好的开发体验
-4. **生态系统**：建立插件和扩展生态系统
+1. **More Powerful Type Inference**: Improve TypeScript type inference
+2. **Performance Optimization**: Further reduce runtime overhead
+3. **Development Tools**: Provide better development experience
+4. **Ecosystem**: Establish plugin and extension ecosystem
 
-### 社区贡献
+### Community Contributions
 
-Koka 欢迎社区贡献：
+Koka welcomes community contributions:
 
-1. **问题报告**：报告 bug 和功能请求
-2. **代码贡献**：提交 PR 改进代码
-3. **文档改进**：帮助改进文档
-4. **示例分享**：分享使用示例和最佳实践
+1. **Issue Reporting**: Report bugs and feature requests
+2. **Code Contribution**: Submit PR to improve code
+3. **Documentation Improvement**: Help improve documentation
+4. **Example Sharing**: Share usage examples and best practices
 
-### 学习资源
+### Learning Resources
 
-1. **官方文档**：完整的 API 文档和教程
-2. **示例项目**：实际的使用示例
-3. **社区讨论**：GitHub Issues 和 Discussions
-4. **博客文章**：深入的技术文章和教程
+1. **Official Documentation**: Complete API documentation and tutorials
+2. **Example Project**: Actual usage examples
+3. **Community Discussions**: GitHub Issues and Discussions
+4. **Blog Articles**: Deep technical articles and tutorials

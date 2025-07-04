@@ -1,35 +1,45 @@
-# Koka - 基于代数效应的轻量级 TypeScript 效果管理库
+# Koka - Lightweight TypeScript Effect Management Library Based on Algebraic Effects
 
-**警告：此库处于早期开发阶段，可能会发生重大变化。请勿在生产环境中使用。**
+**Warning: This library is in early development and may undergo significant changes. Do not use in production environments.**
 
-Koka 是一个基于代数效应的轻量级 TypeScript 效果管理库，提供结构化错误处理、上下文管理和异步操作，具有可组合性和类型安全性。
+Koka is a lightweight TypeScript effect management library based on algebraic effects, providing structured error handling, context management, and asynchronous operations with composability and type safety.
 
-## 📚 文档导航
+## 📚 Documentation Navigation
 
--   **[文档首页](./docs/README.md)** - 完整的文档导航
--   **[教程](./docs/tutorials.md)** - 从零开始学习 Koka
--   **[操作指南](./docs/how-to-guides.md)** - 解决具体问题的步骤
--   **[API 参考](./docs/reference.md)** - 完整的 API 文档
--   **[概念解释](./docs/explanations.md)** - 深入理解 Koka 的设计理念
+[中文文档](./README.zh_CN.md)
 
-## 🚀 快速开始
+-   **[Documentation Home](./docs/README.md)** - Complete documentation navigation
+-   **[Tutorials](./docs/tutorials.md)** - Learn Koka from scratch
+-   **[How-to Guides](./docs/how-to-guides.md)** - Step-by-step solutions to specific problems
+-   **[API Reference](./docs/reference.md)** - Complete API documentation
+-   **[Concept Explanations](./docs/explanations.md)** - Deep understanding of Koka's design philosophy
 
-### 安装
+## 📋 Quick Navigation
+
+-   [🚀 Quick Start](#-quick-start)
+-   [✨ Core Features](#-core-features)
+-   [🔄 Comparison with Effect-TS](#-comparison-with-effect-ts)
+-   [📖 Documentation Structure](#-documentation-structure)
+-   [🤝 Contributing](#-contributing)
+
+## 🚀 Quick Start
+
+### Installation
 
 ```bash
 npm install koka
-# 或
+# or
 yarn add koka
-# 或
+# or
 pnpm add koka
 ```
 
-### 基本使用
+### Basic Usage
 
 ```typescript
 import { Eff } from 'koka'
 
-// 错误处理
+// Error handling
 function* getUser(id: string) {
     if (!id) {
         yield* Eff.err('ValidationError').throw('ID is required')
@@ -37,83 +47,83 @@ function* getUser(id: string) {
     return { id, name: 'John Doe' }
 }
 
-// 上下文管理
+// Context management
 function* calculateTotal() {
     const discount = yield* Eff.ctx('Discount').get<number>()
     return 100 * (1 - discount)
 }
 
-// 异步操作
+// Async operations
 async function* fetchData() {
     const response = yield* Eff.await(fetch('/api/data'))
     return response.json()
 }
 
-// 运行效果
+// Run effects
 const result = await Eff.run(
-    Eff.try(getUser('123')).catch({
+    Eff.try(getUser('123')).handle({
         ValidationError: (error) => ({ error }),
     }),
 )
 ```
 
-## ✨ 核心特性
+## ✨ Core Features
 
--   **类型安全** - 完整的 TypeScript 支持
--   **轻量级** - 仅 ~3kB gzipped
--   **可组合** - 效果自然组合
--   **异步就绪** - 无缝 Promise 集成
--   **设计优先** - 支持预定义效果类型
+-   **Type Safe** - Full TypeScript support
+-   **Lightweight** - Only ~3kB gzipped
+-   **Composable** - Effects naturally compose
+-   **Async Ready** - Seamless Promise integration
+-   **Design First** - Support for predefined effect types
 
-## 🔄 与 Effect-TS 对比
+## 🔄 Comparison with Effect-TS
 
-| 特性       | Koka | Effect-TS |
-| ---------- | ---- | --------- |
-| 错误效果   | ✅   | ✅        |
-| 上下文效果 | ✅   | ✅        |
-| 异步效果   | ✅   | ✅        |
-| 可组合性   | ✅   | ✅        |
-| 类型安全   | ✅   | ✅        |
-| 最小 API   | ✅   | ❌        |
-| 完整生态   | ❌   | ✅        |
-| 学习曲线   | 低   | 高        |
-| 包大小     | ~3kB | ~50kB     |
+| Feature         | Koka | Effect-TS |
+| --------------- | ---- | --------- |
+| Error Effects   | ✅   | ✅        |
+| Context Effects | ✅   | ✅        |
+| Async Effects   | ✅   | ✅        |
+| Composability   | ✅   | ✅        |
+| Type Safety     | ✅   | ✅        |
+| Minimal API     | ✅   | ❌        |
+| Full Ecosystem  | ❌   | ✅        |
+| Learning Curve  | Low  | High      |
+| Package Size    | ~3kB | ~50kB     |
 
-Koka 是 Effect-TS 的轻量级替代方案，专注于提供核心的效果管理功能，而无需完整的生态系统。
+Koka is a lightweight alternative to Effect-TS, focusing on providing core effect management functionality without the complete ecosystem.
 
-## 📖 文档结构
+## 📖 Documentation Structure
 
-### 教程 (Tutorials)
+### Tutorials
 
--   [从零开始](./docs/tutorials.md#getting-started) - 创建你的第一个 Koka 程序
--   [错误处理基础](./docs/tutorials.md#error-handling) - 学习如何处理错误效果
--   [上下文管理](./docs/tutorials.md#context-management) - 理解上下文效果的使用
--   [异步编程](./docs/tutorials.md#async-programming) - 掌握异步效果的处理
+-   [Getting Started](./docs/tutorials.md#getting-started) - Create your first Koka program
+-   [Error Handling Basics](./docs/tutorials.md#error-handling-basics) - Learn how to handle error effects
+-   [Context Management](./docs/tutorials.md#context-management) - Understand how to use context effects
+-   [Async Programming](./docs/tutorials.md#async-programming) - Master async effect handling
 
-### 操作指南 (How-to Guides)
+### How-to Guides
 
--   [处理特定错误类型](./docs/how-to-guides.md#handle-specific-errors)
--   [组合多个效果](./docs/how-to-guides.md#combine-multiple-effects)
--   [使用设计优先方法](./docs/how-to-guides.md#design-first-approach)
--   [消息传递](./docs/how-to-guides.md#message-passing)
--   [流式处理](./docs/how-to-guides.md#stream-processing)
+-   [Handle Specific Error Types](./docs/how-to-guides.md#handle-specific-error-types)
+-   [Combine Multiple Effects](./docs/how-to-guides.md#combine-multiple-effects)
+-   [Use Design-First Approach](./docs/how-to-guides.md#use-design-first-approach)
+-   [Message Passing](./docs/how-to-guides.md#message-passing)
+-   [Stream Processing](./docs/how-to-guides.md#stream-processing)
 
-### 参考文档 (Reference)
+### Reference
 
--   [Eff API](./docs/reference.md#eff-api) - 完整的 Eff 类 API
--   [效果类型](./docs/reference.md#effect-types) - 所有效果类型的定义
--   [工具函数](./docs/reference.md#utility-functions) - 辅助函数和类型
+-   [Eff API](./docs/reference.md#eff-api) - Complete Eff class API
+-   [Effect Types](./docs/reference.md#effect-types) - Definitions of all effect types
+-   [Utility Functions](./docs/reference.md#utility-functions) - Helper functions and types
 
-### 解释文档 (Explanations)
+### Explanations
 
--   [代数效应](./docs/explanations.md#algebraic-effects) - 代数效应的概念
--   [效果系统设计](./docs/explanations.md#effect-system-design) - Koka 的设计理念
--   [与 Effect-TS 的详细对比](./docs/explanations.md#comparison-with-effect-ts)
+-   [Algebraic Effects](./docs/explanations.md#algebraic-effects) - Concepts of algebraic effects
+-   [Effect System Design](./docs/explanations.md#effect-system-design) - Koka's design philosophy
+-   [Detailed Comparison with Effect-TS](./docs/explanations.md#detailed-comparison-with-effect-ts)
 
-## 🤝 贡献
+## 🤝 Contributing
 
-欢迎提交 PR！请确保测试通过，新功能包含适当的测试覆盖。
+PRs are welcome! Please ensure tests pass and new features include appropriate test coverage.
 
-## 📄 许可证
+## 📄 License
 
 MIT

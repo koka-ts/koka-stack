@@ -1,44 +1,44 @@
-# Koka How-to Guides
+# Koka 操作指南
 
-This guide provides step-by-step solutions to specific problems.
+本指南提供解决具体问题的步骤和方法。
 
-## 📋 Table of Contents
+## 📋 目录
 
--   [Handle Specific Error Types](#handle-specific-error-types)
-    -   [How to Define and Use Custom Error Types](#how-to-define-and-use-custom-error-types)
-    -   [How to Create Error Handling Middleware](#how-to-create-error-handling-middleware)
--   [Combine Multiple Effects](#combine-multiple-effects)
-    -   [How to Execute Multiple Effects in Parallel](#how-to-execute-multiple-effects-in-parallel)
-    -   [How to Combine Object Effects](#how-to-combine-object-effects)
--   [Use Design-First Approach](#use-design-first-approach)
-    -   [How to Organize Effect Definitions](#how-to-organize-effect-definitions)
-    -   [How to Create Reusable Effect Combinations](#how-to-create-reusable-effect-combinations)
--   [Message Passing](#message-passing)
-    -   [How to Implement Bidirectional Communication](#how-to-implement-bidirectional-communication)
-    -   [How to Create Message Handlers](#how-to-create-message-handlers)
--   [Stream Processing](#stream-processing)
-    -   [How to Handle Streaming Data](#how-to-handle-streaming-data)
-    -   [How to Process Data Streams](#how-to-process-data-streams)
--   [Error Recovery and Retry](#error-recovery-and-retry)
-    -   [How to Implement Retry Mechanisms](#how-to-implement-retry-mechanisms)
-    -   [How to Handle Transient Errors](#how-to-handle-transient-errors)
--   [Test Effects](#test-effects)
-    -   [How to Write Tests for Effects](#how-to-write-tests-for-effects)
-    -   [How to Mock Effect Handlers](#how-to-mock-effect-handlers)
+-   [处理特定错误类型](#处理特定错误类型)
+    -   [如何定义和使用自定义错误类型](#如何定义和使用自定义错误类型)
+    -   [如何创建错误处理中间件](#如何创建错误处理中间件)
+-   [组合多个效果](#组合多个效果)
+    -   [如何并行执行多个效果](#如何并行执行多个效果)
+    -   [如何组合对象效果](#如何组合对象效果)
+-   [使用设计优先方法](#使用设计优先方法)
+    -   [如何组织效果定义](#如何组织效果定义)
+    -   [如何创建可重用的效果组合](#如何创建可重用的效果组合)
+-   [消息传递](#消息传递)
+    -   [如何实现双向通信](#如何实现双向通信)
+    -   [如何创建消息处理器](#如何创建消息处理器)
+-   [流式处理](#流式处理)
+    -   [如何处理流式数据](#如何处理流式数据)
+    -   [如何处理数据流](#如何处理数据流)
+-   [错误恢复和重试](#错误恢复和重试)
+    -   [如何实现重试机制](#如何实现重试机制)
+    -   [如何处理临时错误](#如何处理临时错误)
+-   [测试效果](#测试效果)
+    -   [如何为效果编写测试](#如何为效果编写测试)
+    -   [如何模拟效果处理器](#如何模拟效果处理器)
 
-## Handle Specific Error Types
+## 处理特定错误类型
 
-### How to Define and Use Custom Error Types
+### 如何定义和使用自定义错误类型
 
 ```typescript
 import { Eff } from 'koka'
 
-// Define custom error types
+// 定义自定义错误类型
 class UserNotFound extends Eff.Err('UserNotFound')<string> {}
 class ValidationError extends Eff.Err('ValidationError')<{ field: string; message: string }> {}
 class DatabaseError extends Eff.Err('DatabaseError')<{ code: string; details: string }> {}
 
-// Use in functions
+// 在函数中使用
 function* getUser(userId: string) {
     if (!userId) {
         yield* Eff.throw(new ValidationError({ field: 'userId', message: 'Required' }))
@@ -55,7 +55,7 @@ function* getUser(userId: string) {
     }
 }
 
-// Handle specific errors
+// 处理特定错误
 const result = await Eff.run(
     Eff.try(getUser('123')).handle({
         UserNotFound: (error) => ({ status: 404, message: error }),
@@ -65,10 +65,10 @@ const result = await Eff.run(
 )
 ```
 
-### How to Create Error Handling Middleware
+### 如何创建错误处理中间件
 
 ```typescript
-// Create generic error handling function
+// 创建通用的错误处理函数
 function createErrorHandler<T>(handlers: {
     UserNotFound?: (error: string) => T
     ValidationError?: (error: { field: string; message: string }) => T
@@ -77,7 +77,7 @@ function createErrorHandler<T>(handlers: {
     return handlers
 }
 
-// Use middleware
+// 使用中间件
 const errorHandler = createErrorHandler({
     UserNotFound: (error) => ({ type: 'not_found', message: error }),
     ValidationError: (error) => ({ type: 'validation_error', field: error.field, message: error.message }),
@@ -87,28 +87,28 @@ const errorHandler = createErrorHandler({
 const result = await Eff.run(Eff.try(getUser('123')).handle(errorHandler))
 ```
 
-## Combine Multiple Effects
+## 组合多个效果
 
-### How to Execute Multiple Effects in Parallel
+### 如何并行执行多个效果
 
 ```typescript
 import { Eff } from 'koka'
 
-// Fetch user and orders data in parallel
+// 并行获取用户和订单数据
 async function* getUserAndOrders(userId: string) {
     const [user, orders] = yield* Eff.combine([fetchUser(userId), fetchOrders(userId)])
 
     return { user, orders }
 }
 
-// Use race to get the fastest result
+// 使用 race 获取最快的结果
 async function* getFastestData(userId: string) {
     const result = yield* Eff.race([fetchFromCache(userId), fetchFromDatabase(userId), fetchFromAPI(userId)])
 
     return result
 }
 
-// Use all to wait for all results
+// 使用 all 等待所有结果
 async function* getAllUserData(userId: string) {
     const results = yield* Eff.all([fetchProfile(userId), fetchPreferences(userId), fetchHistory(userId)])
 
@@ -120,10 +120,10 @@ async function* getAllUserData(userId: string) {
 }
 ```
 
-### How to Combine Object Effects
+### 如何组合对象效果
 
 ```typescript
-// Combine multiple effects in an object
+// 组合对象中的多个效果
 async function* createUserProfile(userData: any) {
     const result = yield* Eff.combine({
         user: createUser(userData),
@@ -135,7 +135,7 @@ async function* createUserProfile(userData: any) {
     return result
 }
 
-// Run combined effects
+// 运行组合效果
 const profile = await Eff.run(
     Eff.try(createUserProfile(userData)).handle({
         ValidationError: (error) => ({ error }),
@@ -145,9 +145,9 @@ const profile = await Eff.run(
 )
 ```
 
-## Use Design-First Approach
+## 使用设计优先方法
 
-### How to Organize Effect Definitions
+### 如何组织效果定义
 
 ```typescript
 // effects/user.ts
@@ -202,7 +202,7 @@ const result = await Eff.run(
 )
 ```
 
-### How to Create Reusable Effect Combinations
+### 如何创建可重用的效果组合
 
 ```typescript
 // utils/with-logging.ts
@@ -220,12 +220,12 @@ export function* withLogging<T>(message: string, effect: () => Generator<any, T>
     }
 }
 
-// Use logging wrapper
+// 使用日志包装器
 function* getUserWithLogging(userId: string) {
     return yield* withLogging(`Fetching user ${userId}`, () => getUserService(userId))
 }
 
-// Use the wrapper
+// 使用包装器
 const result = await Eff.run(
     Eff.try(getUserWithLogging('123')).handle({
         UserNotFound: (error) => ({ error }),
@@ -240,19 +240,19 @@ const result = await Eff.run(
 )
 ```
 
-## Message Passing
+## 消息传递
 
-### How to Implement Generator Communication
+### 如何实现生成器之间的通信
 
 ```typescript
 import { Eff } from 'koka'
 
-// Define message type
+// 定义消息类型
 class UserRequest extends Eff.Msg('UserRequest')<{ userId: string }> {}
 class UserResponse extends Eff.Msg('UserResponse')<{ user: any }> {}
 class LogMessage extends Eff.Msg('Log')<string> {}
 
-// Client generator
+// 客户端生成器
 function* userClient() {
     yield* Eff.send(new UserRequest({ userId: '123' }))
     const response = yield* Eff.wait(UserResponse)
@@ -260,7 +260,7 @@ function* userClient() {
     return `Client: ${response.user.name}`
 }
 
-// Server generator
+// 服务端生成器
 function* userServer() {
     const request = yield* Eff.wait(UserRequest)
     yield* Eff.msg('Log').send(`Processing request for user: ${request.userId}`)
@@ -271,14 +271,14 @@ function* userServer() {
     return `Server: processed ${request.userId}`
 }
 
-// Log generator
+// 日志生成器
 function* logger() {
     const log1 = yield* Eff.msg('Log').wait<string>()
     const log2 = yield* Eff.msg('Log').wait<string>()
     return `Logger: ${log1}, ${log2}`
 }
 
-// Run communication program
+// 运行通信程序
 const result = Eff.runSync(
     Eff.communicate({
         client: userClient,
@@ -288,7 +288,7 @@ const result = Eff.runSync(
 )
 
 console.log(result)
-// Output:
+// 输出:
 // {
 //   client: 'Client: John Doe',
 //   server: 'Server: processed 123',
@@ -296,32 +296,32 @@ console.log(result)
 // }
 ```
 
-### How to Implement Request-Response Pattern
+### 如何实现请求-响应模式
 
 ```typescript
-// Define request-response message
+// 定义请求-响应消息
 class ApiRequest extends Eff.Msg('ApiRequest')<{ method: string; url: string; data?: any }> {}
 class ApiResponse extends Eff.Msg('ApiResponse')<{ status: number; data: any }> {}
 
-// API Client
+// API 客户端
 function* apiClient() {
     yield* Eff.send(new ApiRequest({ method: 'GET', url: '/users/123' }))
     const response = yield* Eff.wait(ApiResponse)
     return response.data
 }
 
-// API Server
+// API 服务器
 function* apiServer() {
     const request = yield* Eff.wait(ApiRequest)
 
-    // Simulate API processing
+    // 模拟 API 处理
     const data = { id: '123', name: 'John Doe' }
     yield* Eff.send(new ApiResponse({ status: 200, data }))
 
     return `Processed ${request.method} ${request.url}`
 }
 
-// Run API communication
+// 运行 API 通信
 const result = Eff.runSync(
     Eff.communicate({
         client: apiClient,
@@ -330,20 +330,20 @@ const result = Eff.runSync(
 )
 ```
 
-## Stream Processing
+## 流式处理
 
-### How to Handle Stream Data
+### 如何处理流式数据
 
 ```typescript
 import { Eff } from 'koka'
 
-// Create data generator
+// 创建数据生成器
 function* dataGenerator(id: number) {
     yield* Eff.await(new Promise((resolve) => setTimeout(resolve, id * 10)))
     return `Data ${id}`
 }
 
-// Stream processing multiple generators
+// 流式处理多个生成器
 async function* processStream() {
     const results = yield* Eff.stream([dataGenerator(1), dataGenerator(2), dataGenerator(3)], async (stream) => {
         const processed = []
@@ -356,15 +356,15 @@ async function* processStream() {
     return results
 }
 
-// Run stream processing
+// 运行流式处理
 const result = await Eff.run(processStream())
 console.log(result) // ['Processed: Data 1', 'Processed: Data 2', 'Processed: Data 3']
 ```
 
-### How to Implement Concurrency Control
+### 如何实现并发控制
 
 ```typescript
-// Limit stream processing concurrency
+// 限制并发数量的流处理
 async function* limitedConcurrency() {
     const generators = Array.from({ length: 10 }, (_, i) => dataGenerator(i + 1))
 
@@ -376,7 +376,7 @@ async function* limitedConcurrency() {
             results[index] = value
             count++
 
-            // Limit simultaneous processing
+            // 限制同时处理的数量
             if (count % 3 === 0) {
                 await new Promise((resolve) => setTimeout(resolve, 100))
             }
@@ -389,10 +389,10 @@ async function* limitedConcurrency() {
 }
 ```
 
-### How to Handle Stream Errors
+### 如何处理流式错误
 
 ```typescript
-// Handle errors in stream
+// 处理流中的错误
 function* failingGenerator(id: number) {
     if (id === 2) {
         yield* Eff.err('StreamError').throw(`Error in generator ${id}`)
@@ -419,7 +419,7 @@ async function* handleStreamErrors() {
     return result
 }
 
-// Run error handling
+// 运行错误处理
 const result = await Eff.runResult(handleStreamErrors())
 if (result.type === 'err') {
     console.error('Stream error:', result.error)
@@ -428,12 +428,12 @@ if (result.type === 'err') {
 }
 ```
 
-## Error Recovery and Retry
+## 错误恢复和重试
 
-### How to Implement Automatic Retry Mechanism
+### 如何实现自动重试机制
 
 ```typescript
-// Retry function
+// 重试函数
 function* withRetry<T>(effect: () => Generator<any, T>, maxRetries: number = 3, delay: number = 1000) {
     let lastError: any
 
@@ -452,16 +452,16 @@ function* withRetry<T>(effect: () => Generator<any, T>, maxRetries: number = 3, 
     throw lastError
 }
 
-// Use retry mechanism
+// 使用重试机制
 function* fetchUserWithRetry(userId: string) {
     return yield* withRetry(() => fetchUser(userId), 3, 1000)
 }
 ```
 
-### How to Implement Circuit Breaker Pattern
+### 如何实现断路器模式
 
 ```typescript
-// Simple circuit breaker implementation
+// 简单的断路器实现
 class CircuitBreaker {
     private failures = 0
     private lastFailure = 0
@@ -503,7 +503,7 @@ class CircuitBreaker {
     }
 }
 
-// Use circuit breaker in Koka
+// 在 Koka 中使用断路器
 const breaker = new CircuitBreaker()
 
 function* fetchUserWithCircuitBreaker(userId: string) {
@@ -511,14 +511,14 @@ function* fetchUserWithCircuitBreaker(userId: string) {
 }
 ```
 
-## Test Effects
+## 测试效果
 
-### How to Write Tests for Effects
+### 如何为效果编写测试
 
 ```typescript
 import { Eff } from 'koka'
 
-// Test user service
+// 测试用户服务
 describe('UserService', () => {
     it('should fetch user successfully', async () => {
         const mockUser = { id: '123', name: 'John Doe' }
@@ -558,10 +558,10 @@ describe('UserService', () => {
 })
 ```
 
-### How to Simulate Effects for Testing
+### 如何模拟效果进行测试
 
 ```typescript
-// Create test tool
+// 创建测试工具
 function createTestContext(overrides: any = {}) {
     return {
         UserNotFound: (error: string) => ({ error }),
@@ -577,7 +577,7 @@ function createTestContext(overrides: any = {}) {
     }
 }
 
-// Use test tool
+// 使用测试工具
 it('should handle database errors', async () => {
     const testContext = createTestContext({
         UserDatabase: {

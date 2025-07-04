@@ -1,23 +1,49 @@
-# Koka API 参考
+# Koka API Reference
 
-本文档提供 Koka 库的完整 API 参考。
+This document provides the complete API reference for the Koka library.
+
+## 📋 Table of Contents
+
+-   [Eff API](#eff-api)
+    -   [Core Methods](#core-methods)
+    -   [Effect Composition Methods](#effect-composition-methods)
+    -   [Stream Processing Methods](#stream-processing-methods)
+    -   [Message Passing Methods](#message-passing-methods)
+    -   [Result Processing Methods](#result-processing-methods)
+    -   [Predefined Effect Classes](#predefined-effect-classes)
+    -   [Effect Operation Methods](#effect-operation-methods)
+-   [Effect Type](#effect-type)
+    -   [Base Types](#base-types)
+    -   [Combined Types](#combined-types)
+-   [Result Type](#result-type)
+    -   [Base Types](#base-types-1)
+    -   [Result Tools Functions](#result-tools-functions)
+-   [Tools Functions](#tools-functions)
+    -   [`isGenerator(value)`](#isgeneratorvalue)
+-   [Type Tools](#type-tools)
+    -   [`Task<Yield, Return>`](#taskyield-return)
+    -   [`MaybePromise<T>`](#maybepromiset)
+    -   [`MaybeFunction<T>`](#maybefunctiont)
+    -   [`StreamResult<T>`](#streamresultt)
+    -   [`StreamResults<TaskReturn>`](#streamresultstaskreturn)
+    -   [`StreamHandler<TaskReturn, HandlerReturn>`](#streamhandlertaskreturn-handlerreturn)
 
 ## Eff API
 
-### 核心方法
+### Core Methods
 
 #### `Eff.err(name).throw(error?)`
 
-抛出错误效果。
+Throw an error effect.
 
-**参数：**
+**Parameters:**
 
--   `name` (string): 错误类型的名称
--   `error` (any, 可选): 错误信息
+-   `name` (string): Name of the error type
+-   `error` (any, optional): Error information
 
-**返回：** `Generator<Err<Name, E>, never>`
+**Returns:** `Generator<Err<Name, E>, never>`
 
-**示例：**
+**Example:**
 
 ```typescript
 function* validateUser(userId: string) {
@@ -30,16 +56,16 @@ function* validateUser(userId: string) {
 
 #### `Eff.ctx(name).get<T>()`
 
-获取上下文值。
+Get a context value.
 
-**参数：**
+**Parameters:**
 
--   `name` (string): 上下文名称
--   `T` (类型参数): 上下文值的类型
+-   `name` (string): Context name
+-   `T` (type parameter): Type of the context value
 
-**返回：** `Generator<Ctx<Name, T>, T>`
+**Returns:** `Generator<Ctx<Name, T>, T>`
 
-**示例：**
+**Example:**
 
 ```typescript
 function* getUserInfo() {
@@ -51,16 +77,16 @@ function* getUserInfo() {
 
 #### `Eff.ctx(name).opt<T>()`
 
-获取可选的上下文值。
+Get an optional context value.
 
-**参数：**
+**Parameters:**
 
--   `name` (string): 上下文名称
--   `T` (类型参数): 上下文值的类型
+-   `name` (string): Context name
+-   `T` (type parameter): Type of the context value
 
-**返回：** `Generator<Opt<Name, T>, T | undefined>`
+**Returns:** `Generator<Opt<Name, T>, T | undefined>`
 
-**示例：**
+**Example:**
 
 ```typescript
 function* getUserPreferences() {
@@ -72,15 +98,15 @@ function* getUserPreferences() {
 
 #### `Eff.await<T>(promise)`
 
-处理异步操作。
+Handle asynchronous operations.
 
-**参数：**
+**Parameters:**
 
--   `promise` (Promise<T> | T): Promise 或同步值
+-   `promise` (Promise<T> | T): Promise or synchronous value
 
-**返回：** `Generator<Async, T>`
+**Returns:** `Generator<Async, T>`
 
-**示例：**
+**Example:**
 
 ```typescript
 async function* fetchData() {
@@ -91,16 +117,16 @@ async function* fetchData() {
 
 #### `Eff.try(generator).handle(handlers)`
 
-处理效果。
+Handle effects.
 
-**参数：**
+**Parameters:**
 
--   `generator` (Task<Yield, Return>): 生成器函数或生成器
--   `handlers` (Partial<EffectHandlers<Yield>>): 效果处理器
+-   `generator` (Task<Yield, Return>): Generator function or generator
+-   `handlers` (Partial<EffectHandlers<Yield>>): Effect handlers
 
-**返回：** `Task<Exclude<Yield, { name: keyof Handlers }>, Return | ExtractErrorHandlerReturn<Handlers, Yield>>`
+**Returns:** `Task<Exclude<Yield, { name: keyof Handlers }>, Return | ExtractErrorHandlerReturn<Handlers, Yield>>`
 
-**示例：**
+**Example:**
 
 ```typescript
 const result = Eff.run(
@@ -114,35 +140,35 @@ const result = Eff.run(
 
 #### `Eff.run(generator)`
 
-运行生成器。
+Run a generator.
 
-**参数：**
+**Parameters:**
 
--   `generator` (MaybeFunction<Generator<AnyOpt, Return>>): 生成器函数或生成器
+-   `generator` (MaybeFunction<Generator<AnyOpt, Return>>): Generator function or generator
 
-**返回：** `Return` 或 `Promise<Return>`
+**Returns:** `Return` or `Promise<Return>`
 
-**示例：**
+**Example:**
 
 ```typescript
-// 同步运行
+// Synchronous execution
 const result = Eff.run(getUserPreferences())
 
-// 异步运行
+// Asynchronous execution
 const result = await Eff.run(fetchData())
 ```
 
 #### `Eff.runSync(generator)`
 
-同步运行生成器。
+Run a generator synchronously.
 
-**参数：**
+**Parameters:**
 
--   `generator` (MaybeFunction<Generator<AnyOpt, Return>>): 生成器函数或生成器
+-   `generator` (MaybeFunction<Generator<AnyOpt, Return>>): Generator function or generator
 
-**返回：** `Return`
+**Returns:** `Return`
 
-**示例：**
+**Example:**
 
 ```typescript
 const result = Eff.runSync(getUserPreferences())
@@ -150,39 +176,39 @@ const result = Eff.runSync(getUserPreferences())
 
 #### `Eff.runAsync(generator)`
 
-异步运行生成器。
+Run a generator asynchronously.
 
-**参数：**
+**Parameters:**
 
--   `generator` (MaybeFunction<Generator<Async | AnyOpt, Return>>): 生成器函数或生成器
+-   `generator` (MaybeFunction<Generator<Async | AnyOpt, Return>>): Generator function or generator
 
-**返回：** `Promise<Return>`
+**Returns:** `Promise<Return>`
 
-**示例：**
+**Example:**
 
 ```typescript
 const result = await Eff.runAsync(fetchData())
 ```
 
-### 效果组合方法
+### Effect Composition Methods
 
 #### `Eff.combine(inputs)`
 
-组合多个效果。
+Combine multiple effects.
 
-**参数：**
+**Parameters:**
 
--   `inputs` (T): 数组或对象形式的输入
+-   `inputs` (T): Input in array or object form
 
-**返回：** `Generator<ExtractYield<T> | Async, ExtractReturn<T>>`
+**Returns:** `Generator<ExtractYield<T> | Async, ExtractReturn<T>>`
 
-**示例：**
+**Example:**
 
 ```typescript
-// 数组形式
+// Array form
 const [user, orders] = yield * Eff.combine([fetchUser(userId), fetchOrders(userId)])
 
-// 对象形式
+// Object form
 const result =
     yield *
     Eff.combine({
@@ -194,15 +220,15 @@ const result =
 
 #### `Eff.all(inputs)`
 
-并行执行所有效果并等待所有结果。
+Execute all effects in parallel and wait for all results.
 
-**参数：**
+**Parameters:**
 
--   `inputs` (Iterable<Task<Yield, Return>>): 可迭代的效果列表
+-   `inputs` (Iterable<Task<Yield, Return>>): Iterable list of effects
 
-**返回：** `Generator<Yield | Async, Return[]>`
+**Returns:** `Generator<Yield | Async, Return[]>`
 
-**示例：**
+**Example:**
 
 ```typescript
 const results = yield * Eff.all([fetchUser(userId), fetchProfile(userId), fetchOrders(userId)])
@@ -210,34 +236,34 @@ const results = yield * Eff.all([fetchUser(userId), fetchProfile(userId), fetchO
 
 #### `Eff.race(inputs)`
 
-并行执行效果并返回最快的结果。
+Execute effects in parallel and return the fastest result.
 
-**参数：**
+**Parameters:**
 
--   `inputs` (Iterable<Task<Yield, Return>>): 可迭代的效果列表
+-   `inputs` (Iterable<Task<Yield, Return>>): Iterable list of effects
 
-**返回：** `Generator<Yield | Async, Return>`
+**Returns:** `Generator<Yield | Async, Return>`
 
-**示例：**
+**Example:**
 
 ```typescript
 const result = yield * Eff.race([fetchFromCache(userId), fetchFromDatabase(userId), fetchFromAPI(userId)])
 ```
 
-### 流式处理方法
+### Stream Processing Methods
 
 #### `Eff.stream(inputs, handler)`
 
-处理流式数据。
+Process stream data.
 
-**参数：**
+**Parameters:**
 
--   `inputs` (Iterable<Task<Yield, TaskReturn>>): 可迭代的效果列表
--   `handler` (StreamHandler<TaskReturn, HandlerReturn>): 流处理器函数
+-   `inputs` (Iterable<Task<Yield, TaskReturn>>): Iterable list of effects
+-   `handler` (StreamHandler<TaskReturn, HandlerReturn>): Stream processor function
 
-**返回：** `Generator<Async | Yield, HandlerReturn>`
+**Returns:** `Generator<Async | Yield, HandlerReturn>`
 
-**示例：**
+**Example:**
 
 ```typescript
 const results =
@@ -251,19 +277,19 @@ const results =
     })
 ```
 
-### 消息传递方法
+### Message Passing Methods
 
 #### `Eff.communicate(inputs)`
 
-在生成器之间进行消息传递。
+Message passing between generators.
 
-**参数：**
+**Parameters:**
 
--   `inputs` (T): 包含生成器的对象
+-   `inputs` (T): Object containing generators
 
-**返回：** `Generator<Exclude<ExtractYield<T>, { type: 'msg' }>, ExtractReturn<T>>`
+**Returns:** `Generator<Exclude<ExtractYield<T>, { type: 'msg' }>, ExtractReturn<T>>`
 
-**示例：**
+**Example:**
 
 ```typescript
 const result = Eff.runSync(
@@ -276,16 +302,16 @@ const result = Eff.runSync(
 
 #### `Eff.msg(name).send(message)`
 
-发送消息。
+Send a message.
 
-**参数：**
+**Parameters:**
 
--   `name` (string): 消息名称
--   `message` (T): 消息内容
+-   `name` (string): Message name
+-   `message` (T): Message content
 
-**返回：** `Generator<SendMsg<Name, T>, void>`
+**Returns:** `Generator<SendMsg<Name, T>, void>`
 
-**示例：**
+**Example:**
 
 ```typescript
 yield * Eff.msg('Greeting').send('Hello, World!')
@@ -293,34 +319,34 @@ yield * Eff.msg('Greeting').send('Hello, World!')
 
 #### `Eff.msg(name).wait<T>()`
 
-等待消息。
+Wait for a message.
 
-**参数：**
+**Parameters:**
 
--   `name` (string): 消息名称
--   `T` (类型参数): 消息类型
+-   `name` (string): Message name
+-   `T` (type parameter): Message type
 
-**返回：** `Generator<WaitMsg<Name, T>, T>`
+**Returns:** `Generator<WaitMsg<Name, T>, T>`
 
-**示例：**
+**Example:**
 
 ```typescript
 const message = yield * Eff.msg('Greeting').wait<string>()
 ```
 
-### 结果处理方法
+### Result Processing Methods
 
 #### `Eff.result(generator)`
 
-将生成器转换为结果类型。
+Convert a generator to a result type.
 
-**参数：**
+**Parameters:**
 
--   `generator` (Generator<Yield, Return>): 生成器
+-   `generator` (Generator<Yield, Return>): Generator
 
-**返回：** `Generator<ExcludeErr<Yield>, Ok<Return> | ExtractErr<Yield>>`
+**Returns:** `Generator<ExcludeErr<Yield>, Ok<Return> | ExtractErr<Yield>>`
 
-**示例：**
+**Example:**
 
 ```typescript
 const result = Eff.run(Eff.result(getUser('123')))
@@ -333,15 +359,15 @@ if (result.type === 'ok') {
 
 #### `Eff.ok(generator)`
 
-解包 Ok 结果。
+Unpack Ok result.
 
-**参数：**
+**Parameters:**
 
--   `generator` (Generator<Yield, Return>): 返回 Result 类型的生成器
+-   `generator` (Generator<Yield, Return>): Return Result type generator
 
-**返回：** `Generator<Yield | ExtractErr<Return>, InferOkValue<Return>>`
+**Returns:** `Generator<Yield | ExtractErr<Return>, InferOkValue<Return>>`
 
-**示例：**
+**Example:**
 
 ```typescript
 const user = yield * Eff.ok(Eff.result(getUser('123')))
@@ -349,34 +375,34 @@ const user = yield * Eff.ok(Eff.result(getUser('123')))
 
 #### `Eff.runResult(generator)`
 
-运行生成器并返回结果类型。
+Run a generator and return a result type.
 
-**参数：**
+**Parameters:**
 
--   `generator` (MaybeFunction<Generator<Yield, Return>>): 生成器函数或生成器
+-   `generator` (MaybeFunction<Generator<Yield, Return>>): Generator function or generator
 
-**返回：** `Ok<Return> | ExtractErr<Yield>` 或 `Promise<Ok<Return> | ExtractErr<Yield>>`
+**Returns:** `Ok<Return> | ExtractErr<Yield>` or `Promise<Ok<Return> | ExtractErr<Yield>>`
 
-**示例：**
+**Example:**
 
 ```typescript
 const result = await Eff.runResult(getUser('123'))
 ```
 
-### 预定义效果类
+### Predefined Effect Classes
 
 #### `Eff.Err(name)<Error>`
 
-创建错误效果类。
+Create error effect class.
 
-**参数：**
+**Parameters:**
 
--   `name` (string): 错误类型名称
--   `Error` (类型参数): 错误数据类型
+-   `name` (string): Error type name
+-   `Error` (type parameter): Error data type
 
-**返回：** 错误效果类
+**Returns:** Error effect class
 
-**示例：**
+**Example:**
 
 ```typescript
 class UserNotFound extends Eff.Err('UserNotFound')<string> {}
@@ -387,16 +413,16 @@ const error = new UserNotFound('User not found')
 
 #### `Eff.Ctx(name)<Context>`
 
-创建上下文效果类。
+Create context effect class.
 
-**参数：**
+**Parameters:**
 
--   `name` (string): 上下文名称
--   `Context` (类型参数): 上下文数据类型
+-   `name` (string): Context name
+-   `Context` (type parameter): Context data type
 
-**返回：** 上下文效果类
+**Returns:** Context effect class
 
-**示例：**
+**Example:**
 
 ```typescript
 class DatabaseConnection extends Eff.Ctx('Database')<{ query: (sql: string) => Promise<any> }> {}
@@ -407,16 +433,16 @@ const db = new DatabaseConnection()
 
 #### `Eff.Opt(name)<T>`
 
-创建可选效果类。
+Create optional effect class.
 
-**参数：**
+**Parameters:**
 
--   `name` (string): 效果名称
--   `T` (类型参数): 数据类型
+-   `name` (string): Effect name
+-   `T` (type parameter): Data type
 
-**返回：** 可选效果类
+**Returns:** Optional effect class
 
-**示例：**
+**Example:**
 
 ```typescript
 class Theme extends Eff.Opt('Theme')<string> {}
@@ -427,16 +453,16 @@ const theme = new Theme()
 
 #### `Eff.Msg(name)<T>`
 
-创建消息效果类。
+Create message effect class.
 
-**参数：**
+**Parameters:**
 
--   `name` (string): 消息名称
--   `T` (类型参数): 消息数据类型
+-   `name` (string): Message name
+-   `T` (type parameter): Message data type
 
-**返回：** 消息效果类
+**Returns:** Message effect class
 
-**示例：**
+**Example:**
 
 ```typescript
 class UserRequest extends Eff.Msg('UserRequest')<{ userId: string }> {}
@@ -445,19 +471,19 @@ class UserResponse extends Eff.Msg('UserResponse')<{ user: any }> {}
 const request = new UserRequest({ userId: '123' })
 ```
 
-### 效果操作方法
+### Effect Operation Methods
 
 #### `Eff.throw(err)`
 
-抛出预定义的错误效果。
+Throw predefined error effect.
 
-**参数：**
+**Parameters:**
 
--   `err` (Err): 错误效果实例
+-   `err` (Err): Error effect instance
 
-**返回：** `Generator<E, never>`
+**Returns:** `Generator<E, never>`
 
-**示例：**
+**Example:**
 
 ```typescript
 class UserNotFound extends Eff.Err('UserNotFound')<string> {}
@@ -472,15 +498,15 @@ function* getUser(userId: string) {
 
 #### `Eff.get(ctx)`
 
-从预定义上下文获取值。
+Get value from predefined context.
 
-**参数：**
+**Parameters:**
 
--   `ctx` (Ctx | (new () => C)): 上下文类或实例
+-   `ctx` (Ctx | (new () => C)): Context class or instance
 
-**返回：** `Generator<C, CtxValue<C>>`
+**Returns:** `Generator<C, CtxValue<C>>`
 
-**示例：**
+**Example:**
 
 ```typescript
 class DatabaseConnection extends Eff.Ctx('Database')<{ query: (sql: string) => Promise<any> }> {}
@@ -491,13 +517,13 @@ function* getUser(userId: string) {
 }
 ```
 
-## 效果类型
+## Effect Type
 
-### 基础类型
+### Base Types
 
 #### `Err<Name, T>`
 
-错误效果类型。
+Error effect type.
 
 ```typescript
 type Err<Name extends string, T> = {
@@ -509,7 +535,7 @@ type Err<Name extends string, T> = {
 
 #### `Ctx<Name, T>`
 
-上下文效果类型。
+Context effect type.
 
 ```typescript
 type Ctx<Name extends string, T> = {
@@ -522,7 +548,7 @@ type Ctx<Name extends string, T> = {
 
 #### `Opt<Name, T>`
 
-可选效果类型。
+Optional effect type.
 
 ```typescript
 interface Opt<Name extends string, T> extends Ctx<Name, T> {
@@ -532,7 +558,7 @@ interface Opt<Name extends string, T> extends Ctx<Name, T> {
 
 #### `Async`
 
-异步效果类型。
+Asynchronous effect type.
 
 ```typescript
 type Async = {
@@ -544,7 +570,7 @@ type Async = {
 
 #### `Msg<Name, T>`
 
-消息效果类型。
+Message effect type.
 
 ```typescript
 type Msg<Name extends string, T> = {
@@ -554,11 +580,11 @@ type Msg<Name extends string, T> = {
 }
 ```
 
-### 组合类型
+### Combined Types
 
 #### `AnyErr`
 
-任意错误效果类型。
+Any error effect type.
 
 ```typescript
 type AnyErr = Err<string, any>
@@ -566,7 +592,7 @@ type AnyErr = Err<string, any>
 
 #### `AnyCtx`
 
-任意上下文效果类型。
+Any context effect type.
 
 ```typescript
 type AnyCtx = Ctx<string, any>
@@ -574,7 +600,7 @@ type AnyCtx = Ctx<string, any>
 
 #### `AnyOpt`
 
-任意可选效果类型。
+Any optional effect type.
 
 ```typescript
 type AnyOpt = Opt<string, any>
@@ -582,7 +608,7 @@ type AnyOpt = Opt<string, any>
 
 #### `AnyMsg`
 
-任意消息效果类型。
+Any message effect type.
 
 ```typescript
 type AnyMsg = Msg<string, any>
@@ -590,19 +616,19 @@ type AnyMsg = Msg<string, any>
 
 #### `AnyEff`
 
-任意效果类型。
+Any effect type.
 
 ```typescript
 type AnyEff = Err<string, any> | Ctx<string, any> | Opt<string, any> | Async | Msg<string, any>
 ```
 
-## Result 类型
+## Result Type
 
-### 基础类型
+### Base Types
 
 #### `Ok<T>`
 
-成功结果类型。
+Success result type.
 
 ```typescript
 type Ok<T> = {
@@ -613,25 +639,25 @@ type Ok<T> = {
 
 #### `Result<T, E>`
 
-结果联合类型。
+Result union type.
 
 ```typescript
 type Result<T, E> = Ok<T> | (E extends AnyErr ? E : never)
 ```
 
-### Result 工具函数
+### Result Tools Functions
 
 #### `Result.ok(value)`
 
-创建成功结果。
+Create success result.
 
-**参数：**
+**Parameters:**
 
--   `value` (T): 成功值
+-   `value` (T): Success value
 
-**返回：** `Ok<T>`
+**Returns:** `Ok<T>`
 
-**示例：**
+**Example:**
 
 ```typescript
 const success = Result.ok(42)
@@ -639,34 +665,34 @@ const success = Result.ok(42)
 
 #### `Result.err(name, error)`
 
-创建错误结果。
+Create error result.
 
-**参数：**
+**Parameters:**
 
--   `name` (Name): 错误名称
--   `error` (T): 错误信息
+-   `name` (Name): Error name
+-   `error` (T): Error information
 
-**返回：** `Err<Name, T>`
+**Returns:** `Err<Name, T>`
 
-**示例：**
+**Example:**
 
 ```typescript
 const error = Result.err('ValidationError', 'Invalid input')
 ```
 
-## 工具函数
+## Tools Functions
 
 ### `isGenerator(value)`
 
-检查值是否为生成器。
+Check if value is a generator.
 
-**参数：**
+**Parameters:**
 
--   `value` (unknown): 要检查的值
+-   `value` (unknown): Value to check
 
-**返回：** `boolean`
+**Returns:** `boolean`
 
-**示例：**
+**Example:**
 
 ```typescript
 function* gen() {}
@@ -676,11 +702,11 @@ console.log(isGenerator(gen())) // true
 console.log(isGenerator(notGen())) // false
 ```
 
-## 类型工具
+## Type Tools
 
 ### `Task<Yield, Return>`
 
-任务类型，可以是生成器或生成器函数。
+Task type, can be a generator or generator function.
 
 ```typescript
 type Task<Yield extends AnyEff, Return> = Generator<Yield, Return> | (() => Generator<Yield, Return>)
@@ -688,7 +714,7 @@ type Task<Yield extends AnyEff, Return> = Generator<Yield, Return> | (() => Gene
 
 ### `MaybePromise<T>`
 
-可能是 Promise 的类型。
+Maybe Promise type.
 
 ```typescript
 type MaybePromise<T> = T extends Promise<any> ? T : T | Promise<T>
@@ -696,7 +722,7 @@ type MaybePromise<T> = T extends Promise<any> ? T : T | Promise<T>
 
 ### `MaybeFunction<T>`
 
-可能是函数的类型。
+Maybe function type.
 
 ```typescript
 type MaybeFunction<T> = T | (() => T)
@@ -704,7 +730,7 @@ type MaybeFunction<T> = T | (() => T)
 
 ### `StreamResult<T>`
 
-流结果类型。
+Stream result type.
 
 ```typescript
 type StreamResult<T> = {
@@ -715,7 +741,7 @@ type StreamResult<T> = {
 
 ### `StreamResults<TaskReturn>`
 
-流结果异步生成器类型。
+Stream results asynchronous generator type.
 
 ```typescript
 type StreamResults<TaskReturn> = AsyncGenerator<StreamResult<TaskReturn>, void, void>
@@ -723,7 +749,7 @@ type StreamResults<TaskReturn> = AsyncGenerator<StreamResult<TaskReturn>, void, 
 
 ### `StreamHandler<TaskReturn, HandlerReturn>`
 
-流处理器类型。
+Stream processor type.
 
 ```typescript
 type StreamHandler<TaskReturn, HandlerReturn> = (results: StreamResults<TaskReturn>) => Promise<HandlerReturn>
