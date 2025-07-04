@@ -1119,6 +1119,68 @@ describe('Eff.stream', () => {
         })
         expect(cleanupCalled).toBe(true)
     })
+
+    it('should handle unexpected completion errors in stream', async () => {
+        function* normalGen() {
+            return 42
+        }
+
+        const inputs = [normalGen()]
+        const handler = async (stream: StreamResults<number>) => {
+            const results = []
+            for await (const result of stream) {
+                results.push(result)
+            }
+            return results
+        }
+
+        // This should not throw an unexpected completion error
+        const result = await Eff.run(Eff.stream(inputs, handler))
+        expect(result).toEqual([{ index: 0, value: 42 }])
+    })
+
+    it('should handle stream with mixed sync and async effects', async () => {
+        function* syncGen() {
+            return 1
+        }
+
+        function* asyncGen() {
+            const value = yield* Eff.await(Promise.resolve(2))
+            return value
+        }
+
+        const inputs = [syncGen(), asyncGen()]
+        const handler = async (stream: StreamResults<number>) => {
+            const results = []
+            for await (const result of stream) {
+                results.push(result)
+            }
+            return results
+        }
+
+        const result = await Eff.run(Eff.stream(inputs, handler))
+        expect(result).toEqual([
+            { index: 0, value: 1 },
+            { index: 1, value: 2 },
+        ])
+    })
+
+    it('should handle stream handler that resolves correctly', async () => {
+        function* gen() {
+            return 42
+        }
+
+        const inputs = [gen()]
+        const handler = async (stream: StreamResults<number>) => {
+            for await (const result of stream) {
+                return result.value * 2
+            }
+            return 0
+        }
+
+        const result = await Eff.run(Eff.stream(inputs, handler))
+        expect(result).toBe(84)
+    })
 })
 
 describe('design first approach', () => {
@@ -1399,7 +1461,7 @@ describe('Eff.communicate', () => {
                     receiver,
                 }),
             ),
-        ).toThrow(/Some messages were not received/)
+        ).toThrow(/Message 'Test' sent by 'sender' was not received/)
     })
 
     it('should throw error for unsent messages', () => {
@@ -1419,7 +1481,58 @@ describe('Eff.communicate', () => {
                     receiver,
                 }),
             ),
-        ).toThrow(/Some messages were not sent/)
+        ).toThrow(/Message 'Test' waited by 'receiver' was not sent/)
+    })
+
+    it('should throw specific error messages for unmatched send/wait pairs', () => {
+        function* sender1() {
+            yield* Eff.msg('Test1').send('message1')
+            return 'sent1'
+        }
+
+        function* sender2() {
+            yield* Eff.msg('Test2').send('message2')
+            return 'sent2'
+        }
+
+        function* receiver() {
+            const msg1 = yield* Eff.msg('Test1').wait<string>()
+            // Missing wait for Test2
+            return `received: ${msg1}`
+        }
+
+        expect(() =>
+            Eff.runSync(
+                Eff.communicate({
+                    sender1,
+                    sender2,
+                    receiver,
+                }),
+            ),
+        ).toThrow(/Message 'Test2' sent by 'sender2' was not received/)
+    })
+
+    it('should handle multiple unmatched messages correctly', () => {
+        function* sender() {
+            yield* Eff.msg('Test1').send('message1')
+            yield* Eff.msg('Test2').send('message2')
+            return 'sent'
+        }
+
+        function* receiver() {
+            // Only waiting for one message, leaving the other unmatched
+            const msg = yield* Eff.msg('Test1').wait<string>()
+            return `received: ${msg}`
+        }
+
+        expect(() =>
+            Eff.runSync(
+                Eff.communicate({
+                    sender,
+                    receiver,
+                }),
+            ),
+        ).toThrow(/Message 'Test2' sent by 'sender' was not received/)
     })
 
     it('should handle generator inputs', () => {
@@ -1594,5 +1707,389 @@ describe('Eff.communicate', () => {
         const result = Eff.runSync(program)
 
         expect(result).toEqual('Handled: ID validation failed')
+    })
+
+    it('should allow generators to catch send/wait errors with try-catch', () => {
+        function* sender() {
+            try {
+                yield* Eff.msg('Test').send('message')
+                return 'sent successfully'
+            } catch (error) {
+                if (error instanceof Error && error.message.includes('was not received')) {
+                    return 'caught send error: message not received'
+                }
+                throw error
+            }
+        }
+
+        function* receiver() {
+            return 'received without waiting'
+        }
+
+        const result = Eff.runSync(
+            Eff.communicate({
+                sender,
+                receiver,
+            }),
+        )
+
+        expect(result).toEqual({
+            sender: 'caught send error: message not received',
+            receiver: 'received without waiting',
+        })
+    })
+
+    it('should allow generators to catch wait errors with try-catch', () => {
+        function* sender() {
+            return 'sent nothing'
+        }
+
+        function* receiver() {
+            try {
+                const message = yield* Eff.msg('Test').wait<string>()
+                return `received: ${message}`
+            } catch (error) {
+                if (error instanceof Error && error.message.includes('was not sent')) {
+                    return 'caught wait error: message not sent'
+                }
+                throw error
+            }
+        }
+
+        const result = Eff.runSync(
+            Eff.communicate({
+                sender,
+                receiver,
+            }),
+        )
+
+        expect(result).toEqual({
+            sender: 'sent nothing',
+            receiver: 'caught wait error: message not sent',
+        })
+    })
+
+    it('should handle multiple generators with error catching', () => {
+        function* sender1() {
+            try {
+                yield* Eff.msg('Test1').send('message1')
+                return 'sent1 successfully'
+            } catch (error) {
+                if (error instanceof Error && error.message.includes('was not received')) {
+                    return 'sender1 caught error'
+                }
+                throw error
+            }
+        }
+
+        function* sender2() {
+            try {
+                yield* Eff.msg('Test2').send('message2')
+                return 'sent2 successfully'
+            } catch (error) {
+                if (error instanceof Error && error.message.includes('was not received')) {
+                    return 'sender2 caught error'
+                }
+                throw error
+            }
+        }
+
+        function* receiver() {
+            try {
+                const msg1 = yield* Eff.msg('Test1').wait<string>()
+                return `received: ${msg1}`
+            } catch (error) {
+                if (error instanceof Error && error.message.includes('was not sent')) {
+                    return 'receiver caught error'
+                }
+                throw error
+            }
+        }
+
+        const result = Eff.runSync(
+            Eff.communicate({
+                sender1,
+                sender2,
+                receiver,
+            }),
+        )
+
+        expect(result).toEqual({
+            sender1: 'sent1 successfully',
+            sender2: 'sender2 caught error',
+            receiver: 'received: message1',
+        })
+    })
+
+    it('should continue processing after gen.throw and clear queue', () => {
+        let processedCount = 0
+
+        function* sender() {
+            try {
+                yield* Eff.msg('Test').send('message')
+                processedCount++
+                return 'sent'
+            } catch (error) {
+                processedCount++
+                return 'caught send error'
+            }
+        }
+
+        function* receiver() {
+            try {
+                const message = yield* Eff.msg('Test').wait<string>()
+                processedCount++
+                return `received: ${message}`
+            } catch (error) {
+                processedCount++
+                return 'caught wait error'
+            }
+        }
+
+        function* extraGenerator() {
+            processedCount++
+            return 'extra processed'
+        }
+
+        const result = Eff.runSync(
+            Eff.communicate({
+                sender,
+                receiver,
+                extraGenerator,
+            }),
+        )
+
+        // All generators should be processed, even after errors
+        expect(processedCount).toBe(3)
+        expect(result).toHaveProperty('sender')
+        expect(result).toHaveProperty('receiver')
+        expect(result).toHaveProperty('extraGenerator')
+    })
+
+    it('should allow continuing send/wait after catching errors', () => {
+        function* sender() {
+            try {
+                yield* Eff.msg('Test1').send('message1')
+                return 'sent1 successfully'
+            } catch (error) {
+                // 捕获错误后继续发送其他消息
+                yield* Eff.msg('Test2').send('message2')
+                return 'sent2 after error'
+            }
+        }
+
+        function* receiver() {
+            try {
+                const msg1 = yield* Eff.msg('Test1').wait<string>()
+                return `received1: ${msg1}`
+            } catch (error) {
+                // 捕获错误后继续等待其他消息
+                const msg2 = yield* Eff.msg('Test2').wait<string>()
+                return `received2: ${msg2}`
+            }
+        }
+
+        const result = Eff.runSync(
+            Eff.communicate({
+                sender,
+                receiver,
+            }),
+        )
+
+        // 由于消息成功匹配，不会抛出错误
+        expect(result).toEqual({
+            sender: 'sent1 successfully',
+            receiver: 'received1: message1',
+        })
+    })
+
+    it('should handle multiple send/wait operations after error recovery', () => {
+        function* sender() {
+            try {
+                yield* Eff.msg('Test1').send('message1')
+                yield* Eff.msg('Test2').send('message2')
+                return 'sent both successfully'
+            } catch (error) {
+                // 捕获错误后发送多个消息
+                yield* Eff.msg('Test3').send('message3')
+                yield* Eff.msg('Test4').send('message4')
+                yield* Eff.msg('Test5').send('message5')
+                return 'sent three after error'
+            }
+        }
+
+        function* receiver() {
+            const messages = []
+            try {
+                const msg1 = yield* Eff.msg('Test1').wait<string>()
+                messages.push(msg1)
+                const msg2 = yield* Eff.msg('Test2').wait<string>()
+                messages.push(msg2)
+                return `received: ${messages.join(', ')}`
+            } catch (error) {
+                // 捕获错误后等待多个消息
+                const msg3 = yield* Eff.msg('Test3').wait<string>()
+                messages.push(msg3)
+                const msg4 = yield* Eff.msg('Test4').wait<string>()
+                messages.push(msg4)
+                const msg5 = yield* Eff.msg('Test5').wait<string>()
+                messages.push(msg5)
+                return `received after error: ${messages.join(', ')}`
+            }
+        }
+
+        const result = Eff.runSync(
+            Eff.communicate({
+                sender,
+                receiver,
+            }),
+        )
+
+        // 由于消息成功匹配，不会抛出错误
+        expect(result).toEqual({
+            sender: 'sent both successfully',
+            receiver: 'received: message1, message2',
+        })
+    })
+
+    it('should implement log collection with try-finally', () => {
+        function* logger() {
+            const logs = []
+            try {
+                // 不断等待日志消息，无需匹配数量
+                while (true) {
+                    const log = yield* Eff.msg('Log').wait<string>()
+                    logs.push(log)
+                }
+            } finally {
+                // eslint-disable-next-line no-unsafe-finally
+                return `Collected logs: ${logs.join(' | ')}`
+            }
+        }
+
+        function* producer1() {
+            yield* Eff.msg('Log').send('Producer1: Started')
+            yield* Eff.msg('Log').send('Producer1: Processing')
+            yield* Eff.msg('Log').send('Producer1: Completed')
+            return 'producer1 done'
+        }
+
+        function* producer2() {
+            yield* Eff.msg('Log').send('Producer2: Started')
+            yield* Eff.msg('Log').send('Producer2: Error occurred')
+            return 'producer2 done'
+        }
+
+        const result = Eff.runSync(
+            Eff.communicate({
+                logger,
+                producer1,
+                producer2,
+            }),
+        )
+
+        expect(result.logger).toBe(
+            'Collected logs: Producer1: Started | Producer1: Processing | Producer1: Completed | Producer2: Started | Producer2: Error occurred',
+        )
+        expect(result.producer1).toBe('producer1 done')
+        expect(result.producer2).toBe('producer2 done')
+    })
+
+    it('should handle mixed error recovery and log collection', () => {
+        function* logger() {
+            const logs = []
+            try {
+                while (true) {
+                    const log = yield* Eff.msg('Log').wait<string>()
+                    logs.push(log)
+                }
+            } finally {
+                // eslint-disable-next-line no-unsafe-finally
+                return `Logs: ${logs.join(' | ')}`
+            }
+        }
+
+        function* sender() {
+            try {
+                yield* Eff.msg('Test').send('message')
+                yield* Eff.msg('Log').send('Sender: Message sent successfully')
+                return 'sent successfully'
+            } catch (error) {
+                // 捕获错误后继续发送日志
+                yield* Eff.msg('Log').send('Sender: Message failed, but continuing')
+                yield* Eff.msg('Log').send('Sender: Recovery completed')
+                return 'sent after error'
+            }
+        }
+
+        function* receiver() {
+            try {
+                const message = yield* Eff.msg('Test').wait<string>()
+                yield* Eff.msg('Log').send('Receiver: Message received')
+                return `received: ${message}`
+            } catch (error) {
+                yield* Eff.msg('Log').send('Receiver: Message not received, but continuing')
+                return 'received nothing'
+            }
+        }
+
+        const result = Eff.runSync(
+            Eff.communicate({
+                logger,
+                sender,
+                receiver,
+            }),
+        )
+
+        // 由于消息成功匹配，不会抛出错误
+        expect(result.logger).toContain('Sender: Message sent successfully')
+        expect(result.logger).toContain('Receiver: Message received')
+        expect(result.sender).toBe('sent successfully')
+        expect(result.receiver).toBe('received: message')
+    })
+
+    it('should demonstrate error recovery with unmatched messages', () => {
+        function* sender1() {
+            try {
+                yield* Eff.msg('Test1').send('message1')
+                return 'sent1 successfully'
+            } catch (error) {
+                // 捕获错误后发送其他消息
+                yield* Eff.msg('Test2').send('message2')
+                return 'sent2 after error'
+            }
+        }
+
+        function* sender2() {
+            try {
+                yield* Eff.msg('Test3').send('message3')
+                return 'sent3 successfully'
+            } catch (error) {
+                return 'sent3 failed'
+            }
+        }
+
+        function* receiver() {
+            try {
+                const msg2 = yield* Eff.msg('Test2').wait<string>()
+                const msg3 = yield* Eff.msg('Test3').wait<string>()
+                return `received: ${msg2}, ${msg3}`
+            } catch (error) {
+                return 'receiver caught error'
+            }
+        }
+
+        const result = Eff.runSync(
+            Eff.communicate({
+                sender1,
+                sender2,
+                receiver,
+            }),
+        )
+
+        // sender1 会成功发送 Test1，然后捕获 Test3 的错误，再发送 Test2
+        expect(result.sender1).toBe('sent2 after error')
+        expect(result.sender2).toBe('sent3 successfully')
+        expect(result.receiver).toBe('received: message2, message3')
     })
 })

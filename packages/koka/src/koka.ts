@@ -337,11 +337,25 @@ export class Eff {
             }
         }
 
-        type SendStorageValue = { key: string; gen: Generator<AnyEff, unknown>; message: unknown }
-        type WaitStorageValue = { key: string; gen: Generator<AnyEff, unknown> }
+        type SendStorageValue = {
+            type: 'send'
+            name: string
+            key: string
+            gen: Generator<AnyEff, unknown>
+            message: unknown
+        }
+
+        type WaitStorageValue = {
+            type: 'wait'
+            name: string
+            key: string
+            gen: Generator<AnyEff, unknown>
+        }
 
         const sendStorage = {} as Record<string, SendStorageValue>
         const waitStorage = {} as Record<string, WaitStorageValue>
+
+        const queue = [] as (SendStorageValue | WaitStorageValue)[]
 
         const process = function* (
             key: string,
@@ -357,14 +371,18 @@ export class Eff {
                         if (effect.name in waitStorage) {
                             const waitItem = waitStorage[effect.name]
                             delete waitStorage[effect.name]
+                            queue.splice(queue.indexOf(waitItem), 1)
                             yield* process(waitItem.key, waitItem.gen, waitItem.gen.next(effect.message))
                             result = gen.next()
                         } else {
                             sendStorage[effect.name] = {
+                                type: 'send',
+                                name: effect.name,
                                 key,
                                 gen,
                                 message: effect.message,
                             }
+                            queue.push(sendStorage[effect.name])
                             return
                         }
                     } else {
@@ -372,14 +390,18 @@ export class Eff {
                         if (effect.name in sendStorage) {
                             const sendedItem = sendStorage[effect.name]
                             delete sendStorage[effect.name]
+                            queue.splice(queue.indexOf(sendedItem), 1)
                             yield* process(key, gen, gen.next(sendedItem.message))
                             yield* process(sendedItem.key, sendedItem.gen, sendedItem.gen.next())
                             return
                         } else {
                             waitStorage[effect.name] = {
+                                type: 'wait',
+                                name: effect.name,
                                 key,
                                 gen,
                             }
+                            queue.push(waitStorage[effect.name])
                         }
                         return
                     }
@@ -396,12 +418,22 @@ export class Eff {
                 yield* process(key, gen, gen.next()) as any
             }
 
-            if (Object.keys(waitStorage).length > 0) {
-                throw new Error(`Some messages were not sent: ${JSON.stringify(Object.keys(waitStorage))}`)
-            }
+            while (queue.length > 0) {
+                const item = queue.shift()!
 
-            if (Object.keys(sendStorage).length > 0) {
-                throw new Error(`Some messages were not received: ${JSON.stringify(Object.keys(sendStorage))}`)
+                if (item.type === 'send') {
+                    yield* process(
+                        item.key,
+                        item.gen,
+                        item.gen.throw(new Error(`Message '${item.name}' sent by '${item.key}' was not received`)),
+                    ) as any
+                } else {
+                    yield* process(
+                        item.key,
+                        item.gen,
+                        item.gen.throw(new Error(`Message '${item.name}' waited by '${item.key}' was not sent`)),
+                    ) as any
+                }
             }
 
             if (Object.keys(results).length !== Object.keys(gens).length) {
