@@ -311,7 +311,13 @@ describe('Custom Context in Store', () => {
     })
 
     it('should get context value', () => {
-        const result = store.runQuery(Eff.ctx('a').get<number>())
+        class A extends Eff.Ctx('a')<number> {}
+
+        const result = store.runQuery(
+            (function* () {
+                return yield* Eff.get(A)
+            })(),
+        )
 
         expect(result).toEqual({
             type: 'ok',
@@ -320,9 +326,10 @@ describe('Custom Context in Store', () => {
     })
 
     it('should get context function result', () => {
-        const result = store.runQuery(function* () {
-            const b = yield* Eff.ctx('b').get<(n: number) => number>()
+        class B extends Eff.Ctx('b')<(n: number) => number> {}
 
+        const result = store.runQuery(function* () {
+            const b = yield* Eff.get(B)
             return b(1)
         })
 

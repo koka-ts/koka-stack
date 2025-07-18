@@ -164,28 +164,11 @@ export type StreamResult<T> = {
 export type StreamResults<TaskReturn> = AsyncGenerator<StreamResult<TaskReturn>, void, void>
 export type StreamHandler<TaskReturn, HandlerReturn> = (results: StreamResults<TaskReturn>) => Promise<HandlerReturn>
 export declare class Eff {
-    static err: <const Name extends string>(
-        name: Name,
-    ) => {
-        throw<E = void>(...args: E extends void ? [] : [E]): Generator<Err<Name, E>, never>
-    }
     static Err: typeof Err
     static throw<E extends AnyErr>(err: E): Generator<E, never>
-    static ctx: <const Name extends string>(
-        name: Name,
-    ) => {
-        get<T>(): Generator<Ctx<Name, T>, T>
-        opt<T>(): Generator<Opt<Name, T>, T | undefined>
-    }
     static Ctx: typeof Ctx
     static Opt: typeof Opt
     static get<C extends AnyCtx>(ctx: C | (new () => C)): Generator<C, CtxValue<C>>
-    static msg: <const Name extends string>(
-        name: Name,
-    ) => {
-        send<T>(message: T): Generator<SendMsg<Name, T>, void>
-        wait<T>(): Generator<WaitMsg<Name, T>, T>
-    }
     static Msg: typeof Msg
     static send<T extends SendMsg<string, unknown>>(message: T): Generator<T, void>
     static wait<MsgCtor extends typeof AbstractMsg<unknown>>(

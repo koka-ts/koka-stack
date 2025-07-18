@@ -35,12 +35,14 @@ class UserStorageDomain<Root extends RootState> extends Domain<Root['users'], Ro
         if (id in users) {
             return users[id]
         }
-        throw yield* Eff.err('DomainErr').throw(`User ${id} not found`)
+        class DomainErr extends Eff.Err('DomainErr')<string> {}
+        throw yield* Eff.throw(new DomainErr(`User ${id} not found`))
     }
     *addUser(user: UserEntity) {
         const users = yield* get(this)
         if (user.id in users) {
-            throw yield* Eff.err('DomainErr').throw(`User ${user.id} exists`)
+            class DomainErr extends Eff.Err('DomainErr')<string> {}
+            throw yield* Eff.throw(new DomainErr(`User ${user.id} exists`))
         }
         yield* set(this, { ...users, [user.id]: user })
     }
@@ -65,12 +67,14 @@ class OrderStorageDomain<Root extends RootState> extends Domain<Root['orders'], 
         if (id in orders) {
             return orders[id]
         }
-        throw yield* Eff.err('DomainErr').throw(`Order ${id} not found`)
+        class DomainErr extends Eff.Err('DomainErr')<string> {}
+        throw yield* Eff.throw(new DomainErr(`Order ${id} not found`))
     }
     *addOrder(order: OrderEntity) {
         const orders = yield* get(this)
         if (order.id in orders) {
-            throw yield* Eff.err('DomainErr').throw(`Order ${order.id} exists`)
+            class DomainErr extends Eff.Err('DomainErr')<string> {}
+            throw yield* Eff.throw(new DomainErr(`Order ${order.id} exists`))
         }
         yield* set(this, { ...orders, [order.id]: order })
     }
@@ -95,12 +99,14 @@ class ProductStorageDomain<Root extends RootState> extends Domain<Root['products
         if (id in products) {
             return products[id]
         }
-        throw yield* Eff.err('DomainErr').throw(`Product ${id} not found`)
+        class DomainErr extends Eff.Err('DomainErr')<string> {}
+        throw yield* Eff.throw(new DomainErr(`Product ${id} not found`))
     }
     *addProduct(product: ProductEntity) {
         const products = yield* get(this)
         if (product.id in products) {
-            throw yield* Eff.err('DomainErr').throw(`Product ${product.id} exists`)
+            class DomainErr extends Eff.Err('DomainErr')<string> {}
+            throw yield* Eff.throw(new DomainErr(`Product ${product.id} exists`))
         }
         yield* set(this, { ...products, [product.id]: product })
     }

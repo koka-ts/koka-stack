@@ -2,6 +2,17 @@ import { Eff, Err, Result, isGenerator, Async, StreamResult, StreamResults } fro
 
 const delayTime = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
+type Resource = {
+    open: () => void
+    get: () => number
+    close: () => void
+}
+
+class LogMsg extends Eff.Msg('Log')<string> {}
+class ConfigMsg extends Eff.Msg('Config')<{ apiKey: string }> {}
+class ResourceMsg extends Eff.Msg('Resource')<Resource> {}
+class TestMsg extends Eff.Msg('Test')<string> {}
+
 describe('Result', () => {
     it('should create ok result', () => {
         const ok = Result.ok(42)
@@ -17,10 +28,12 @@ describe('Result', () => {
     })
 })
 
-describe('Eff.err', () => {
+describe('Eff.throw', () => {
     it('should throw error effect', () => {
+        class TestError extends Eff.Err('TestError')<string> {}
+
         function* test() {
-            yield* Eff.err('TestError').throw('error message')
+            yield* Eff.throw(new TestError('error message'))
             return 'should not reach here'
         }
 
@@ -34,12 +47,15 @@ describe('Eff.err', () => {
     })
 })
 
-describe('Eff.ctx', () => {
+describe('Eff.get', () => {
     it('should get context value', () => {
+        class TestCtx extends Eff.Ctx('TestCtx')<number> {}
+        class Num extends Eff.Ctx('Num')<number> {}
+
         function* test() {
-            const value = yield* Eff.ctx('TestCtx').get<number>()
-            const num = yield* Eff.ctx('Num').get<number>()
-            return value * 2
+            const value = yield* Eff.get(TestCtx)
+            const num = yield* Eff.get(Num)
+            return value * num
         }
 
         const program0 = Eff.try(test()).handle({
@@ -55,8 +71,10 @@ describe('Eff.ctx', () => {
     })
 
     it('should propagate context when not handled', () => {
+        class TestCtx extends Eff.Ctx('TestCtx')<number> {}
+
         function* inner() {
-            return yield* Eff.ctx('TestCtx').get<number>()
+            return yield* Eff.get(TestCtx)
         }
 
         function* outer() {
@@ -85,8 +103,10 @@ describe('Eff.try', () => {
     })
 
     it('should catch error effect', () => {
+        class TestError extends Eff.Err('TestError')<string> {}
+
         function* test() {
-            yield* Eff.err('TestError').throw('error')
+            yield* Eff.throw(new TestError('error'))
             return 'should not reach here'
         }
 
@@ -99,8 +119,10 @@ describe('Eff.try', () => {
     })
 
     it('should propagate unhandled error', () => {
+        class UnhandledError extends Eff.Err('UnhandledError')<string> {}
+
         function* test() {
-            yield* Eff.err('UnhandledError').throw('error')
+            yield* Eff.throw(new UnhandledError('error'))
             return 'should not reach here'
         }
 
@@ -118,10 +140,14 @@ describe('Eff.try', () => {
     })
 
     it('should handle multiple catches', () => {
+        class TestCtx extends Eff.Ctx('TestCtx')<() => 1> {}
+        class FirstError extends Eff.Err('FirstError')<string> {}
+        class SecondError extends Eff.Err('SecondError')<string> {}
+
         function* test() {
-            yield* Eff.ctx('TestCtx').get<() => 1>()
-            yield* Eff.err('FirstError').throw<void | string>('first error')
-            yield* Eff.err('SecondError').throw('second error')
+            yield* Eff.get(TestCtx)
+            yield* Eff.throw(new FirstError('first error'))
+            yield* Eff.throw(new SecondError('second error'))
             return 'should not reach here'
         }
 
@@ -136,8 +162,10 @@ describe('Eff.try', () => {
     })
 
     it('should handle nested try/catch', () => {
+        class InnerError extends Eff.Err('InnerError')<string> {}
+
         function* inner() {
-            yield* Eff.err('InnerError').throw('inner error')
+            yield* Eff.throw(new InnerError('inner error'))
             return 'should not reach here'
         }
 
@@ -256,14 +284,16 @@ describe('Eff.runSync', () => {
 
 describe('Eff.result', () => {
     it('should convert generator to Result', () => {
+        class TestCtx extends Eff.Ctx('TestCtx')<string> {}
+        class TestError extends Eff.Err('TestError')<string> {}
+
         function* success() {
             return 42
         }
 
         function* failure() {
-            const message = yield* Eff.ctx('TestCtx').get<string>()
-
-            yield* Eff.err('TestError').throw(message)
+            const message = yield* Eff.get(TestCtx)
+            yield* Eff.throw(new TestError(message))
             return 'should not reach here'
         }
 
@@ -328,8 +358,10 @@ describe('Eff.ok', () => {
     })
 
     it('test failure', () => {
+        class TestError extends Eff.Err('TestError')<string> {}
+
         function* testFailure() {
-            yield* Eff.ok(Eff.result(Eff.err('TestError').throw('error')))
+            yield* Eff.ok(Eff.result(Eff.throw(new TestError('error'))))
         }
 
         const failureResult = Eff.run(
@@ -344,11 +376,13 @@ describe('Eff.ok', () => {
 
 describe('Eff.runResult', () => {
     it('should run generator and return Result', async () => {
+        class ZeroError extends Eff.Err('ZeroError')<string> {}
+
         function* program(input: number) {
             const value = yield* Eff.await(Promise.resolve(input))
 
             if (value === 0) {
-                yield* Eff.err('ZeroError').throw('value is zero')
+                yield* Eff.throw(new ZeroError('value is zero'))
             }
 
             return value
@@ -363,8 +397,10 @@ describe('Eff.runResult', () => {
     })
 
     it('should handle error in generator', () => {
+        class TestError extends Eff.Err('TestError')<string> {}
+
         function* program() {
-            yield* Eff.err('TestError').throw('error message')
+            yield* Eff.throw(new TestError('error message'))
             return 'should not reach here'
         }
 
@@ -380,8 +416,10 @@ describe('Eff.runResult', () => {
 
 describe('Complex scenarios', () => {
     it('should handle successful nested effects', async () => {
+        class TestCtx extends Eff.Ctx('TestCtx')<number> {}
+
         function* program() {
-            const ctxValue = yield* Eff.ctx('TestCtx').get<number>()
+            const ctxValue = yield* Eff.get(TestCtx)
             const asyncValue = yield* Eff.await(Promise.resolve(ctxValue * 2))
             return asyncValue + 1
         }
@@ -395,10 +433,13 @@ describe('Complex scenarios', () => {
     })
 
     it('should handle error in nested effects', async () => {
+        class TestCtx extends Eff.Ctx('TestCtx')<number> {}
+        class ZeroError extends Eff.Err('ZeroError')<string> {}
+
         function* program() {
-            const ctxValue = yield* Eff.ctx('TestCtx').get<number>()
+            const ctxValue = yield* Eff.get(TestCtx)
             if (ctxValue === 0) {
-                yield* Eff.err('ZeroError').throw('ctx is zero')
+                yield* Eff.throw(new ZeroError('ctx is zero'))
             }
             const asyncValue = yield* Eff.await(Promise.resolve(ctxValue * 2))
             return asyncValue + 1
@@ -666,7 +707,8 @@ describe('Eff.combine', () => {
     it('should handle multiple async effects and run concurrently', async () => {
         function* delayedEffect<T>(value: T, delay: number) {
             if (delay === 0) {
-                yield* Eff.err('DelayError').throw('Delay cannot be zero')
+                class DelayError extends Eff.Err('DelayError')<string> {}
+                yield* Eff.throw(new DelayError('Delay cannot be zero'))
             }
 
             yield* Eff.await(delayTime(delay))
@@ -869,8 +911,10 @@ describe('Eff.all', () => {
 
 describe('Eff.opt', () => {
     it('should return undefined when no value provided', () => {
+        class TestOpt extends Eff.Opt('TestOpt')<number> {}
+
         function* test() {
-            return yield* Eff.ctx('TestOpt').opt<number>()
+            return yield* Eff.get(TestOpt)
         }
 
         const result = Eff.run(test())
@@ -878,8 +922,10 @@ describe('Eff.opt', () => {
     })
 
     it('should return value when provided', () => {
+        class TestOpt extends Eff.Opt('TestOpt')<number> {}
+
         function* test() {
-            const optValue = yield* Eff.ctx('TestOpt').opt<number>()
+            const optValue = yield* Eff.get(TestOpt)
             return optValue ?? 42
         }
 
@@ -888,8 +934,10 @@ describe('Eff.opt', () => {
     })
 
     it('should work with async effects', async () => {
+        class TestOpt extends Eff.Opt('TestOpt')<number> {}
+
         function* test() {
-            const optValue = yield* Eff.ctx('TestOpt').opt<number>()
+            const optValue = yield* Eff.get(TestOpt)
             const asyncValue = yield* Eff.await(Promise.resolve(optValue ?? 42))
             return asyncValue
         }
@@ -899,8 +947,10 @@ describe('Eff.opt', () => {
     })
 
     it('should handle undefined context value', () => {
+        class TestOpt extends Eff.Opt('TestOpt')<number> {}
+
         function* test() {
-            const optValue = yield* Eff.ctx('TestOpt').opt<number>()
+            const optValue = yield* Eff.get(TestOpt)
             return optValue ?? 100
         }
 
@@ -1278,13 +1328,15 @@ describe('design first approach', () => {
 
 describe('Eff.communicate', () => {
     it('should handle basic message send and receive', () => {
+        class Greeting extends Eff.Msg('Greeting')<string> {}
+
         function* sender() {
-            yield* Eff.msg('Greeting').send('Hello, World!')
+            yield* Eff.send(new Greeting('Hello, World!'))
             return 'sent'
         }
 
         function* receiver() {
-            const message = yield* Eff.msg('Greeting').wait<string>()
+            const message = yield* Eff.wait(Greeting)
             return `received: ${message}`
         }
 
@@ -1301,7 +1353,7 @@ describe('Eff.communicate', () => {
         })
     })
 
-    it('should handle Eff.send and Eff.recv syntax', () => {
+    it('should handle Eff.send and Eff.wait syntax', () => {
         class DataMsg extends Eff.Msg('Data')<{ id: number; value: string }> {}
 
         function* producer() {
@@ -1328,15 +1380,18 @@ describe('Eff.communicate', () => {
     })
 
     it('should handle multiple messages between generators', () => {
+        class Request extends Eff.Msg('Request')<string> {}
+        class Response extends Eff.Msg('Response')<string> {}
+
         function* client() {
-            yield* Eff.msg('Request').send('get user data')
-            const response = yield* Eff.msg('Response').wait<string>()
+            yield* Eff.send(new Request('get user data'))
+            const response = yield* Eff.wait(Response)
             return `client: ${response}`
         }
 
         function* server() {
-            const request = yield* Eff.msg('Request').wait<string>()
-            yield* Eff.msg('Response').send(`processed: ${request}`)
+            const request = yield* Eff.wait(Request)
+            yield* Eff.send(new Response(`processed: ${request}`))
             return `server: handled ${request}`
         }
 
@@ -1356,24 +1411,25 @@ describe('Eff.communicate', () => {
     it('should handle complex message passing scenarios', () => {
         class UserRequest extends Eff.Msg('UserRequest')<{ userId: string }> {}
         class UserResponse extends Eff.Msg('UserResponse')<{ user: { id: string; name: string } }> {}
+        class LogMessage extends Eff.Msg('Log')<string> {}
 
         function* apiClient() {
             yield* Eff.send(new UserRequest({ userId: '123' }))
             const userResponse = yield* Eff.wait(UserResponse)
-            yield* Eff.msg('Log').send(`Retrieved user: ${userResponse.user.name}`)
+            yield* Eff.send(new LogMessage(`Retrieved user: ${userResponse.user.name}`))
             return `API client: ${userResponse.user.name}`
         }
 
         function* apiServer() {
             const request = yield* Eff.wait(UserRequest)
-            yield* Eff.msg('Log').send(`Processing request for user: ${request.userId}`)
+            yield* Eff.send(new LogMessage(`Processing request for user: ${request.userId}`))
             yield* Eff.send(new UserResponse({ user: { id: request.userId, name: 'John Doe' } }))
             return `API server: processed ${request.userId}`
         }
 
         function* logger() {
-            const log1 = yield* Eff.msg('Log').wait<string>()
-            const log2 = yield* Eff.msg('Log').wait<string>()
+            const log1 = yield* Eff.wait(LogMessage)
+            const log2 = yield* Eff.wait(LogMessage)
             return `Logger: ${log1}, ${log2}`
         }
 
@@ -1393,17 +1449,17 @@ describe('Eff.communicate', () => {
     })
 
     it('should handle mixed message passing syntax', () => {
-        class StatusMsg extends Eff.Msg('Status')<{ status: string; timestamp: number }> {}
+        class Status extends Eff.Msg('Status')<{ status: string; timestamp: number }> {}
 
         function* worker1() {
-            yield* Eff.msg('Status').send({ status: 'working', timestamp: Date.now() })
-            const status = yield* Eff.wait(StatusMsg)
+            yield* Eff.send(new Status({ status: 'working', timestamp: Date.now() }))
+            const status = yield* Eff.wait(Status)
             return `worker1: saw ${status.status}`
         }
 
         function* worker2() {
-            const status = yield* Eff.msg('Status').wait<{ status: string; timestamp: number }>()
-            yield* Eff.send(new StatusMsg({ status: 'done', timestamp: Date.now() }))
+            const status = yield* Eff.wait(Status)
+            yield* Eff.send(new Status({ status: 'done', timestamp: Date.now() }))
             return `worker2: processed ${status.status}`
         }
 
@@ -1419,14 +1475,16 @@ describe('Eff.communicate', () => {
     })
 
     it('should handle async message passing', async () => {
+        class AsyncData extends Eff.Msg('AsyncData')<string> {}
+
         function* asyncProducer() {
             const data = yield* Eff.await(Promise.resolve('async data'))
-            yield* Eff.msg('AsyncData').send(data)
+            yield* Eff.send(new AsyncData(data))
             return 'async produced'
         }
 
         function* asyncConsumer() {
-            const data = yield* Eff.msg('AsyncData').wait<string>()
+            const data = yield* Eff.wait(AsyncData)
             const processed = yield* Eff.await(Promise.resolve(`processed: ${data}`))
             return processed
         }
@@ -1445,8 +1503,10 @@ describe('Eff.communicate', () => {
     })
 
     it('should throw error for unmatched messages', () => {
+        class TestMsg extends Eff.Msg('Test')<string> {}
+
         function* sender() {
-            yield* Eff.msg('Test').send('message')
+            yield* Eff.send(new TestMsg('message'))
             return 'sent'
         }
 
@@ -1465,12 +1525,14 @@ describe('Eff.communicate', () => {
     })
 
     it('should throw error for unsent messages', () => {
+        class TestMsg extends Eff.Msg('Test')<string> {}
+
         function* sender() {
             return 'sent'
         }
 
         function* receiver() {
-            yield* Eff.msg('Test').wait<string>()
+            yield* Eff.wait(TestMsg)
             return 'received'
         }
 
@@ -1485,18 +1547,21 @@ describe('Eff.communicate', () => {
     })
 
     it('should throw specific error messages for unmatched send/wait pairs', () => {
+        class Test1Msg extends Eff.Msg('Test1')<string> {}
+        class Test2Msg extends Eff.Msg('Test2')<string> {}
+
         function* sender1() {
-            yield* Eff.msg('Test1').send('message1')
+            yield* Eff.send(new Test1Msg('message1'))
             return 'sent1'
         }
 
         function* sender2() {
-            yield* Eff.msg('Test2').send('message2')
+            yield* Eff.send(new Test2Msg('message2'))
             return 'sent2'
         }
 
         function* receiver() {
-            const msg1 = yield* Eff.msg('Test1').wait<string>()
+            const msg1 = yield* Eff.wait(Test1Msg)
             // Missing wait for Test2
             return `received: ${msg1}`
         }
@@ -1513,15 +1578,18 @@ describe('Eff.communicate', () => {
     })
 
     it('should handle multiple unmatched messages correctly', () => {
+        class Test1Msg extends Eff.Msg('Test1')<string> {}
+        class Test2Msg extends Eff.Msg('Test2')<string> {}
+
         function* sender() {
-            yield* Eff.msg('Test1').send('message1')
-            yield* Eff.msg('Test2').send('message2')
+            yield* Eff.send(new Test1Msg('message1'))
+            yield* Eff.send(new Test2Msg('message2'))
             return 'sent'
         }
 
         function* receiver() {
             // Only waiting for one message, leaving the other unmatched
-            const msg = yield* Eff.msg('Test1').wait<string>()
+            const msg = yield* Eff.wait(Test1Msg)
             return `received: ${msg}`
         }
 
@@ -1536,13 +1604,15 @@ describe('Eff.communicate', () => {
     })
 
     it('should handle generator inputs', () => {
+        class GreetingMsg extends Eff.Msg('Greeting')<string> {}
+
         const sender = function* () {
-            yield* Eff.msg('Greeting').send('Hello')
+            yield* Eff.send(new GreetingMsg('Hello'))
             return 'sent'
         }
 
         const receiver = function* () {
-            const msg = yield* Eff.msg('Greeting').wait<string>()
+            const msg = yield* Eff.wait(GreetingMsg)
             return `received: ${msg}`
         }
 
@@ -1560,13 +1630,15 @@ describe('Eff.communicate', () => {
     })
 
     it('should handle mixed function and generator inputs', () => {
+        class DataMsg extends Eff.Msg('Data')<{ value: number }> {}
+
         function* producer() {
-            yield* Eff.msg('Data').send({ value: 100 })
+            yield* Eff.send(new DataMsg({ value: 100 }))
             return 'produced'
         }
 
         const consumer = function* () {
-            const data = yield* Eff.msg('Data').wait<{ value: number }>()
+            const data = yield* Eff.wait(DataMsg)
             return `consumed: ${data.value}`
         }
 
@@ -1589,7 +1661,7 @@ describe('Eff.communicate', () => {
 
         function* commandProcessor() {
             const command = yield* Eff.wait(CommandMsg)
-            yield* Eff.msg('Log').send(`Processing command: ${command.cmd}`)
+            yield* Eff.send(new LogMsg(`Processing command: ${command.cmd}`))
 
             if (command.cmd === 'calculate') {
                 const result = command.args.reduce((sum, arg) => sum + parseInt(arg, 10), 0)
@@ -1604,13 +1676,13 @@ describe('Eff.communicate', () => {
         function* commandClient() {
             yield* Eff.send(new CommandMsg({ cmd: 'calculate', args: ['1', '2', '3'] }))
             const result = yield* Eff.wait(ResultMsg)
-            yield* Eff.msg('Log').send(`Command result: ${result.success ? result.data : result.data}`)
+            yield* Eff.send(new LogMsg(`Command result: ${result.success ? result.data : result.data}`))
             return `client: ${result.data}`
         }
 
         function* logger() {
-            const log1 = yield* Eff.msg('Log').wait<string>()
-            const log2 = yield* Eff.msg('Log').wait<string>()
+            const log1 = yield* Eff.wait(LogMsg)
+            const log2 = yield* Eff.wait(LogMsg)
             return `Logger: ${log1} | ${log2}`
         }
 
@@ -1633,12 +1705,12 @@ describe('Eff.communicate', () => {
         class UserCtx extends Eff.Ctx('User')<{ id: string; name: string }> {}
 
         function* configProvider() {
-            yield* Eff.msg('Config').send({ apiKey: 'secret-key' })
+            yield* Eff.send(new ConfigMsg({ apiKey: 'secret-key' }))
             return 'config provided'
         }
 
         function* service() {
-            const config = yield* Eff.msg('Config').wait<{ apiKey: string }>()
+            const config = yield* Eff.wait(ConfigMsg)
             const user = yield* Eff.get(UserCtx)
             return `service: ${user.name} with key ${config.apiKey.slice(0, 5)}...`
         }
@@ -1690,7 +1762,7 @@ describe('Eff.communicate', () => {
         }
 
         function* client() {
-            yield* Eff.msg('Request').send({ id: 'ab' })
+            yield* Eff.send(new RequestMsg({ id: 'ab' }))
             const response = yield* Eff.wait(ResponseMsg)
             return `client: ${response.success ? response.data?.status : response.error}`
         }
@@ -1712,7 +1784,7 @@ describe('Eff.communicate', () => {
     it('should allow generators to catch send/wait errors with try-catch', () => {
         function* sender() {
             try {
-                yield* Eff.msg('Test').send('message')
+                yield* Eff.send(new TestMsg('message'))
                 return 'sent successfully'
             } catch (error) {
                 if (error instanceof Error && error.message.includes('was not received')) {
@@ -1746,7 +1818,7 @@ describe('Eff.communicate', () => {
 
         function* receiver() {
             try {
-                const message = yield* Eff.msg('Test').wait<string>()
+                const message = yield* Eff.wait(TestMsg)
                 return `received: ${message}`
             } catch (error) {
                 if (error instanceof Error && error.message.includes('was not sent')) {
@@ -1770,9 +1842,12 @@ describe('Eff.communicate', () => {
     })
 
     it('should handle multiple generators with error catching', () => {
+        class Test1Msg extends Eff.Msg('Test1')<string> {}
+        class Test2Msg extends Eff.Msg('Test2')<string> {}
+
         function* sender1() {
             try {
-                yield* Eff.msg('Test1').send('message1')
+                yield* Eff.send(new Test1Msg('message1'))
                 return 'sent1 successfully'
             } catch (error) {
                 if (error instanceof Error && error.message.includes('was not received')) {
@@ -1784,7 +1859,7 @@ describe('Eff.communicate', () => {
 
         function* sender2() {
             try {
-                yield* Eff.msg('Test2').send('message2')
+                yield* Eff.send(new Test2Msg('message2'))
                 return 'sent2 successfully'
             } catch (error) {
                 if (error instanceof Error && error.message.includes('was not received')) {
@@ -1796,7 +1871,7 @@ describe('Eff.communicate', () => {
 
         function* receiver() {
             try {
-                const msg1 = yield* Eff.msg('Test1').wait<string>()
+                const msg1 = yield* Eff.wait(Test1Msg)
                 return `received: ${msg1}`
             } catch (error) {
                 if (error instanceof Error && error.message.includes('was not sent')) {
@@ -1826,7 +1901,7 @@ describe('Eff.communicate', () => {
 
         function* sender() {
             try {
-                yield* Eff.msg('Test').send('message')
+                yield* Eff.send(new TestMsg('message'))
                 processedCount++
                 return 'sent'
             } catch (error) {
@@ -1837,7 +1912,7 @@ describe('Eff.communicate', () => {
 
         function* receiver() {
             try {
-                const message = yield* Eff.msg('Test').wait<string>()
+                const message = yield* Eff.wait(TestMsg)
                 processedCount++
                 return `received: ${message}`
             } catch (error) {
@@ -1869,22 +1944,22 @@ describe('Eff.communicate', () => {
     it('should allow continuing send/wait after catching errors', () => {
         function* sender() {
             try {
-                yield* Eff.msg('Test1').send('message1')
+                yield* Eff.send(new TestMsg('message1'))
                 return 'sent1 successfully'
             } catch (error) {
                 // Continue sending other messages after catching error
-                yield* Eff.msg('Test2').send('message2')
+                yield* Eff.send(new TestMsg('message2'))
                 return 'sent2 after error'
             }
         }
 
         function* receiver() {
             try {
-                const msg1 = yield* Eff.msg('Test1').wait<string>()
+                const msg1 = yield* Eff.wait(TestMsg)
                 return `received1: ${msg1}`
             } catch (error) {
                 // Continue waiting for other messages after catching error
-                const msg2 = yield* Eff.msg('Test2').wait<string>()
+                const msg2 = yield* Eff.wait(TestMsg)
                 return `received2: ${msg2}`
             }
         }
@@ -1904,16 +1979,22 @@ describe('Eff.communicate', () => {
     })
 
     it('should handle multiple send/wait operations after error recovery', () => {
+        class Test1Msg extends Eff.Msg('Test1')<string> {}
+        class Test2Msg extends Eff.Msg('Test2')<string> {}
+        class Test3Msg extends Eff.Msg('Test3')<string> {}
+        class Test4Msg extends Eff.Msg('Test4')<string> {}
+        class Test5Msg extends Eff.Msg('Test5')<string> {}
+
         function* sender() {
             try {
-                yield* Eff.msg('Test1').send('message1')
-                yield* Eff.msg('Test2').send('message2')
+                yield* Eff.send(new Test1Msg('message1'))
+                yield* Eff.send(new Test2Msg('message2'))
                 return 'sent both successfully'
             } catch (error) {
                 // Send multiple messages after catching error
-                yield* Eff.msg('Test3').send('message3')
-                yield* Eff.msg('Test4').send('message4')
-                yield* Eff.msg('Test5').send('message5')
+                yield* Eff.send(new Test3Msg('message3'))
+                yield* Eff.send(new Test4Msg('message4'))
+                yield* Eff.send(new Test5Msg('message5'))
                 return 'sent three after error'
             }
         }
@@ -1921,18 +2002,18 @@ describe('Eff.communicate', () => {
         function* receiver() {
             const messages = []
             try {
-                const msg1 = yield* Eff.msg('Test1').wait<string>()
+                const msg1 = yield* Eff.wait(Test1Msg)
                 messages.push(msg1)
-                const msg2 = yield* Eff.msg('Test2').wait<string>()
+                const msg2 = yield* Eff.wait(Test2Msg)
                 messages.push(msg2)
                 return `received: ${messages.join(', ')}`
             } catch (error) {
                 // Wait for multiple messages after catching error
-                const msg3 = yield* Eff.msg('Test3').wait<string>()
+                const msg3 = yield* Eff.wait(Test3Msg)
                 messages.push(msg3)
-                const msg4 = yield* Eff.msg('Test4').wait<string>()
+                const msg4 = yield* Eff.wait(Test4Msg)
                 messages.push(msg4)
-                const msg5 = yield* Eff.msg('Test5').wait<string>()
+                const msg5 = yield* Eff.wait(Test5Msg)
                 messages.push(msg5)
                 return `received after error: ${messages.join(', ')}`
             }
@@ -1958,7 +2039,7 @@ describe('Eff.communicate', () => {
             try {
                 // Continuously wait for log messages without matching count
                 while (true) {
-                    const log = yield* Eff.msg('Log').wait<string>()
+                    const log = yield* Eff.wait(LogMsg)
                     logs.push(log)
                 }
             } finally {
@@ -1968,15 +2049,15 @@ describe('Eff.communicate', () => {
         }
 
         function* producer1() {
-            yield* Eff.msg('Log').send('Producer1: Started')
-            yield* Eff.msg('Log').send('Producer1: Processing')
-            yield* Eff.msg('Log').send('Producer1: Completed')
+            yield* Eff.send(new LogMsg('Producer1: Started'))
+            yield* Eff.send(new LogMsg('Producer1: Processing'))
+            yield* Eff.send(new LogMsg('Producer1: Completed'))
             return 'producer1 done'
         }
 
         function* producer2() {
-            yield* Eff.msg('Log').send('Producer2: Started')
-            yield* Eff.msg('Log').send('Producer2: Error occurred')
+            yield* Eff.send(new LogMsg('Producer2: Started'))
+            yield* Eff.send(new LogMsg('Producer2: Error occurred'))
             return 'producer2 done'
         }
 
@@ -1996,19 +2077,15 @@ describe('Eff.communicate', () => {
     })
 
     it('should implement shared resources and cleanup correctly', () => {
-        type Resource = {
-            open: () => void
-            get: () => number
-            close: () => void
-        }
+        class ResourceCtx extends Eff.Ctx('Resource')<Resource> {}
 
         function* resourceProvider() {
-            const resource = yield* Eff.ctx('Resource').get<Resource>()
+            const resource = yield* Eff.get(ResourceCtx)
             let count = 0
             try {
                 resource.open()
                 while (true) {
-                    yield* Eff.msg('Resource').send(resource)
+                    yield* Eff.send(new ResourceMsg(resource))
                     count++
                 }
             } finally {
@@ -2019,7 +2096,7 @@ describe('Eff.communicate', () => {
         }
 
         function* getResource() {
-            const resource = yield* Eff.msg('Resource').wait<Resource>()
+            const resource = yield* Eff.wait(ResourceMsg)
             return resource.get()
         }
 
@@ -2078,7 +2155,7 @@ describe('Eff.communicate', () => {
             const logs = []
             try {
                 while (true) {
-                    const log = yield* Eff.msg('Log').wait<string>()
+                    const log = yield* Eff.wait(LogMsg)
                     logs.push(log)
                 }
             } finally {
@@ -2089,24 +2166,24 @@ describe('Eff.communicate', () => {
 
         function* sender() {
             try {
-                yield* Eff.msg('Test').send('message')
-                yield* Eff.msg('Log').send('Sender: Message sent successfully')
+                yield* Eff.send(new TestMsg('message'))
+                yield* Eff.send(new LogMsg('Sender: Message sent successfully'))
                 return 'sent successfully'
             } catch (error) {
                 // Continue sending logs after catching error
-                yield* Eff.msg('Log').send('Sender: Message failed, but continuing')
-                yield* Eff.msg('Log').send('Sender: Recovery completed')
+                yield* Eff.send(new LogMsg('Sender: Message failed, but continuing'))
+                yield* Eff.send(new LogMsg('Sender: Recovery completed'))
                 return 'sent after error'
             }
         }
 
         function* receiver() {
             try {
-                const message = yield* Eff.msg('Test').wait<string>()
-                yield* Eff.msg('Log').send('Receiver: Message received')
+                const message = yield* Eff.wait(TestMsg)
+                yield* Eff.send(new LogMsg('Receiver: Message received'))
                 return `received: ${message}`
             } catch (error) {
-                yield* Eff.msg('Log').send('Receiver: Message not received, but continuing')
+                yield* Eff.send(new LogMsg('Receiver: Message not received, but continuing'))
                 return 'received nothing'
             }
         }
@@ -2127,20 +2204,24 @@ describe('Eff.communicate', () => {
     })
 
     it('should demonstrate error recovery with unmatched messages', () => {
+        class Test1Msg extends Eff.Msg('Test1')<string> {}
+        class Test2Msg extends Eff.Msg('Test2')<string> {}
+        class Test3Msg extends Eff.Msg('Test3')<string> {}
+
         function* sender1() {
             try {
-                yield* Eff.msg('Test1').send('message1')
+                yield* Eff.send(new Test1Msg('message1'))
                 return 'sent1 successfully'
             } catch (error) {
                 // Send other messages after catching error
-                yield* Eff.msg('Test2').send('message2')
+                yield* Eff.send(new Test2Msg('message2'))
                 return 'sent2 after error'
             }
         }
 
         function* sender2() {
             try {
-                yield* Eff.msg('Test3').send('message3')
+                yield* Eff.send(new Test3Msg('message3'))
                 return 'sent3 successfully'
             } catch (error) {
                 return 'sent3 failed'
@@ -2149,8 +2230,8 @@ describe('Eff.communicate', () => {
 
         function* receiver() {
             try {
-                const msg2 = yield* Eff.msg('Test2').wait<string>()
-                const msg3 = yield* Eff.msg('Test3').wait<string>()
+                const msg2 = yield* Eff.wait(Test2Msg)
+                const msg3 = yield* Eff.wait(Test3Msg)
                 return `received: ${msg2}, ${msg3}`
             } catch (error) {
                 return 'receiver caught error'

@@ -237,50 +237,12 @@ export type StreamResults<TaskReturn> = AsyncGenerator<StreamResult<TaskReturn>,
 export type StreamHandler<TaskReturn, HandlerReturn> = (results: StreamResults<TaskReturn>) => Promise<HandlerReturn>
 
 export class Eff {
-    static err = <const Name extends string>(name: Name) => {
-        return {
-            *throw<E = void>(...args: E extends void ? [] : [E]): Generator<Err<Name, E>, never> {
-                yield {
-                    type: 'err',
-                    name,
-                    error: args[0] as E,
-                }
-                /* istanbul ignore next */
-                throw new Error(`Unexpected resumption of error effect [${name}]`)
-            },
-        }
-    }
-
     static Err = Err
 
     static *throw<E extends AnyErr>(err: E): Generator<E, never> {
         yield err
         /* istanbul ignore next */
         throw new Error(`Unexpected resumption of error effect [${err.name}]`)
-    }
-
-    static ctx = <const Name extends string>(name: Name) => {
-        return {
-            *get<T>(): Generator<Ctx<Name, T>, T> {
-                const context = yield {
-                    type: 'ctx',
-                    name,
-                    context: EffSymbol,
-                }
-
-                return context as T
-            },
-            *opt<T>(): Generator<Opt<Name, T>, T | undefined> {
-                const context = yield {
-                    type: 'ctx',
-                    name,
-                    context: EffSymbol,
-                    optional: true,
-                }
-
-                return context as T | undefined
-            },
-        }
     }
 
     static Ctx = Ctx
@@ -290,18 +252,6 @@ export class Eff {
         const context = yield typeof ctx === 'function' ? new ctx() : ctx
 
         return context as CtxValue<C>
-    }
-
-    static msg = <const Name extends string>(name: Name) => {
-        return {
-            *send<T>(message: T): Generator<SendMsg<Name, T>, void> {
-                yield { type: 'msg', name, message }
-            },
-            *wait<T>(): Generator<WaitMsg<Name, T>, T> {
-                const message = yield { type: 'msg', name }
-                return message as T
-            },
-        }
     }
 
     static Msg = Msg
