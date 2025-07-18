@@ -124,11 +124,8 @@ typings/
 
 # rollup.js default build output
 dist/
-!dist/
 cjs/
-!cjs/
 esm/
-!esm
 packages/*/dist/
 projects/*/dist/
 packages/*/cjs/

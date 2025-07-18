@@ -1,4 +1,5 @@
-import { Eff, Err, Result, isGenerator, Async, StreamResult, StreamResults } from '../src/koka'
+import { Err, Result, isGenerator, Async, StreamResult, StreamResults } from '../src'
+import * as Eff from '../src'
 
 const delayTime = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 

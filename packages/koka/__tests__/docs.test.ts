@@ -1,4 +1,4 @@
-import { AnyEff, Eff } from '../src/koka'
+import * as Eff from '../src'
 
 class ValidationError extends Eff.Err('ValidationError')<string> {}
 class InnerError extends Eff.Err('InnerError')<string> {}
@@ -10,8 +10,6 @@ class MyRandom extends Eff.Ctx('MyRandom')<() => number> {}
 class SomeContext extends Eff.Ctx('SomeContext')<number> {}
 class GreetingMsg extends Eff.Msg('Greeting')<string> {}
 class LogMsg extends Eff.Msg('Log')<string> {}
-class UserRequest extends Eff.Msg('UserRequest')<{ userId: string }> {}
-class UserResponse extends Eff.Msg('UserResponse')<{ user: any }> {}
 
 describe('Koka Documentation Examples - Tutorial Section', () => {
     it('Your First Koka Program', () => {
@@ -482,7 +480,7 @@ describe('Koka Documentation Examples - How-to Guides Section', () => {
 
     it('Error Recovery and Retry Mechanism', async () => {
         // Retry function
-        function* withRetry<E extends AnyEff, T>(
+        function* withRetry<E extends Eff.AnyEff, T>(
             effect: () => Generator<E, T>,
             maxRetries: number = 3,
             delay: number = 1000,
