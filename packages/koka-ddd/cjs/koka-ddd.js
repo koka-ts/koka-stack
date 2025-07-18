@@ -1,6 +1,6 @@
 'use strict'
 Object.defineProperty(exports, '__esModule', { value: true })
-exports.Store = exports.prettyPrintCommandStack = exports.Domain = void 0
+exports.Store = exports.ExecutionTreeOpt = exports.SetRoot = exports.GetRoot = exports.Domain = void 0
 exports.get = get
 exports.set = set
 exports.query = query
@@ -22,127 +22,104 @@ var Domain = /** @class */ (function () {
     return Domain
 })()
 exports.Domain = Domain
-var prettyPrintCommandStack = function (commandStack) {
-    var stackLines = []
-    var formatStack = function (stack, indent) {
-        var e_1, _a, e_2, _b
-        if (indent === void 0) {
-            indent = 0
-        }
-        var spaces = ' '.repeat(indent * 2)
-        stackLines.push(''.concat(spaces, 'Command: ').concat(stack.name))
-        if (stack.args.length > 0) {
-            stackLines.push(''.concat(spaces, 'Args: ').concat(JSON.stringify(stack.args)))
-        }
-        if (stack.return !== undefined) {
-            stackLines.push(''.concat(spaces, 'Return: ').concat(JSON.stringify(stack.return)))
-        }
-        if (stack.states.length > 0) {
-            stackLines.push(''.concat(spaces, 'States:'))
-            try {
-                for (var _c = tslib_1.__values(stack.states), _d = _c.next(); !_d.done; _d = _c.next()) {
-                    var state = _d.value
-                    stackLines.push(''.concat(spaces, '  Previous: ').concat(JSON.stringify(state.previous)))
-                    stackLines.push(''.concat(spaces, '  Next: ').concat(JSON.stringify(state.next)))
-                }
-            } catch (e_1_1) {
-                e_1 = { error: e_1_1 }
-            } finally {
-                try {
-                    if (_d && !_d.done && (_a = _c.return)) _a.call(_c)
-                } finally {
-                    if (e_1) throw e_1.error
-                }
-            }
-        }
-        if (stack.stacks.length > 0) {
-            stackLines.push(''.concat(spaces, 'Sub-Commands:'))
-            try {
-                for (var _e = tslib_1.__values(stack.stacks), _f = _e.next(); !_f.done; _f = _e.next()) {
-                    var subStack = _f.value
-                    formatStack(subStack, indent + 1)
-                }
-            } catch (e_2_1) {
-                e_2 = { error: e_2_1 }
-            } finally {
-                try {
-                    if (_f && !_f.done && (_b = _e.return)) _b.call(_e)
-                } finally {
-                    if (e_2) throw e_2.error
-                }
-            }
-        }
+var GetRoot = /** @class */ (function (_super) {
+    tslib_1.__extends(GetRoot, _super)
+    function GetRoot() {
+        return (_super !== null && _super.apply(this, arguments)) || this
     }
-    if (commandStack.name === '') {
-        commandStack.stacks.forEach(formatStack)
-    } else {
-        formatStack(commandStack)
+    return GetRoot
+})(koka_1.Eff.Ctx('koka-ddd/get-root'))
+exports.GetRoot = GetRoot
+var SetRoot = /** @class */ (function (_super) {
+    tslib_1.__extends(SetRoot, _super)
+    function SetRoot() {
+        return (_super !== null && _super.apply(this, arguments)) || this
     }
-    return stackLines.join('\n')
-}
-exports.prettyPrintCommandStack = prettyPrintCommandStack
+    return SetRoot
+})(koka_1.Eff.Ctx('koka-ddd/set-root'))
+exports.SetRoot = SetRoot
+var ExecutionTreeOpt = /** @class */ (function (_super) {
+    tslib_1.__extends(ExecutionTreeOpt, _super)
+    function ExecutionTreeOpt() {
+        return (_super !== null && _super.apply(this, arguments)) || this
+    }
+    return ExecutionTreeOpt
+})(koka_1.Eff.Opt('koka-ddd/execution-tree'))
+exports.ExecutionTreeOpt = ExecutionTreeOpt
 function get(domainOrOptic) {
-    var optic, getRoot, root, State
+    var optic, executionTree, getRoot, root, state
     return tslib_1.__generator(this, function (_a) {
         switch (_a.label) {
             case 0:
                 optic = domainOrOptic instanceof Domain ? domainOrOptic.$ : domainOrOptic
-                return [5 /*yield**/, tslib_1.__values(koka_1.Eff.ctx('getRoot').get())]
+                return [5 /*yield**/, tslib_1.__values(koka_1.Eff.get(ExecutionTreeOpt))]
             case 1:
+                executionTree = _a.sent()
+                return [5 /*yield**/, tslib_1.__values(koka_1.Eff.get(GetRoot))]
+            case 2:
                 getRoot = _a.sent()
                 root = getRoot()
                 return [5 /*yield**/, tslib_1.__values(optic.get(root))]
-            case 2:
-                State = _a.sent()
-                return [2 /*return*/, State]
+            case 3:
+                state = _a.sent()
+                executionTree === null || executionTree === void 0 ? void 0 : executionTree.states.push(state)
+                return [2 /*return*/, state]
         }
     })
 }
 function set(domainOrOptic, setStateInput) {
-    var optic, commandStack, updateRoot, getRoot, root, newRoot, setRoot
+    var optic, executionTree, updateRoot, getRoot, root, newRoot, setRoot
     return tslib_1.__generator(this, function (_a) {
         switch (_a.label) {
             case 0:
                 optic = domainOrOptic instanceof Domain ? domainOrOptic.$ : domainOrOptic
-                return [5 /*yield**/, tslib_1.__values(koka_1.Eff.ctx('commandStack').get())]
+                return [5 /*yield**/, tslib_1.__values(koka_1.Eff.get(ExecutionTreeOpt))]
             case 1:
-                commandStack = _a.sent()
+                executionTree = _a.sent()
                 updateRoot = optic.set(function (state) {
                     var result, nextState
                     return tslib_1.__generator(this, function (_a) {
                         switch (_a.label) {
                             case 0:
                                 if (typeof setStateInput !== 'function') {
-                                    commandStack === null || commandStack === void 0
-                                        ? void 0
-                                        : commandStack.states.push({
-                                              previous: state,
-                                              next: setStateInput,
-                                          })
+                                    if (
+                                        (executionTree === null || executionTree === void 0
+                                            ? void 0
+                                            : executionTree.type) === 'command'
+                                    ) {
+                                        executionTree.changes.push({
+                                            previous: state,
+                                            next: setStateInput,
+                                        })
+                                    }
                                     return [2 /*return*/, setStateInput]
                                 }
                                 result = setStateInput(state)
                                 return [5 /*yield**/, tslib_1.__values((0, koka_optic_1.getOpticValue)(result))]
                             case 1:
                                 nextState = _a.sent()
-                                commandStack === null || commandStack === void 0
-                                    ? void 0
-                                    : commandStack.states.push({
-                                          previous: state,
-                                          next: nextState,
-                                      })
+                                if (
+                                    (executionTree === null || executionTree === void 0
+                                        ? void 0
+                                        : executionTree.type) === 'command'
+                                ) {
+                                    executionTree.changes.push({
+                                        previous: state,
+                                        next: nextState,
+                                    })
+                                }
                                 return [2 /*return*/, nextState]
                         }
                     })
                 })
-                return [5 /*yield**/, tslib_1.__values(koka_1.Eff.ctx('getRoot').get())]
+                return [5 /*yield**/, tslib_1.__values(koka_1.Eff.get(GetRoot))]
             case 2:
                 getRoot = _a.sent()
                 root = getRoot()
                 return [5 /*yield**/, tslib_1.__values(updateRoot(root))]
             case 3:
                 newRoot = _a.sent()
-                return [5 /*yield**/, tslib_1.__values(koka_1.Eff.ctx('setRoot').get())]
+                return [5 /*yield**/, tslib_1.__values(koka_1.Eff.get(SetRoot))]
             case 4:
                 setRoot = _a.sent()
                 setRoot(newRoot)
@@ -154,14 +131,68 @@ function query() {
     return function (target, context) {
         var methodName = context.name
         function replacementMethod() {
+            var _i, parent, name, executionTree, gen, result, effect, _a, _b, _c, _d
+            var _e
+            var _f, _g
             var args = []
-            for (var _i = 0; _i < arguments.length; _i++) {
+            for (_i = 0; _i < arguments.length; _i++) {
                 args[_i] = arguments[_i]
             }
-            console.log("LOG COMMAND: Entering method '".concat(methodName, "'."))
-            var result = target.call.apply(target, tslib_1.__spreadArray([this], tslib_1.__read(args), false))
-            console.log("LOG COMMAND: Exiting method '".concat(methodName, "'."))
-            return result
+            return tslib_1.__generator(this, function (_h) {
+                switch (_h.label) {
+                    case 0:
+                        return [5 /*yield**/, tslib_1.__values(koka_1.Eff.get(ExecutionTreeOpt))]
+                    case 1:
+                        parent = _h.sent()
+                        name = ''
+                            .concat(
+                                (_g = (_f = this.constructor) === null || _f === void 0 ? void 0 : _f.name) !== null &&
+                                    _g !== void 0
+                                    ? _g
+                                    : 'UnknownDomain',
+                                '.',
+                            )
+                            .concat(methodName)
+                        executionTree = {
+                            type: 'query',
+                            async: false,
+                            name: name,
+                            args: args,
+                            return: undefined,
+                            states: [],
+                            queries: [],
+                        }
+                        if (parent) {
+                            parent.queries.push(executionTree)
+                        }
+                        gen = koka_1.Eff.try(
+                            target.call.apply(target, tslib_1.__spreadArray([this], tslib_1.__read(args), false)),
+                        ).catch(((_e = {}), (_e[ExecutionTreeOpt.field] = executionTree), _e))
+                        result = gen.next()
+                        _h.label = 2
+                    case 2:
+                        if (!!result.done) return [3 /*break*/, 7]
+                        effect = result.value
+                        if (!(effect.type === 'async')) return [3 /*break*/, 4]
+                        executionTree.async = true
+                        _b = (_a = gen).next
+                        return [4 /*yield*/, effect]
+                    case 3:
+                        result = _b.apply(_a, [_h.sent()])
+                        return [3 /*break*/, 6]
+                    case 4:
+                        _d = (_c = gen).next
+                        return [4 /*yield*/, effect]
+                    case 5:
+                        result = _d.apply(_c, [_h.sent()])
+                        _h.label = 6
+                    case 6:
+                        return [3 /*break*/, 2]
+                    case 7:
+                        executionTree.return = result.value
+                        return [2 /*return*/, result.value]
+                }
+            })
         }
         return replacementMethod
     }
@@ -170,53 +201,68 @@ function command() {
     return function (target, context) {
         var methodName = context.name
         function replacementMethod() {
-            var _i, parent, name, commandStack, result
-            var _a, _b
+            var _i, parent, name, executionTree, gen, result, effect, _a, _b, _c, _d
+            var _e
+            var _f, _g
             var args = []
             for (_i = 0; _i < arguments.length; _i++) {
                 args[_i] = arguments[_i]
             }
-            return tslib_1.__generator(this, function (_c) {
-                switch (_c.label) {
+            return tslib_1.__generator(this, function (_h) {
+                switch (_h.label) {
                     case 0:
-                        return [5 /*yield**/, tslib_1.__values(koka_1.Eff.ctx('commandStack').get())]
+                        return [5 /*yield**/, tslib_1.__values(koka_1.Eff.get(ExecutionTreeOpt))]
                     case 1:
-                        parent = _c.sent()
+                        parent = _h.sent()
                         name = ''
                             .concat(
-                                (_b = (_a = this.constructor) === null || _a === void 0 ? void 0 : _a.name) !== null &&
-                                    _b !== void 0
-                                    ? _b
+                                (_g = (_f = this.constructor) === null || _f === void 0 ? void 0 : _f.name) !== null &&
+                                    _g !== void 0
+                                    ? _g
                                     : 'UnknownDomain',
                                 '.',
                             )
                             .concat(methodName)
-                        commandStack = {
-                            name: name,
+                        executionTree = {
+                            type: 'command',
                             async: false,
+                            name: name,
                             args: args,
                             return: undefined,
                             states: [],
-                            stacks: [],
+                            changes: [],
+                            commands: [],
+                            queries: [],
                         }
-                        parent === null || parent === void 0 ? void 0 : parent.stacks.push(commandStack)
-                        return [
-                            5 /*yield**/,
-                            tslib_1.__values(
-                                koka_1.Eff.try(
-                                    target.call.apply(
-                                        target,
-                                        tslib_1.__spreadArray([this], tslib_1.__read(args), false),
-                                    ),
-                                ).catch({
-                                    commandStack: commandStack,
-                                }),
-                            ),
-                        ]
+                        if ((parent === null || parent === void 0 ? void 0 : parent.type) === 'command') {
+                            parent.commands.push(executionTree)
+                        }
+                        gen = koka_1.Eff.try(
+                            target.call.apply(target, tslib_1.__spreadArray([this], tslib_1.__read(args), false)),
+                        ).catch(((_e = {}), (_e[ExecutionTreeOpt.field] = executionTree), _e))
+                        result = gen.next()
+                        _h.label = 2
                     case 2:
-                        result = _c.sent()
-                        commandStack.return = result
-                        return [2 /*return*/, result]
+                        if (!!result.done) return [3 /*break*/, 7]
+                        effect = result.value
+                        if (!(effect.type === 'async')) return [3 /*break*/, 4]
+                        executionTree.async = true
+                        _b = (_a = gen).next
+                        return [4 /*yield*/, effect]
+                    case 3:
+                        result = _b.apply(_a, [_h.sent()])
+                        return [3 /*break*/, 6]
+                    case 4:
+                        _d = (_c = gen).next
+                        return [4 /*yield*/, effect]
+                    case 5:
+                        result = _d.apply(_c, [_h.sent()])
+                        _h.label = 6
+                    case 6:
+                        return [3 /*break*/, 2]
+                    case 7:
+                        executionTree.return = result.value
+                        return [2 /*return*/, result.value]
                 }
             })
         }
@@ -225,8 +271,11 @@ function command() {
 }
 var Store = /** @class */ (function () {
     function Store(options) {
+        var e_1, _a
         var _this = this
+        var _b
         this.context = {}
+        this.enhancers = []
         this.getState = function () {
             return _this.state
         }
@@ -247,7 +296,27 @@ var Store = /** @class */ (function () {
         }
         this.pid = 0
         this.listeners = []
+        this.executionListeners = []
         this.state = options.state
+        this.enhancers = tslib_1.__spreadArray(
+            tslib_1.__spreadArray([], tslib_1.__read(this.enhancers), false),
+            tslib_1.__read((_b = options.enhancers) !== null && _b !== void 0 ? _b : []),
+            false,
+        )
+        try {
+            for (var _c = tslib_1.__values(this.enhancers), _d = _c.next(); !_d.done; _d = _c.next()) {
+                var enhancer = _d.value
+                enhancer(this)
+            }
+        } catch (e_1_1) {
+            e_1 = { error: e_1_1 }
+        } finally {
+            try {
+                if (_d && !_d.done && (_a = _c.return)) _a.call(_c)
+            } finally {
+                if (e_1) throw e_1.error
+            }
+        }
     }
     Store.prototype.subscribe = function (listener) {
         var _this = this
@@ -260,7 +329,7 @@ var Store = /** @class */ (function () {
         }
     }
     Store.prototype.publish = function () {
-        var e_3, _a
+        var e_2, _a
         if (!this.dirty) {
             return
         }
@@ -270,6 +339,33 @@ var Store = /** @class */ (function () {
             for (var _b = tslib_1.__values(this.listeners), _c = _b.next(); !_c.done; _c = _b.next()) {
                 var listener = _c.value
                 listener(this.state)
+            }
+        } catch (e_2_1) {
+            e_2 = { error: e_2_1 }
+        } finally {
+            try {
+                if (_c && !_c.done && (_a = _b.return)) _a.call(_b)
+            } finally {
+                if (e_2) throw e_2.error
+            }
+        }
+    }
+    Store.prototype.subscribeExecution = function (listener) {
+        var _this = this
+        this.executionListeners.push(listener)
+        return function () {
+            var index = _this.executionListeners.indexOf(listener)
+            if (index !== -1) {
+                _this.executionListeners.splice(index, 1)
+            }
+        }
+    }
+    Store.prototype.publishExecution = function (tree) {
+        var e_3, _a
+        try {
+            for (var _b = tslib_1.__values(this.executionListeners), _c = _b.next(); !_c.done; _c = _b.next()) {
+                var listener = _c.value
+                listener(tree)
             }
         } catch (e_3_1) {
             e_3 = { error: e_3_1 }
@@ -290,30 +386,75 @@ var Store = /** @class */ (function () {
         return result
     }
     Store.prototype.runQuery = function (input) {
+        var _a
+        var _this = this
         var query = typeof input === 'function' ? input() : input
-        var withRoot = koka_1.Eff.try(query).catch(tslib_1.__assign({ getRoot: this.getState }, this.context))
-        return koka_1.Eff.runResult(withRoot)
+        var executionTree =
+            this.enhancers.length > 0
+                ? {
+                      type: 'query',
+                      async: true,
+                      name: '',
+                      args: [],
+                      return: undefined,
+                      states: [],
+                      queries: [],
+                  }
+                : undefined
+        var withRoot = koka_1.Eff.try(query).catch(
+            tslib_1.__assign(
+                tslib_1.__assign({}, this.context),
+                ((_a = {}), (_a[GetRoot.field] = this.getState), (_a[ExecutionTreeOpt.field] = executionTree), _a),
+            ),
+        )
+        var result = koka_1.Eff.runResult(withRoot)
+        var handleResult = function (result) {
+            if (executionTree) {
+                executionTree.return = result
+                _this.publishExecution(executionTree)
+            }
+            return result
+        }
+        if (result instanceof Promise) {
+            return result.then(handleResult)
+        }
+        return handleResult(result)
     }
     Store.prototype.runCommand = function (input) {
+        var _a
+        var _this = this
         var command = typeof input === 'function' ? input() : input
-        var commandStack = {
-            name: '',
-            async: false,
-            args: [],
-            return: undefined,
-            states: [],
-            stacks: [],
-        }
+        var executionTree =
+            this.enhancers.length > 0
+                ? {
+                      type: 'command',
+                      async: true,
+                      name: '#root#',
+                      args: [],
+                      return: undefined,
+                      states: [],
+                      changes: [],
+                      commands: [],
+                      queries: [],
+                  }
+                : undefined
         var withRoot = koka_1.Eff.try(command).catch(
-            tslib_1.__assign(tslib_1.__assign({ setRoot: this.setState, getRoot: this.getState }, this.context), {
-                commandStack: commandStack,
-            }),
+            tslib_1.__assign(
+                tslib_1.__assign({}, this.context),
+                ((_a = {}),
+                (_a[SetRoot.field] = this.setState),
+                (_a[GetRoot.field] = this.getState),
+                (_a[ExecutionTreeOpt.field] = executionTree),
+                _a),
+            ),
         )
         try {
             var result = koka_1.Eff.runResult(withRoot)
             var handleResult = function (result) {
-                commandStack.return = result
-                console.log((0, exports.prettyPrintCommandStack)(commandStack))
+                if (executionTree) {
+                    executionTree.return = result
+                    _this.publishExecution(executionTree)
+                }
                 return result
             }
             if (result instanceof Promise) {
