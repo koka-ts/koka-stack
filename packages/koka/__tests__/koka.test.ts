@@ -1,4 +1,4 @@
-import { Err, Result, isGenerator, Async, StreamResult, StreamResults } from '../src'
+import { Err, Result, isGenerator, Async, StreamResult, StreamResults, TaskInputs } from '../src'
 import * as Eff from '../src'
 
 const delayTime = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -1525,6 +1525,32 @@ describe('Eff.communicate', () => {
         ).toThrow(/Message 'Test' sent by 'sender' was not received/)
     })
 
+    it('should support send message of undefined type', () => {
+        class TestMsg extends Eff.Msg('Test')<void> {}
+
+        function* sender() {
+            yield* Eff.send(new TestMsg())
+            return 'sent'
+        }
+
+        function* receiver() {
+            yield* Eff.wait(TestMsg)
+            return `received`
+        }
+
+        const result = Eff.runSync(
+            Eff.communicate({
+                sender,
+                receiver,
+            }),
+        )
+
+        expect(result).toEqual({
+            sender: 'sent',
+            receiver: 'received',
+        })
+    })
+
     it('should throw error for unsent messages', () => {
         class TestMsg extends Eff.Msg('Test')<string> {}
 
@@ -2251,5 +2277,513 @@ describe('Eff.communicate', () => {
         expect(result.sender1).toBe('sent2 after error')
         expect(result.sender2).toBe('sent3 successfully')
         expect(result.receiver).toBe('received: message2, message3')
+    })
+})
+
+describe('Stream maxConcurrency and TaskProducer', () => {
+    it('should respect maxConcurrency limit', async () => {
+        const activeTasks: number[] = []
+        const maxConcurrency = 2
+        const maxActiveTasks: number[] = []
+
+        function* task(index: number) {
+            activeTasks.push(index)
+            maxActiveTasks.push(activeTasks.length)
+            try {
+                yield* Eff.await(delayTime(50))
+                return `task-${index}`
+            } finally {
+                const taskIndex = activeTasks.indexOf(index)
+                if (taskIndex > -1) {
+                    activeTasks.splice(taskIndex, 1)
+                }
+            }
+        }
+
+        // Use TaskProducer function
+        const producer = (index: number) => {
+            if (index < 4) {
+                return task(index)
+            }
+            return undefined // Early termination
+        }
+
+        const handler = async (stream: StreamResults<string>) => {
+            const results = []
+            for await (const { value } of stream) {
+                results.push(value)
+            }
+            return results
+        }
+
+        const result = await Eff.run(Eff.stream(producer, handler, { maxConcurrency }))
+
+        expect(result).toEqual(['task-0', 'task-1', 'task-2', 'task-3'])
+        // Verify that active task count never exceeds max concurrency limit
+        expect(Math.max(...maxActiveTasks)).toBeLessThanOrEqual(maxConcurrency)
+        // Verify all tasks have completed
+        expect(activeTasks.length).toBe(0)
+    })
+
+    it('should handle TaskProducer with early termination', async () => {
+        let callCount = 0
+
+        const producer = (index: number) => {
+            callCount++
+            if (index < 3) {
+                return function* () {
+                    yield* Eff.await(delayTime(10))
+                    return `item-${index}`
+                }
+            }
+            return undefined // Early termination
+        }
+
+        const handler = async (stream: StreamResults<string>) => {
+            const results = []
+            for await (const { value } of stream) {
+                results.push(value)
+            }
+            return results
+        }
+
+        const result = await Eff.run(Eff.stream(producer, handler, { maxConcurrency: 2 }))
+
+        expect(result).toEqual(['item-0', 'item-1', 'item-2'])
+        expect(callCount).toBe(4) // 4th call returns undefined
+    })
+
+    it('should handle empty TaskProducer', async () => {
+        const producer = (index: number) => {
+            return undefined // Immediate termination
+        }
+
+        const handler = async (stream: StreamResults<string>) => {
+            const results = []
+            for await (const { value } of stream) {
+                results.push(value)
+            }
+            return results
+        }
+
+        const result = await Eff.run(Eff.stream(producer, handler))
+
+        expect(result).toEqual([])
+    })
+
+    it('should handle TaskProducer with conditional task generation', async () => {
+        const producer = (index: number) => {
+            if (index % 2 === 0) {
+                return function* () {
+                    yield* Eff.await(delayTime(10))
+                    return `even-${index}`
+                }
+            } else if (index < 5) {
+                return function* () {
+                    yield* Eff.await(delayTime(5))
+                    return `odd-${index}`
+                }
+            }
+            return undefined
+        }
+
+        const handler = async (stream: StreamResults<string>) => {
+            const results = [] as string[]
+            for await (const { index, value } of stream) {
+                results[index] = value
+            }
+            return results
+        }
+
+        const result = await Eff.run(Eff.stream(producer, handler, { maxConcurrency: 3 }))
+
+        expect(result).toEqual(['even-0', 'odd-1', 'even-2', 'odd-3', 'even-4'])
+    })
+})
+
+describe('All maxConcurrency and TaskProducer', () => {
+    it('should respect maxConcurrency in all function', async () => {
+        const activeTasks: number[] = []
+        const maxConcurrency = 2
+        const maxActiveTasks: number[] = []
+
+        function* task(index: number) {
+            activeTasks.push(index)
+            maxActiveTasks.push(activeTasks.length)
+            try {
+                yield* Eff.await(delayTime(30))
+                return `task-${index}`
+            } finally {
+                const taskIndex = activeTasks.indexOf(index)
+                if (taskIndex > -1) {
+                    activeTasks.splice(taskIndex, 1)
+                }
+            }
+        }
+
+        const producer = (index: number) => {
+            if (index < 4) {
+                return task(index)
+            }
+            return undefined
+        }
+
+        const result = await Eff.run(Eff.all(producer, { maxConcurrency }))
+
+        expect(result).toEqual(['task-0', 'task-1', 'task-2', 'task-3'])
+        // Verify that active task count never exceeds max concurrency limit
+        expect(Math.max(...maxActiveTasks)).toBeLessThanOrEqual(maxConcurrency)
+        expect(activeTasks.length).toBe(0)
+    })
+
+    it('should handle all with TaskProducer returning undefined', async () => {
+        const producer = (index: number) => {
+            if (index < 2) {
+                return function* () {
+                    yield* Eff.await(delayTime(10))
+                    return `item-${index}`
+                }
+            }
+            return undefined
+        }
+
+        const result = await Eff.run(Eff.all(producer))
+
+        expect(result).toEqual(['item-0', 'item-1'])
+    })
+
+    it('should maintain order with maxConcurrency', async () => {
+        const producer = (index: number) => {
+            if (index < 3) {
+                return function* () {
+                    // Simulate different delays, but results should maintain index order
+                    yield* Eff.await(delayTime((3 - index) * 10))
+                    return `item-${index}`
+                }
+            }
+            return undefined
+        }
+
+        const result = await Eff.run(Eff.all(producer, { maxConcurrency: 2 }))
+
+        expect(result).toEqual(['item-0', 'item-1', 'item-2'])
+    })
+})
+
+describe('Race maxConcurrency and TaskProducer', () => {
+    it('should respect maxConcurrency in race function', async () => {
+        const activeTasks: number[] = []
+        const maxConcurrency = 2
+        const maxActiveTasks: number[] = []
+
+        function* task(index: number) {
+            activeTasks.push(index)
+            maxActiveTasks.push(activeTasks.length)
+            try {
+                yield* Eff.await(delayTime((index + 1) * 20))
+                return `task-${index}`
+            } finally {
+                const taskIndex = activeTasks.indexOf(index)
+                if (taskIndex > -1) {
+                    activeTasks.splice(taskIndex, 1)
+                }
+            }
+        }
+
+        const producer = (index: number) => {
+            if (index < 3) {
+                return task(index)
+            }
+            return undefined
+        }
+
+        const result = await Eff.run(Eff.race(producer, { maxConcurrency }))
+
+        // Should return the fastest task (task-0, 20ms delay)
+        expect(result).toBe('task-0')
+        // Verify that active task count never exceeds max concurrency limit
+        expect(Math.max(...maxActiveTasks)).toBeLessThanOrEqual(maxConcurrency)
+        expect(activeTasks.length).toBe(0)
+    })
+
+    it('should handle race with TaskProducer returning undefined', async () => {
+        const producer = (index: number) => {
+            if (index === 0) {
+                return function* () {
+                    yield* Eff.await(delayTime(10))
+                    return 'fast'
+                }
+            }
+            return undefined
+        }
+
+        const result = await Eff.run(Eff.race(producer))
+
+        expect(result).toBe('fast')
+    })
+
+    it('should handle race with mixed fast and slow tasks', async () => {
+        const producer = (index: number) => {
+            if (index < 3) {
+                return function* () {
+                    if (index === 1) {
+                        // Fastest task
+                        return 'fastest'
+                    } else {
+                        yield* Eff.await(delayTime(50))
+                        return `slow-${index}`
+                    }
+                }
+            }
+            return undefined
+        }
+
+        const result = await Eff.run(Eff.race(producer, { maxConcurrency: 2 }))
+
+        expect(result).toBe('fastest')
+    })
+})
+
+describe('Edge cases for maxConcurrency', () => {
+    it('should throw error for invalid maxConcurrency', async () => {
+        const producer = (index: number) => {
+            if (index < 2) {
+                return function* () {
+                    return `item-${index}`
+                }
+            }
+            return undefined
+        }
+
+        const handler = async (stream: StreamResults<string>) => {
+            const results = []
+            for await (const { value } of stream) {
+                results.push(value)
+            }
+            return results
+        }
+
+        // Test maxConcurrency = 0
+        expect(() => Eff.run(Eff.stream(producer, handler, { maxConcurrency: 0 }))).toThrow(
+            'maxConcurrency must be greater than 0',
+        )
+
+        // Test maxConcurrency = -1
+        expect(() => Eff.run(Eff.stream(producer, handler, { maxConcurrency: -1 }))).toThrow(
+            'maxConcurrency must be greater than 0',
+        )
+    })
+
+    it('should handle maxConcurrency = 1 (sequential execution)', async () => {
+        const executionOrder: number[] = []
+        const activeTasks: number[] = []
+        const maxActiveTasks: number[] = []
+
+        const producer = (index: number) => {
+            if (index < 3) {
+                return function* () {
+                    activeTasks.push(index)
+                    maxActiveTasks.push(activeTasks.length)
+                    executionOrder.push(index)
+                    try {
+                        yield* Eff.await(delayTime(10))
+                        return `item-${index}`
+                    } finally {
+                        const taskIndex = activeTasks.indexOf(index)
+                        if (taskIndex > -1) {
+                            activeTasks.splice(taskIndex, 1)
+                        }
+                    }
+                }
+            }
+            return undefined
+        }
+
+        const handler = async (stream: StreamResults<string>) => {
+            const results = []
+            for await (const { value } of stream) {
+                results.push(value)
+            }
+            return results
+        }
+
+        const result = await Eff.run(Eff.stream(producer, handler, { maxConcurrency: 1 }))
+
+        expect(result).toEqual(['item-0', 'item-1', 'item-2'])
+        // Verify that max concurrency is indeed 1
+        expect(Math.max(...maxActiveTasks)).toBe(1)
+        // Execution order should be 0, 1, 2 (sequential execution)
+        expect(executionOrder).toEqual([0, 1, 2])
+        expect(activeTasks.length).toBe(0)
+    })
+
+    it('should handle large maxConcurrency value', async () => {
+        const activeTasks: number[] = []
+        const maxActiveTasks: number[] = []
+
+        const producer = (index: number) => {
+            if (index < 5) {
+                return function* () {
+                    activeTasks.push(index)
+                    maxActiveTasks.push(activeTasks.length)
+                    try {
+                        yield* Eff.await(delayTime(10))
+                        return `item-${index}`
+                    } finally {
+                        const taskIndex = activeTasks.indexOf(index)
+                        if (taskIndex > -1) {
+                            activeTasks.splice(taskIndex, 1)
+                        }
+                    }
+                }
+            }
+            return undefined
+        }
+
+        const handler = async (stream: StreamResults<string>) => {
+            const results = []
+            for await (const { value } of stream) {
+                results.push(value)
+            }
+            return results
+        }
+
+        const result = await Eff.run(Eff.stream(producer, handler, { maxConcurrency: 1000 }))
+
+        expect(result).toEqual(['item-0', 'item-1', 'item-2', 'item-3', 'item-4'])
+        // Verify all tasks can execute concurrently (max active tasks should equal total tasks)
+        expect(Math.max(...maxActiveTasks)).toBe(5)
+        expect(activeTasks.length).toBe(0)
+    })
+})
+
+describe('TaskProducer with error handling', () => {
+    it('should handle errors in TaskProducer', async () => {
+        class ProducerError extends Eff.Err('ProducerError')<string> {}
+
+        const producer: Eff.TaskProducer<ProducerError | Async, string> = (index: number) => {
+            if (index === 1) {
+                return function* () {
+                    yield* Eff.throw(new ProducerError('Producer failed'))
+                    return 'should not reach here'
+                }
+            } else if (index < 3) {
+                return function* () {
+                    yield* Eff.await(delayTime(10))
+                    return `item-${index}`
+                }
+            }
+            return undefined
+        }
+
+        const handler = async (stream: StreamResults<string>) => {
+            const results = []
+            try {
+                for await (const { value } of stream) {
+                    results.push(value)
+                }
+            } catch (error) {
+                if (error instanceof ProducerError) {
+                    return `Error: ${error.error}`
+                }
+                throw error
+            }
+            return results
+        }
+
+        const result = await Eff.runAsync(
+            Eff.try(Eff.stream(producer, handler, { maxConcurrency: 2 })).handle({
+                ProducerError: (error) => `Error: ${error}`,
+            }),
+        )
+
+        expect(result).toBe('Error: Producer failed')
+    })
+
+    it('should verify maxConcurrency with semaphore-like tracking', async () => {
+        const maxConcurrency = 3
+        const activeCount = { value: 0 }
+        const maxActiveCount = { value: 0 }
+        const taskStartTimes: number[] = []
+        const taskEndTimes: number[] = []
+
+        const producer = (index: number) => {
+            if (index < 5) {
+                return function* () {
+                    // Record task start
+                    activeCount.value++
+                    maxActiveCount.value = Math.max(maxActiveCount.value, activeCount.value)
+                    taskStartTimes[index] = Date.now()
+
+                    try {
+                        // Simulate workload
+                        yield* Eff.await(delayTime(20))
+                        return `task-${index}`
+                    } finally {
+                        // Record task end
+                        activeCount.value--
+                        taskEndTimes[index] = Date.now()
+                    }
+                }
+            }
+            return undefined
+        }
+
+        const handler = async (stream: StreamResults<string>) => {
+            const results = []
+            for await (const { value } of stream) {
+                results.push(value)
+            }
+            return results
+        }
+
+        const result = await Eff.run(Eff.stream(producer, handler, { maxConcurrency }))
+
+        expect(result).toEqual(['task-0', 'task-1', 'task-2', 'task-3', 'task-4'])
+
+        // Verify that max concurrency never exceeds the limit
+        expect(maxActiveCount.value).toBeLessThanOrEqual(maxConcurrency)
+
+        // Verify all tasks have completed
+        expect(activeCount.value).toBe(0)
+
+        // Verify tasks are truly executing concurrently (at least some tasks have overlapping time)
+        const hasOverlap = taskStartTimes.some((startTime, i) => {
+            if (i === 0) return false
+            // Check if any task starts before another task ends
+            return taskStartTimes
+                .slice(0, i)
+                .some((prevStart) => startTime < taskEndTimes[taskStartTimes.indexOf(prevStart)])
+        })
+        expect(hasOverlap).toBe(true)
+    })
+
+    it('should handle TaskProducer returning function vs generator', async () => {
+        const producer = (index: number) => {
+            if (index === 0) {
+                // Return function
+                return function* () {
+                    return 'function'
+                }
+            } else if (index === 1) {
+                // Return generator instance
+                return (function* () {
+                    return 'generator'
+                })()
+            }
+            return undefined
+        }
+
+        const handler = async (stream: StreamResults<string>) => {
+            const results = []
+            for await (const { value } of stream) {
+                results.push(value)
+            }
+            return results
+        }
+
+        const result = await Eff.run(Eff.stream(producer, handler))
+
+        expect(result).toEqual(['function', 'generator'])
     })
 })

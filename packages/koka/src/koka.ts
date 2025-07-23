@@ -34,7 +34,7 @@ export type AnyOpt = Opt<string, any>
 export type Msg<Name extends string, T> = {
     type: 'msg'
     name: Name
-    message?: T
+    message: T | EffSymbol
 }
 
 export type AnyMsg = Msg<string, any>
@@ -44,7 +44,7 @@ export interface SendMsg<Name extends string, T> extends Msg<Name, T> {
 }
 
 export interface WaitMsg<Name extends string, T> extends Msg<Name, T> {
-    message?: undefined
+    message: EffSymbol
 }
 
 export type EffType<T> = Err<string, T> | Ctx<string, T> | Opt<string, T> | Async | Msg<string, T>
@@ -179,9 +179,9 @@ abstract class AbstractMsg<T> {
     static field: string = ''
     type = 'msg' as const
     abstract name: string
-    message: T
-    constructor(message: T) {
-        this.message = message
+    message: T | EffSymbol
+    constructor(...args: T extends undefined | void ? [] : [T]) {
+        this.message = args[0] as T | EffSymbol
     }
 }
 
@@ -195,7 +195,7 @@ export function Msg<const Name extends string>(name: Name) {
 export interface Wait<T extends AbstractMsg<any>> {
     type: 'msg'
     name: T['name']
-    message?: undefined
+    message: EffSymbol
 }
 
 export type CtxValue<C extends AnyCtx> = C['optional'] extends true
@@ -258,15 +258,18 @@ export function* send<T extends SendMsg<string, unknown>>(message: T): Generator
     yield message
 }
 
+type ExtractMsgMessage<T> = T extends Msg<string, infer U> ? U : never
+
 export function* wait<MsgCtor extends typeof AbstractMsg<unknown>>(
     msg: MsgCtor,
-): Generator<Wait<InstanceType<MsgCtor>>, InstanceType<MsgCtor>['message']> {
+): Generator<Wait<InstanceType<MsgCtor>>, ExtractMsgMessage<InstanceType<MsgCtor>>> {
     const message = yield {
         type: 'msg',
         name: msg.field,
+        message: EffSymbol,
     } as Wait<InstanceType<MsgCtor>>
 
-    return message as InstanceType<MsgCtor>['message']
+    return message as ExtractMsgMessage<InstanceType<MsgCtor>>
 }
 
 export function* communicate<const T extends {}>(
@@ -315,7 +318,7 @@ export function* communicate<const T extends {}>(
 
             if (effect.type === 'msg') {
                 // Send a message
-                if (effect.message !== undefined) {
+                if (effect.message !== EffSymbol) {
                     if (effect.name in waitStorage) {
                         const waitItem = waitStorage[effect.name]
                         delete waitStorage[effect.name]
@@ -396,10 +399,32 @@ export function* communicate<const T extends {}>(
     }
 }
 
+export type StreamOptions = {
+    maxConcurrency?: number
+}
+
+export type TaskProducer<Yield extends AnyEff, TaskReturn> = (index: number) => Task<Yield, TaskReturn> | undefined
+
+export type TaskInputs<Yield extends AnyEff, TaskReturn> =
+    | TaskProducer<Yield, TaskReturn>
+    | Array<Task<Yield, TaskReturn>>
+
 export function* stream<Yield extends AnyEff, TaskReturn, HandlerReturn>(
-    inputs: Iterable<Task<Yield, TaskReturn>>,
+    inputs: TaskInputs<Yield, TaskReturn>,
     handler: StreamHandler<TaskReturn, HandlerReturn>,
+    options?: StreamOptions,
 ): Generator<Async | Yield, HandlerReturn> {
+    const config = {
+        maxConcurrency: Number.POSITIVE_INFINITY,
+        ...options,
+    }
+
+    if (config.maxConcurrency < 1) {
+        throw new Error(`maxConcurrency must be greater than 0`)
+    }
+
+    const producer: TaskProducer<Yield, TaskReturn> = typeof inputs === 'function' ? inputs : (index) => inputs[index]
+
     type ProcessingItem = {
         type: 'initial'
         gen: Generator<Yield, TaskReturn>
@@ -431,8 +456,31 @@ export function* stream<Yield extends AnyEff, TaskReturn, HandlerReturn>(
 
     const items = [] as ProcessItem[]
 
-    for (const input of inputs) {
-        const gen = typeof input === 'function' ? input() : input
+    let count = 0
+    let noTask = false
+    const getNextTask = () => {
+        if (noTask) {
+            return undefined
+        }
+
+        const task = producer(count++)
+
+        if (!task) {
+            noTask = true
+            return
+        }
+
+        const gen = typeof task === 'function' ? task() : task
+
+        return gen
+    }
+
+    while (count < config.maxConcurrency) {
+        const gen = getNextTask()
+
+        if (!gen) {
+            break
+        }
 
         items.push({
             type: 'initial',
@@ -537,6 +585,22 @@ export function* stream<Yield extends AnyEff, TaskReturn, HandlerReturn>(
                 }
                 items[item.index] = processedItem
                 processedItems.push(processedItem)
+
+                const gen = getNextTask()
+
+                if (!gen) {
+                    return
+                }
+
+                const newItem: ProcessItem = {
+                    type: 'initial',
+                    gen,
+                    index: items.length,
+                }
+
+                items.push(newItem)
+
+                yield* processItem(newItem, newItem.gen.next())
             } else if (item.type === 'completed') {
                 throw new Error(
                     `Unexpected completion of item that was already completed: ${JSON.stringify(item, null, 2)}`,
@@ -661,32 +725,50 @@ export function* combine<const T extends unknown[] | readonly unknown[] | {}>(
     }
 }
 
+export type AllOptions = {
+    maxConcurrency?: number
+}
+
 export function* all<Yield extends AnyEff, Return>(
-    inputs: Iterable<Task<Yield, Return>>,
+    inputs: TaskInputs<Yield, Return>,
+    options?: AllOptions,
 ): Generator<Yield | Async, Return[]> {
-    const results = yield* stream(inputs, async (stream) => {
-        const results = [] as Return[]
+    const results = yield* stream(
+        inputs,
+        async (stream) => {
+            const results = [] as Return[]
 
-        for await (const { index, value } of stream) {
-            results[index] = value
-        }
+            for await (const { index, value } of stream) {
+                results[index] = value
+            }
 
-        return results
-    })
+            return results
+        },
+        options,
+    )
 
     return results
 }
 
-export function* race<Yield extends AnyEff, Return>(
-    inputs: Iterable<Task<Yield, Return>>,
-): Generator<Yield | Async, Return> {
-    const result = yield* stream(inputs, async (stream) => {
-        for await (const { value } of stream) {
-            return value
-        }
+export type RaceOptions = {
+    maxConcurrency?: number
+}
 
-        throw new Error(`No results in race`)
-    })
+export function* race<Yield extends AnyEff, Return>(
+    inputs: TaskInputs<Yield, Return>,
+    options?: RaceOptions,
+): Generator<Yield | Async, Return> {
+    const result = yield* stream(
+        inputs,
+        async (stream) => {
+            for await (const { value } of stream) {
+                return value
+            }
+
+            throw new Error(`No results in race`)
+        },
+        options,
+    )
 
     return result
 }
