@@ -1,4 +1,5 @@
 import * as Eff from '../src'
+import * as Msg from '../src/msg'
 
 class ValidationError extends Eff.Err('ValidationError')<string> {}
 class InnerError extends Eff.Err('InnerError')<string> {}
@@ -8,8 +9,8 @@ class Theme extends Eff.Opt('Theme')<string> {}
 class FontSize extends Eff.Opt('FontSize')<number> {}
 class MyRandom extends Eff.Ctx('MyRandom')<() => number> {}
 class SomeContext extends Eff.Ctx('SomeContext')<number> {}
-class GreetingMsg extends Eff.Msg('Greeting')<string> {}
-class LogMsg extends Eff.Msg('Log')<string> {}
+class GreetingMsg extends Msg.Msg('Greeting')<string> {}
+class LogMsg extends Msg.Msg('Log')<string> {}
 
 describe('Koka Documentation Examples - Tutorial Section', () => {
     it('Your First Koka Program', () => {
@@ -395,39 +396,39 @@ describe('Koka Documentation Examples - How-to Guides Section', () => {
 
     it('Message Passing - Inter-Generator Communication', () => {
         // Define message types
-        class UserRequest extends Eff.Msg('UserRequest')<{ userId: string }> {}
-        class UserResponse extends Eff.Msg('UserResponse')<{ user: any }> {}
-        class LogMessage extends Eff.Msg('Log')<string> {}
+        class UserRequest extends Msg.Msg('UserRequest')<{ userId: string }> {}
+        class UserResponse extends Msg.Msg('UserResponse')<{ user: any }> {}
+        class LogMessage extends Msg.Msg('Log')<string> {}
 
         // Client generator
         function* userClient() {
-            yield* Eff.send(new UserRequest({ userId: '123' }))
-            const response = yield* Eff.wait(UserResponse)
-            yield* Eff.send(new LogMsg(`Received user: ${response.user.name}`))
+            yield* Msg.send(new UserRequest({ userId: '123' }))
+            const response = yield* Msg.wait(UserResponse)
+            yield* Msg.send(new LogMsg(`Received user: ${response.user.name}`))
             return `Client: ${response.user.name}`
         }
 
         // Server generator
         function* userServer() {
-            const request = yield* Eff.wait(UserRequest)
-            yield* Eff.send(new LogMsg(`Processing request for user: ${request.userId}`))
+            const request = yield* Msg.wait(UserRequest)
+            yield* Msg.send(new LogMsg(`Processing request for user: ${request.userId}`))
 
             const user = { id: request.userId, name: 'John Doe' }
-            yield* Eff.send(new UserResponse({ user }))
+            yield* Msg.send(new UserResponse({ user }))
 
             return `Server: processed ${request.userId}`
         }
 
         // Logger generator
         function* logger() {
-            const log1 = yield* Eff.wait(LogMsg)
-            const log2 = yield* Eff.wait(LogMsg)
+            const log1 = yield* Msg.wait(LogMsg)
+            const log2 = yield* Msg.wait(LogMsg)
             return `Logger: ${log1}, ${log2}`
         }
 
         // Run communication program
         const result = Eff.runSync(
-            Eff.communicate({
+            Msg.communicate({
                 client: userClient,
                 server: userServer,
                 logger,
@@ -443,30 +444,30 @@ describe('Koka Documentation Examples - How-to Guides Section', () => {
 
     it('Message Passing - Request-Response Pattern', () => {
         // Define request-response messages
-        class ApiRequest extends Eff.Msg('ApiRequest')<{ method: string; url: string; data?: any }> {}
-        class ApiResponse extends Eff.Msg('ApiResponse')<{ status: number; data: any }> {}
+        class ApiRequest extends Msg.Msg('ApiRequest')<{ method: string; url: string; data?: any }> {}
+        class ApiResponse extends Msg.Msg('ApiResponse')<{ status: number; data: any }> {}
 
         // API client
         function* apiClient() {
-            yield* Eff.send(new ApiRequest({ method: 'GET', url: '/users/123' }))
-            const response = yield* Eff.wait(ApiResponse)
+            yield* Msg.send(new ApiRequest({ method: 'GET', url: '/users/123' }))
+            const response = yield* Msg.wait(ApiResponse)
             return response.data
         }
 
         // API server
         function* apiServer() {
-            const request = yield* Eff.wait(ApiRequest)
+            const request = yield* Msg.wait(ApiRequest)
 
             // Mock API processing
             const data = { id: '123', name: 'John Doe' }
-            yield* Eff.send(new ApiResponse({ status: 200, data }))
+            yield* Msg.send(new ApiResponse({ status: 200, data }))
 
             return `Processed ${request.method} ${request.url}`
         }
 
         // Run API communication
         const result = Eff.runSync(
-            Eff.communicate({
+            Msg.communicate({
                 client: apiClient,
                 server: apiServer,
             }),
@@ -903,19 +904,19 @@ describe('Koka Documentation Examples - Reference Section', () => {
         expect(result.data).toEqual({ id: '123' })
     })
 
-    it('Eff.communicate() Example', () => {
+    it('Msg.communicate() Example', () => {
         function* senderGenerator() {
-            yield* Eff.send(new GreetingMsg('Hello, World!'))
+            yield* Msg.send(new GreetingMsg('Hello, World!'))
             return 'Sender completed'
         }
 
         function* receiverGenerator() {
-            const message = yield* Eff.wait(GreetingMsg)
+            const message = yield* Msg.wait(GreetingMsg)
             return `Receiver got: ${message}`
         }
 
         const result = Eff.runSync(
-            Eff.communicate({
+            Msg.communicate({
                 sender: senderGenerator,
                 receiver: receiverGenerator,
             }),
@@ -927,18 +928,18 @@ describe('Koka Documentation Examples - Reference Section', () => {
         })
     })
 
-    it('Eff.send() and Eff.wait() Example', () => {
+    it('Msg.send() and Msg.wait() Example', () => {
         function* sender() {
-            yield* Eff.send(new GreetingMsg('Hello, World!'))
+            yield* Msg.send(new GreetingMsg('Hello, World!'))
         }
 
         function* receiver() {
-            const message = yield* Eff.wait(GreetingMsg)
+            const message = yield* Msg.wait(GreetingMsg)
             return message
         }
 
         const result = Eff.runSync(
-            Eff.communicate({
+            Msg.communicate({
                 sender,
                 receiver,
             }),
@@ -1024,7 +1025,7 @@ describe('Koka Documentation Examples - Reference Section', () => {
     it('Predefined Effect Classes Example', () => {
         class UserNotFound extends Eff.Err('UserNotFound')<string> {}
         class DatabaseConnection extends Eff.Ctx('Database')<{ query: (sql: string) => any }> {}
-        class UserRequest extends Eff.Msg('UserRequest')<{ userId: string }> {}
+        class UserRequest extends Msg.Msg('UserRequest')<{ userId: string }> {}
 
         const error = new UserNotFound('User not found')
         expect(error.name).toBe('UserNotFound')

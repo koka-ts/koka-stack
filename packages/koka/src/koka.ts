@@ -1,3 +1,7 @@
+export type EffType = {
+    type: string
+}
+
 export type Err<Name extends string, T> = {
     type: 'err'
     name: Name
@@ -31,25 +35,9 @@ export type Async = {
 
 export type AnyOpt = Opt<string, any>
 
-export type Msg<Name extends string, T> = {
-    type: 'msg'
-    name: Name
-    message: T | EffSymbol
-}
+export type Eff<T> = Err<string, T> | Ctx<string, T> | Opt<string, T> | Async
 
-export type AnyMsg = Msg<string, any>
-
-export interface SendMsg<Name extends string, T> extends Msg<Name, T> {
-    message: T
-}
-
-export interface WaitMsg<Name extends string, T> extends Msg<Name, T> {
-    message: EffSymbol
-}
-
-export type EffType<T> = Err<string, T> | Ctx<string, T> | Opt<string, T> | Async | Msg<string, T>
-
-export type AnyEff = EffType<any>
+export type AnyEff = Eff<any>
 
 type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (k: infer I) => void ? I : never
 
@@ -61,7 +49,7 @@ type ToHandler<Effect> = Effect extends Err<infer Name, infer U>
 
 export type EffectHandlers<Effect> = UnionToIntersection<ToHandler<Effect>>
 
-type ExtractErrorHandlerReturn<Handlers, Eff extends AnyEff> = Eff extends Err<infer Name, infer U>
+type ExtractErrorHandlerReturn<Handlers, Eff> = Eff extends Err<infer Name, infer U>
     ? Name extends keyof Handlers
         ? Handlers[Name] extends (error: U) => infer R
             ? R
@@ -102,13 +90,13 @@ export const Result = {
 
 export type InferOkValue<T> = T extends Ok<infer U> ? U : never
 
-export type Task<Yield extends AnyEff, Return> = Generator<Yield, Return> | (() => Generator<Yield, Return>)
+export type Task<Yield, Return> = Generator<Yield, Return> | (() => Generator<Yield, Return>)
 
-type ExtractYieldFromObject<Gens extends object> = {
+export type ExtractYieldFromObject<Gens extends object> = {
     [K in keyof Gens]: Gens[K] extends Task<infer E, any> ? E : never
 }[keyof Gens]
 
-type ExtractYieldFromTuple<Gens> = Gens extends []
+export type ExtractYieldFromTuple<Gens> = Gens extends []
     ? never
     : Gens extends [infer Head, ...infer Tail]
     ? Head extends Task<infer Yield, any>
@@ -116,13 +104,13 @@ type ExtractYieldFromTuple<Gens> = Gens extends []
         : never
     : never
 
-type ExtractYield<Gens> = Gens extends unknown[]
+export type ExtractYield<Gens> = Gens extends unknown[]
     ? ExtractYieldFromTuple<Gens>
     : Gens extends object
     ? ExtractYieldFromObject<Gens>
     : never
 
-type ExtractReturnFromTuple<Gens> = Gens extends []
+export type ExtractReturnFromTuple<Gens> = Gens extends []
     ? []
     : Gens extends [infer Head, ...infer Tail]
     ? Head extends Task<any, infer R>
@@ -130,11 +118,11 @@ type ExtractReturnFromTuple<Gens> = Gens extends []
         : [Head, ...ExtractReturnFromTuple<Tail>]
     : never
 
-type ExtractReturnFromObject<Gens extends object> = {
+export type ExtractReturnFromObject<Gens extends object> = {
     [K in keyof Gens]: Gens[K] extends Task<any, infer R> ? R : Gens[K]
 }
 
-type ExtractReturn<Gens> = Gens extends unknown[]
+export type ExtractReturn<Gens> = Gens extends unknown[]
     ? ExtractReturnFromTuple<Gens>
     : Gens extends object
     ? {
@@ -175,36 +163,11 @@ export function Opt<const Name extends string>(name: Name) {
     }
 }
 
-abstract class AbstractMsg<T> {
-    static field: string = ''
-    type = 'msg' as const
-    abstract name: string
-    message: T | EffSymbol
-    constructor(...args: T extends undefined | void ? [] : [T]) {
-        this.message = args[0] as T | EffSymbol
-    }
-}
-
-export function Msg<const Name extends string>(name: Name) {
-    return class Eff<T> extends AbstractMsg<T> {
-        static field: Name = name
-        name = name
-    }
-}
-
-export interface Wait<T extends AbstractMsg<any>> {
-    type: 'msg'
-    name: T['name']
-    message: EffSymbol
-}
-
 export type CtxValue<C extends AnyCtx> = C['optional'] extends true
     ? Exclude<C['context'], EffSymbol> | undefined
     : Exclude<C['context'], EffSymbol>
 
-export type MsgValue<M extends AnyMsg> = M extends Msg<string, infer T> ? T : never
-
-const cleanUpGen = <Yield, Return, Next>(gen: Generator<Yield, Return, Next>) => {
+export const cleanUpGen = <Yield, Return, Next>(gen: Generator<Yield, Return, Next>) => {
     const result = (gen as Generator<Yield, Return | undefined, Next>).return(undefined)
 
     if (!result.done) {
@@ -212,7 +175,7 @@ const cleanUpGen = <Yield, Return, Next>(gen: Generator<Yield, Return, Next>) =>
     }
 }
 
-const withResolvers: <T>() => PromiseWithResolvers<T> =
+export const withResolvers: <T>() => PromiseWithResolvers<T> =
     Promise.withResolvers?.bind(Promise) ??
     (<T>() => {
         let resolve: (value: T) => void
@@ -254,160 +217,13 @@ export function* get<C extends AnyCtx>(ctx: C | (new () => C)): Generator<C, Ctx
     return context as CtxValue<C>
 }
 
-export function* send<T extends SendMsg<string, unknown>>(message: T): Generator<T, void> {
-    yield message
-}
-
-type ExtractMsgMessage<T> = T extends Msg<string, infer U> ? U : never
-
-export function* wait<MsgCtor extends typeof AbstractMsg<unknown>>(
-    msg: MsgCtor,
-): Generator<Wait<InstanceType<MsgCtor>>, ExtractMsgMessage<InstanceType<MsgCtor>>> {
-    const message = yield {
-        type: 'msg',
-        name: msg.field,
-        message: EffSymbol,
-    } as Wait<InstanceType<MsgCtor>>
-
-    return message as ExtractMsgMessage<InstanceType<MsgCtor>>
-}
-
-export function* communicate<const T extends {}>(
-    inputs: T,
-): Generator<Exclude<ExtractYield<T>, { type: 'msg' }>, ExtractReturn<T>> {
-    const gens = {} as Record<string, Generator<AnyEff, unknown>>
-    const results = {} as Record<string, unknown>
-
-    for (const [key, value] of Object.entries(inputs)) {
-        if (typeof value === 'function') {
-            gens[key] = value()
-        } else if (isGenerator(value)) {
-            gens[key] = value as Generator<AnyEff, unknown>
-        } else {
-            gens[key] = of(value)
-        }
-    }
-
-    type SendStorageValue = {
-        type: 'send'
-        name: string
-        key: string
-        gen: Generator<AnyEff, unknown>
-        message: unknown
-    }
-
-    type WaitStorageValue = {
-        type: 'wait'
-        name: string
-        key: string
-        gen: Generator<AnyEff, unknown>
-    }
-
-    const sendStorage = {} as Record<string, SendStorageValue>
-    const waitStorage = {} as Record<string, WaitStorageValue>
-
-    const queue = [] as (SendStorageValue | WaitStorageValue)[]
-
-    const process = function* (
-        key: string,
-        gen: Generator<AnyEff, unknown>,
-        result: IteratorResult<AnyEff, unknown>,
-    ): Generator<AnyEff, void> {
-        while (!result.done) {
-            const effect = result.value
-
-            if (effect.type === 'msg') {
-                // Send a message
-                if (effect.message !== EffSymbol) {
-                    if (effect.name in waitStorage) {
-                        const waitItem = waitStorage[effect.name]
-                        delete waitStorage[effect.name]
-                        queue.splice(queue.indexOf(waitItem), 1)
-                        yield* process(waitItem.key, waitItem.gen, waitItem.gen.next(effect.message))
-                        result = gen.next()
-                    } else {
-                        sendStorage[effect.name] = {
-                            type: 'send',
-                            name: effect.name,
-                            key,
-                            gen,
-                            message: effect.message,
-                        }
-                        queue.push(sendStorage[effect.name])
-                        return
-                    }
-                } else {
-                    // Receive a message
-                    if (effect.name in sendStorage) {
-                        const sendedItem = sendStorage[effect.name]
-                        delete sendStorage[effect.name]
-                        queue.splice(queue.indexOf(sendedItem), 1)
-                        yield* process(key, gen, gen.next(sendedItem.message))
-                        yield* process(sendedItem.key, sendedItem.gen, sendedItem.gen.next())
-                        return
-                    } else {
-                        waitStorage[effect.name] = {
-                            type: 'wait',
-                            name: effect.name,
-                            key,
-                            gen,
-                        }
-                        queue.push(waitStorage[effect.name])
-                    }
-                    return
-                }
-            } else {
-                result = gen.next(yield effect)
-            }
-        }
-
-        results[key] = result.value
-    }
-
-    try {
-        for (const [key, gen] of Object.entries(gens)) {
-            yield* process(key, gen, gen.next()) as any
-        }
-
-        while (queue.length > 0) {
-            const item = queue.shift()!
-
-            if (item.type === 'send') {
-                yield* process(
-                    item.key,
-                    item.gen,
-                    item.gen.throw(new Error(`Message '${item.name}' sent by '${item.key}' was not received`)),
-                ) as any
-            } else {
-                yield* process(
-                    item.key,
-                    item.gen,
-                    item.gen.throw(new Error(`Message '${item.name}' waited by '${item.key}' was not sent`)),
-                ) as any
-            }
-        }
-
-        if (Object.keys(results).length !== Object.keys(gens).length) {
-            throw new Error(`Some messages were not processed: ${JSON.stringify(Object.keys(gens))}`)
-        }
-
-        return results as ExtractReturn<T>
-    } finally {
-        for (const gen of Object.values(gens)) {
-            cleanUpGen(gen)
-        }
-    }
-}
-
 export type StreamOptions = {
     maxConcurrency?: number
 }
 
-export type TaskProducer<Yield extends AnyEff, TaskReturn> = (index: number) => Task<Yield, TaskReturn> | undefined
+export type TaskProducer<Yield, TaskReturn> = (index: number) => Task<Yield, TaskReturn> | undefined
 
-export type TaskInputs<Yield extends AnyEff, TaskReturn> =
-    | TaskProducer<Yield, TaskReturn>
-    | Array<Task<Yield, TaskReturn>>
+export type TaskInputs<Yield, TaskReturn> = TaskProducer<Yield, TaskReturn> | Array<Task<Yield, TaskReturn>>
 
 export function* stream<Yield extends AnyEff, TaskReturn, HandlerReturn>(
     inputs: TaskInputs<Yield, TaskReturn>,
@@ -802,13 +618,8 @@ function tryEffect<Yield extends AnyEff, Return>(input: Task<Yield, Return>) {
                         } else {
                             result = gen.next(yield effect as any)
                         }
-                    } else if (effect.type === 'async') {
-                        result = gen.next(yield effect as any)
-                    } else if (effect.type === 'msg') {
-                        result = gen.next(yield effect as any)
                     } else {
-                        effect satisfies never
-                        throw new Error(`Unexpected effect: ${JSON.stringify(effect, null, 2)}`)
+                        result = gen.next(yield effect as any)
                     }
                 }
 

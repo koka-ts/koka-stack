@@ -140,7 +140,7 @@
             "ignoreRestSiblings": true
           }
         ],
-        "@typescript-eslint/array-type": "error",
+        "@typescript-eslint/array-type": "off",
         "@typescript-eslint/await-thenable": "error",
         "@typescript-eslint/adjacent-overload-signatures": "error",
         "@typescript-eslint/ban-ts-comment": [
