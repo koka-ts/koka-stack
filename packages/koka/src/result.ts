@@ -70,7 +70,7 @@ export function* unwrap<Yield, Return extends AnyOk | Eff.AnyErr>(
 }
 
 export function run<Yield, Return>(
-    input: Eff.MaybeFunction<Generator<Yield, Return>>,
+    input: Eff.Actor<Yield, Return>,
 ): Eff.Async extends Yield ? Eff.MaybePromise<Ok<Return> | Eff.ExtractErr<Yield>> : Ok<Return> | Eff.ExtractErr<Yield> {
     const gen = typeof input === 'function' ? input() : input
 

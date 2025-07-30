@@ -53,53 +53,9 @@ type ExtractErrorHandlerReturn<Handlers, Eff> = Eff extends Err<infer Name, infe
         : never
     : never
 
-export type ExtractErr<T> = T extends AnyErr ? T : never
-
-export type ExcludeErr<T> = T extends AnyErr ? never : T
-
-export type Task<Yield, Return> = Generator<Yield, Return> | (() => Generator<Yield, Return>)
-
-export type ExtractYieldFromObject<Gens extends object> = {
-    [K in keyof Gens]: Gens[K] extends Task<infer E, any> ? E : never
-}[keyof Gens]
-
-export type ExtractYieldFromTuple<Gens> = Gens extends []
-    ? never
-    : Gens extends [infer Head, ...infer Tail]
-    ? Head extends Task<infer Yield, any>
-        ? Yield | ExtractYieldFromTuple<Tail>
-        : never
-    : never
-
-export type ExtractYield<Gens> = Gens extends unknown[]
-    ? ExtractYieldFromTuple<Gens>
-    : Gens extends object
-    ? ExtractYieldFromObject<Gens>
-    : never
-
-export type ExtractReturnFromTuple<Gens> = Gens extends []
-    ? []
-    : Gens extends [infer Head, ...infer Tail]
-    ? Head extends Task<any, infer R>
-        ? [R, ...ExtractReturnFromTuple<Tail>]
-        : [Head, ...ExtractReturnFromTuple<Tail>]
-    : never
-
-export type ExtractReturnFromObject<Gens extends object> = {
-    [K in keyof Gens]: Gens[K] extends Task<any, infer R> ? R : Gens[K]
-}
-
-export type ExtractReturn<Gens> = Gens extends unknown[]
-    ? ExtractReturnFromTuple<Gens>
-    : Gens extends object
-    ? {
-          [key in keyof ExtractReturnFromObject<Gens>]: ExtractReturnFromObject<Gens>[key]
-      }
-    : never
+export type Actor<Yield, Return> = Generator<Yield, Return> | (() => Generator<Yield, Return>)
 
 export type MaybePromise<T> = T extends Promise<any> ? T : T | Promise<T>
-
-export type MaybeFunction<T> = T | (() => T)
 
 export function Ctx<const Name extends string>(name: Name) {
     return class Eff<T> {
@@ -160,11 +116,11 @@ export const cleanUpGen = <Yield, Return, Next>(gen: Generator<Yield, Return, Ne
     }
 }
 
-function tryEffect<Yield extends AnyEff, Return>(input: Task<Yield, Return>) {
+function tryEffect<Yield extends AnyEff, Return>(input: Actor<Yield, Return>) {
     return {
         *handle<Handlers extends Partial<EffectHandlers<Yield>>>(
             handlers: Handlers,
-        ): Task<Exclude<Yield, { name: keyof Handlers }>, Return | ExtractErrorHandlerReturn<Handlers, Yield>> {
+        ): Actor<Exclude<Yield, { name: keyof Handlers }>, Return | ExtractErrorHandlerReturn<Handlers, Yield>> {
             const gen = typeof input === 'function' ? input() : input
 
             try {
@@ -204,9 +160,9 @@ function tryEffect<Yield extends AnyEff, Return>(input: Task<Yield, Return>) {
 
 export { tryEffect as try }
 
-export function run<Return>(input: MaybeFunction<Generator<AnyOpt, Return>>): Return
-export function run<Return>(input: MaybeFunction<Generator<Async | AnyOpt, Return>>): MaybePromise<Return>
-export function run<Return>(input: MaybeFunction<Generator<Async | AnyOpt, Return>>): MaybePromise<Return> {
+export function run<Return>(input: Actor<AnyOpt, Return>): Return
+export function run<Return>(input: Actor<Async | AnyOpt, Return>): MaybePromise<Return>
+export function run<Return>(input: Actor<Async | AnyOpt, Return>): MaybePromise<Return> {
     const gen = typeof input === 'function' ? input() : input
 
     const process = (result: IteratorResult<Async | AnyOpt, Return>): MaybePromise<Return> => {
@@ -240,8 +196,8 @@ export function run<Return>(input: MaybeFunction<Generator<Async | AnyOpt, Retur
     return process(gen.next())
 }
 
-export function runSync<Return>(effect: MaybeFunction<Generator<AnyOpt, Return>>): Return {
-    const result = run(effect)
+export function runSync<Return>(actor: Actor<AnyOpt, Return>): Return {
+    const result = run(actor)
 
     if (result instanceof Promise) {
         throw new Error('Expected synchronous effect, but got asynchronous effect')
@@ -250,8 +206,8 @@ export function runSync<Return>(effect: MaybeFunction<Generator<AnyOpt, Return>>
     return result
 }
 
-export function runAsync<Return>(input: MaybeFunction<Generator<Async | AnyOpt, Return>>): Promise<Return> {
-    return Promise.resolve(run(input))
+export function runAsync<Return>(actor: Actor<Async | AnyOpt, Return>): Promise<Return> {
+    return Promise.resolve(run(actor))
 }
 
 function* awaitEffect<T>(value: T | Promise<T>): Generator<Async, T> {
@@ -274,3 +230,45 @@ export const isGenerator = <T = unknown, TReturn = any, TNext = any>(
 ): value is Generator<T, TReturn, TNext> => {
     return typeof value === 'object' && value !== null && 'next' in value && 'throw' in value
 }
+
+export type ExtractErr<T> = T extends AnyErr ? T : never
+
+export type ExcludeErr<T> = T extends AnyErr ? never : T
+
+export type ExtractYieldFromObject<Gens extends object> = {
+    [K in keyof Gens]: Gens[K] extends Actor<infer E, any> ? E : never
+}[keyof Gens]
+
+export type ExtractYieldFromTuple<Gens> = Gens extends []
+    ? never
+    : Gens extends [infer Head, ...infer Tail]
+    ? Head extends Actor<infer Yield, any>
+        ? Yield | ExtractYieldFromTuple<Tail>
+        : never
+    : never
+
+export type ExtractYield<Gens> = Gens extends unknown[]
+    ? ExtractYieldFromTuple<Gens>
+    : Gens extends object
+    ? ExtractYieldFromObject<Gens>
+    : never
+
+export type ExtractReturnFromTuple<Gens> = Gens extends []
+    ? []
+    : Gens extends [infer Head, ...infer Tail]
+    ? Head extends Actor<any, infer R>
+        ? [R, ...ExtractReturnFromTuple<Tail>]
+        : [Head, ...ExtractReturnFromTuple<Tail>]
+    : never
+
+export type ExtractReturnFromObject<Gens extends object> = {
+    [K in keyof Gens]: Gens[K] extends Actor<any, infer R> ? R : Gens[K]
+}
+
+export type ExtractReturn<Gens> = Gens extends unknown[]
+    ? ExtractReturnFromTuple<Gens>
+    : Gens extends object
+    ? {
+          [key in keyof ExtractReturnFromObject<Gens>]: ExtractReturnFromObject<Gens>[key]
+      }
+    : never

@@ -4,7 +4,7 @@ import * as Result from '../src/result'
 
 const delayTime = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-describe('Task.combine', () => {
+describe('Task.fromTuple', () => {
     it('should handle sync effects with array input', async () => {
         function* effect1() {
             return 1
@@ -15,7 +15,7 @@ describe('Task.combine', () => {
         }
 
         function* program() {
-            const combined: Generator<Eff.Async, [number, string]> = Task.combine([effect1(), effect2()])
+            const combined: Generator<Eff.Async, [number, string]> = Task.fromTuple([effect1(), effect2()])
             const results = yield* combined
             return results[0] + Number(results[1])
         }
@@ -34,7 +34,7 @@ describe('Task.combine', () => {
         }
 
         function* program() {
-            const combined: Generator<Eff.Async, [number, string]> = Task.combine([effect1(), effect2()])
+            const combined: Generator<Eff.Async, [number, string]> = Task.fromTuple([effect1(), effect2()])
             const results = yield* combined
             return results[0] + Number(results[1])
         }
@@ -53,7 +53,7 @@ describe('Task.combine', () => {
         }
 
         function* program() {
-            const combined: Generator<Eff.Async, [number, number]> = Task.combine([
+            const combined: Generator<Eff.Async, [number, number]> = Task.fromTuple([
                 syncEffect(),
                 asyncEffect(),
             ] as const)
@@ -64,7 +64,9 @@ describe('Task.combine', () => {
         const result = await Eff.run(program())
         expect(result).toBe(3)
     })
+})
 
+describe('Task.fromObject', () => {
     it('should handle object input with generators', async () => {
         function* effect1() {
             return 1
@@ -79,7 +81,7 @@ describe('Task.combine', () => {
                 a: number
                 b: number
                 c: number
-            } = yield* Task.combine({
+            } = yield* Task.fromObject({
                 a: effect1(),
                 b: effect2(),
                 c: 3,
@@ -101,7 +103,7 @@ describe('Task.combine', () => {
                 a: number
                 b: number
                 c: number
-            } = yield* Task.combine({
+            } = yield* Task.fromObject({
                 a: effect1(),
                 b: 2,
                 c: () => effect1(),
@@ -129,7 +131,7 @@ describe('Task.combine', () => {
             const results: {
                 a: number
                 b: number
-            } = yield* Task.combine({
+            } = yield* Task.fromObject({
                 a: effect1(),
                 b: effect2(),
             })
@@ -146,7 +148,7 @@ describe('Task.combine', () => {
 
     it('should handle empty object input', async () => {
         function* program(): Generator<Eff.Async, {}> {
-            const results: {} = yield* Task.combine({})
+            const results: {} = yield* Task.fromObject({})
             return results
         }
 
@@ -168,7 +170,7 @@ describe('Task.combine', () => {
         }
 
         function* program() {
-            const combined: Generator<Eff.Async | DelayError, [number, string, boolean]> = Task.combine([
+            const combined: Generator<Eff.Async | DelayError, [number, string, boolean]> = Task.fromTuple([
                 delayedEffect(1, 30),
                 delayedEffect('2', 20),
                 delayedEffect(false, 10),
@@ -193,7 +195,7 @@ describe('Task.combine', () => {
 
     it('should handle empty array', async () => {
         function* program(): Generator<Eff.Async, []> {
-            const results = yield* Task.combine([])
+            const results = yield* Task.fromTuple([])
             return results
         }
 
@@ -211,7 +213,7 @@ describe('Task.combine', () => {
         }
 
         function* program(): Generator<Eff.Async, number> {
-            const results = yield* Task.combine([() => effect1(), () => effect2()])
+            const results = yield* Task.fromTuple([() => effect1(), () => effect2()])
             return results[0] + results[1]
         }
 
@@ -227,7 +229,7 @@ describe('Task.combine', () => {
 
         function* program() {
             try {
-                const results = yield* Task.combine([effectWithError(), Eff.await(Promise.resolve(2))])
+                const results = yield* Task.fromTuple([effectWithError(), Eff.await(Promise.resolve(2))])
                 return results[0] + results[1]
             } catch (err: unknown) {
                 return err as Error
@@ -248,7 +250,7 @@ describe('Task.combine', () => {
         }
 
         function* program(): Generator<Eff.Async, number> {
-            const results = yield* Task.combine([failingEffect(), Eff.await(Promise.resolve(2))])
+            const results = yield* Task.fromTuple([failingEffect(), Eff.await(Promise.resolve(2))])
             return results[0] + results[1]
         }
 
@@ -273,7 +275,7 @@ describe('Task.combine', () => {
 
         function* program(): Generator<Eff.Async, number> {
             try {
-                const results = yield* Task.combine([effectWithThrow(), Eff.await(Promise.resolve(2))])
+                const results = yield* Task.fromTuple([effectWithThrow(), Eff.await(Promise.resolve(2))])
                 return results[0] + results[1]
             } catch (err) {
                 if (err instanceof Error) {
@@ -360,7 +362,7 @@ describe('Task.all', () => {
     })
 })
 
-describe('Task.stream', () => {
+describe('Task.concurrent', () => {
     it('should clean up pending effects on early return', async () => {
         const cleanUp = jest.fn()
         const returnFn = jest.fn()
@@ -376,12 +378,12 @@ describe('Task.stream', () => {
         }
 
         const inputs = [valueGen(0), valueGen(1), valueGen(2), valueGen(3)]
-        const handler = async (_stream: Task.StreamResults<number>) => {
+        const handler = async (_stream: Task.TaskResultStream<number>) => {
             // Early return without consuming all results
             return 42
         }
 
-        const result = await Eff.run(Task.stream(inputs, handler))
+        const result = await Eff.run(Task.concurrent(inputs, handler))
         expect(result).toBe(42)
         expect(returnFn).toHaveBeenCalledTimes(0)
         expect(cleanUp).toHaveBeenCalledTimes(4)
@@ -403,8 +405,8 @@ describe('Task.stream', () => {
 
         const inputs = [produce(40), produce(20), produce(30), produce(10)]
 
-        const handler = async (stream: Task.StreamResults<number>) => {
-            const results = [] as Task.StreamResult<number>[]
+        const handler = async (stream: Task.TaskResultStream<number>) => {
+            const results = [] as Task.TaskResult<number>[]
 
             for await (const result of stream) {
                 results.push(result)
@@ -417,7 +419,7 @@ describe('Task.stream', () => {
             throw new Error('Early return')
         }
 
-        const results = await Eff.run(Task.stream(inputs, handler))
+        const results = await Eff.run(Task.concurrent(inputs, handler))
 
         expect(results).toEqual([
             { index: 3, value: 10 },
@@ -435,7 +437,7 @@ describe('Task.stream', () => {
 
         const inputs = [valueGen(1), valueGen(2), valueGen(3)]
 
-        const program = Task.stream(inputs, async (stream) => {
+        const program = Task.concurrent(inputs, async (stream) => {
             const results = [] as number[]
 
             for await (const { index, value } of stream) {
@@ -450,7 +452,7 @@ describe('Task.stream', () => {
     })
 
     it('should handle empty input stream', async () => {
-        const program = Task.stream([] as Generator<never, number>[], async (stream) => {
+        const program = Task.concurrent([] as Generator<never, number>[], async (stream) => {
             const results = [] as number[]
 
             for await (const { index, value } of stream) {
@@ -472,7 +474,7 @@ describe('Task.stream', () => {
 
         const inputs = [asyncValueGen(1), asyncValueGen(2), asyncValueGen(3)]
 
-        const handler = async (stream: Task.StreamResults<number>) => {
+        const handler = async (stream: Task.TaskResultStream<number>) => {
             const results = [] as number[]
             for await (const { index, value } of stream) {
                 results[index] = value * 2
@@ -480,7 +482,7 @@ describe('Task.stream', () => {
             return results
         }
 
-        const program = Task.stream(inputs, handler)
+        const program = Task.concurrent(inputs, handler)
 
         const result = await Eff.run(program)
         expect(result).toEqual([2, 4, 6])
@@ -495,7 +497,7 @@ describe('Task.stream', () => {
         }
 
         const inputs = [failingGen()]
-        const handler = async (stream: Task.StreamResults<number>) => {
+        const handler = async (stream: Task.TaskResultStream<number>) => {
             const results = [] as number[]
             for await (const { value } of stream) {
                 results.push(value)
@@ -503,7 +505,7 @@ describe('Task.stream', () => {
             return results
         }
 
-        const result = await Result.run(Task.stream(inputs, handler))
+        const result = await Result.run(Task.concurrent(inputs, handler))
 
         expect(result).toEqual({
             type: 'err',
@@ -522,7 +524,7 @@ describe('Task.stream', () => {
         }
 
         const inputs = [syncGen(), asyncGen()]
-        const handler = async (stream: Task.StreamResults<number>) => {
+        const handler = async (stream: Task.TaskResultStream<number>) => {
             const results = [] as number[]
 
             for await (const { index, value } of stream) {
@@ -532,7 +534,7 @@ describe('Task.stream', () => {
             return results
         }
 
-        const result = await Eff.run(Task.stream(inputs, handler))
+        const result = await Eff.run(Task.concurrent(inputs, handler))
 
         expect(result).toEqual([2, 4])
     })
@@ -551,7 +553,7 @@ describe('Task.stream', () => {
         }
 
         const inputs = [failingGen()]
-        const handler = async (stream: Task.StreamResults<number>) => {
+        const handler = async (stream: Task.TaskResultStream<number>) => {
             try {
                 for await (const { value } of stream) {
                     return value
@@ -562,7 +564,7 @@ describe('Task.stream', () => {
             }
         }
 
-        const result = await Result.run(Task.stream(inputs, handler))
+        const result = await Result.run(Task.concurrent(inputs, handler))
         expect(result).toEqual({
             type: 'err',
             name: 'CleanupError',
@@ -577,7 +579,7 @@ describe('Task.stream', () => {
         }
 
         const inputs = [normalGen()]
-        const handler = async (stream: Task.StreamResults<number>) => {
+        const handler = async (stream: Task.TaskResultStream<number>) => {
             const results = []
             for await (const result of stream) {
                 results.push(result)
@@ -586,7 +588,7 @@ describe('Task.stream', () => {
         }
 
         // This should not throw an unexpected completion error
-        const result = await Eff.run(Task.stream(inputs, handler))
+        const result = await Eff.run(Task.concurrent(inputs, handler))
         expect(result).toEqual([{ index: 0, value: 42 }])
     })
 
@@ -601,7 +603,7 @@ describe('Task.stream', () => {
         }
 
         const inputs = [syncGen(), asyncGen()]
-        const handler = async (stream: Task.StreamResults<number>) => {
+        const handler = async (stream: Task.TaskResultStream<number>) => {
             const results = []
             for await (const result of stream) {
                 results.push(result)
@@ -609,7 +611,7 @@ describe('Task.stream', () => {
             return results
         }
 
-        const result = await Eff.run(Task.stream(inputs, handler))
+        const result = await Eff.run(Task.concurrent(inputs, handler))
         expect(result).toEqual([
             { index: 0, value: 1 },
             { index: 1, value: 2 },
@@ -622,14 +624,14 @@ describe('Task.stream', () => {
         }
 
         const inputs = [gen()]
-        const handler = async (stream: Task.StreamResults<number>) => {
+        const handler = async (stream: Task.TaskResultStream<number>) => {
             for await (const result of stream) {
                 return result.value * 2
             }
             return 0
         }
 
-        const result = await Eff.run(Task.stream(inputs, handler))
+        const result = await Eff.run(Task.concurrent(inputs, handler))
         expect(result).toBe(84)
     })
 })
@@ -662,7 +664,7 @@ describe('Stream maxConcurrency and TaskProducer', () => {
             return undefined // Early termination
         }
 
-        const handler = async (stream: Task.StreamResults<string>) => {
+        const handler = async (stream: Task.TaskResultStream<string>) => {
             const results = []
             for await (const { value } of stream) {
                 results.push(value)
@@ -670,7 +672,7 @@ describe('Stream maxConcurrency and TaskProducer', () => {
             return results
         }
 
-        const result = await Eff.run(Task.stream(producer, handler, { maxConcurrency }))
+        const result = await Eff.run(Task.concurrent(producer, handler, { maxConcurrency }))
 
         expect(result).toEqual(['task-0', 'task-1', 'task-2', 'task-3'])
         // Verify that active task count never exceeds max concurrency limit
@@ -693,7 +695,7 @@ describe('Stream maxConcurrency and TaskProducer', () => {
             return undefined // Early termination
         }
 
-        const handler = async (stream: Task.StreamResults<string>) => {
+        const handler = async (stream: Task.TaskResultStream<string>) => {
             const results = []
             for await (const { value } of stream) {
                 results.push(value)
@@ -701,7 +703,7 @@ describe('Stream maxConcurrency and TaskProducer', () => {
             return results
         }
 
-        const result = await Eff.run(Task.stream(producer, handler, { maxConcurrency: 2 }))
+        const result = await Eff.run(Task.concurrent(producer, handler, { maxConcurrency: 2 }))
 
         expect(result).toEqual(['item-0', 'item-1', 'item-2'])
         expect(callCount).toBe(4) // 4th call returns undefined
@@ -712,7 +714,7 @@ describe('Stream maxConcurrency and TaskProducer', () => {
             return undefined // Immediate termination
         }
 
-        const handler = async (stream: Task.StreamResults<string>) => {
+        const handler = async (stream: Task.TaskResultStream<string>) => {
             const results = []
             for await (const { value } of stream) {
                 results.push(value)
@@ -720,7 +722,7 @@ describe('Stream maxConcurrency and TaskProducer', () => {
             return results
         }
 
-        const result = await Eff.run(Task.stream(producer, handler))
+        const result = await Eff.run(Task.concurrent(producer, handler))
 
         expect(result).toEqual([])
     })
@@ -741,7 +743,7 @@ describe('Stream maxConcurrency and TaskProducer', () => {
             return undefined
         }
 
-        const handler = async (stream: Task.StreamResults<string>) => {
+        const handler = async (stream: Task.TaskResultStream<string>) => {
             const results = [] as string[]
             for await (const { index, value } of stream) {
                 results[index] = value
@@ -749,7 +751,7 @@ describe('Stream maxConcurrency and TaskProducer', () => {
             return results
         }
 
-        const result = await Eff.run(Task.stream(producer, handler, { maxConcurrency: 3 }))
+        const result = await Eff.run(Task.concurrent(producer, handler, { maxConcurrency: 3 }))
 
         expect(result).toEqual(['even-0', 'odd-1', 'even-2', 'odd-3', 'even-4'])
     })
@@ -909,7 +911,7 @@ describe('Edge cases for maxConcurrency', () => {
             return undefined
         }
 
-        const handler = async (stream: Task.StreamResults<string>) => {
+        const handler = async (stream: Task.TaskResultStream<string>) => {
             const results = []
             for await (const { value } of stream) {
                 results.push(value)
@@ -918,12 +920,12 @@ describe('Edge cases for maxConcurrency', () => {
         }
 
         // Test maxConcurrency = 0
-        expect(() => Eff.run(Task.stream(producer, handler, { maxConcurrency: 0 }))).toThrow(
+        expect(() => Eff.run(Task.concurrent(producer, handler, { maxConcurrency: 0 }))).toThrow(
             'maxConcurrency must be greater than 0',
         )
 
         // Test maxConcurrency = -1
-        expect(() => Eff.run(Task.stream(producer, handler, { maxConcurrency: -1 }))).toThrow(
+        expect(() => Eff.run(Task.concurrent(producer, handler, { maxConcurrency: -1 }))).toThrow(
             'maxConcurrency must be greater than 0',
         )
     })
@@ -953,7 +955,7 @@ describe('Edge cases for maxConcurrency', () => {
             return undefined
         }
 
-        const handler = async (stream: Task.StreamResults<string>) => {
+        const handler = async (stream: Task.TaskResultStream<string>) => {
             const results = []
             for await (const { value } of stream) {
                 results.push(value)
@@ -961,7 +963,7 @@ describe('Edge cases for maxConcurrency', () => {
             return results
         }
 
-        const result = await Eff.run(Task.stream(producer, handler, { maxConcurrency: 1 }))
+        const result = await Eff.run(Task.concurrent(producer, handler, { maxConcurrency: 1 }))
 
         expect(result).toEqual(['item-0', 'item-1', 'item-2'])
         // Verify that max concurrency is indeed 1
@@ -994,7 +996,7 @@ describe('Edge cases for maxConcurrency', () => {
             return undefined
         }
 
-        const handler = async (stream: Task.StreamResults<string>) => {
+        const handler = async (stream: Task.TaskResultStream<string>) => {
             const results = []
             for await (const { value } of stream) {
                 results.push(value)
@@ -1002,7 +1004,7 @@ describe('Edge cases for maxConcurrency', () => {
             return results
         }
 
-        const result = await Eff.run(Task.stream(producer, handler, { maxConcurrency: 1000 }))
+        const result = await Eff.run(Task.concurrent(producer, handler, { maxConcurrency: 1000 }))
 
         expect(result).toEqual(['item-0', 'item-1', 'item-2', 'item-3', 'item-4'])
         // Verify all tasks can execute concurrently (max active tasks should equal total tasks)
@@ -1030,7 +1032,7 @@ describe('TaskProducer with error handling', () => {
             return undefined
         }
 
-        const handler = async (stream: Task.StreamResults<string>) => {
+        const handler = async (stream: Task.TaskResultStream<string>) => {
             const results = []
             try {
                 for await (const { value } of stream) {
@@ -1045,7 +1047,7 @@ describe('TaskProducer with error handling', () => {
             return results
         }
 
-        const program = Task.stream(producer, handler, { maxConcurrency: 2 })
+        const program = Task.concurrent(producer, handler, { maxConcurrency: 2 })
 
         const result = await Eff.runAsync(
             Eff.try(program).handle({
@@ -1085,7 +1087,7 @@ describe('TaskProducer with error handling', () => {
             return undefined
         }
 
-        const handler = async (stream: Task.StreamResults<string>) => {
+        const handler = async (stream: Task.TaskResultStream<string>) => {
             const results = []
             for await (const { value } of stream) {
                 results.push(value)
@@ -1093,7 +1095,7 @@ describe('TaskProducer with error handling', () => {
             return results
         }
 
-        const result = await Eff.run(Task.stream(producer, handler, { maxConcurrency }))
+        const result = await Eff.run(Task.concurrent(producer, handler, { maxConcurrency }))
 
         expect(result).toEqual(['task-0', 'task-1', 'task-2', 'task-3', 'task-4'])
 
@@ -1130,7 +1132,7 @@ describe('TaskProducer with error handling', () => {
             return undefined
         }
 
-        const handler = async (stream: Task.StreamResults<string>) => {
+        const handler = async (stream: Task.TaskResultStream<string>) => {
             const results = []
             for await (const { value } of stream) {
                 results.push(value)
@@ -1138,8 +1140,642 @@ describe('TaskProducer with error handling', () => {
             return results
         }
 
-        const result = await Eff.run(Task.stream(producer, handler))
+        const result = await Eff.run(Task.concurrent(producer, handler))
 
         expect(result).toEqual(['function', 'generator'])
+    })
+})
+
+describe('Task.series', () => {
+    it('should execute tasks sequentially', async () => {
+        const executionOrder: number[] = []
+
+        function* task(index: number) {
+            executionOrder.push(index)
+            yield* Eff.await(delayTime(10))
+            return `task-${index}`
+        }
+
+        const inputs = [task(0), task(1), task(2)]
+        const handler = async (results: Task.TaskResultStream<string>) => {
+            const streamResults = []
+            while (true) {
+                const result = await results.next()
+                if (result.done) break
+                streamResults.push(result.value.value)
+            }
+            return streamResults
+        }
+
+        const result = await Eff.run(Task.series(inputs, handler))
+
+        expect(result).toEqual(['task-0', 'task-1', 'task-2'])
+        expect(executionOrder).toEqual([0, 1, 2]) // Sequential execution
+    })
+
+    it('should handle TaskProducer in series', async () => {
+        const executionOrder: number[] = []
+
+        const producer = (index: number) => {
+            if (index < 3) {
+                return function* () {
+                    executionOrder.push(index)
+                    yield* Eff.await(delayTime(10))
+                    return `task-${index}`
+                }
+            }
+            return undefined
+        }
+
+        const handler = async (results: Task.TaskResultStream<string>) => {
+            const streamResults = []
+            for await (const { value } of results) {
+                streamResults.push(value)
+            }
+            return streamResults
+        }
+
+        const result = await Eff.run(Task.series(producer, handler))
+
+        expect(result).toEqual(['task-0', 'task-1', 'task-2'])
+        expect(executionOrder).toEqual([0, 1, 2])
+    })
+
+    it('should handle errors in series', async () => {
+        class SeriesError extends Eff.Err('SeriesError')<string> {}
+
+        function* failingTask() {
+            yield* Eff.throw(new SeriesError('series error'))
+            return 'should not reach here'
+        }
+
+        function* normalTask() {
+            return 'normal'
+        }
+
+        const inputs = [failingTask(), normalTask()]
+        const handler = async (results: Task.TaskResultStream<string>) => {
+            const streamResults = []
+            for await (const { value } of results) {
+                streamResults.push(value)
+            }
+            return streamResults
+        }
+
+        const result = await Result.run(Task.series(inputs, handler))
+
+        expect(result).toEqual({
+            type: 'err',
+            name: 'SeriesError',
+            error: 'series error',
+        })
+    })
+})
+
+describe('Task.parallel', () => {
+    it('should execute tasks in parallel', async () => {
+        const startTimes: number[] = []
+        const endTimes: number[] = []
+
+        function* task(index: number) {
+            startTimes[index] = Date.now()
+            yield* Eff.await(delayTime(50))
+            endTimes[index] = Date.now()
+            return `task-${index}`
+        }
+
+        const inputs = [task(0), task(1), task(2)]
+        const handler = async (stream: Task.TaskResultStream<string>) => {
+            const results = []
+            for await (const { value } of stream) {
+                results.push(value)
+            }
+            return results
+        }
+
+        const start = Date.now()
+        const result = await Eff.run(Task.parallel(inputs, handler))
+        const totalTime = Date.now() - start
+
+        expect(result).toEqual(['task-0', 'task-1', 'task-2'])
+        // Should complete in roughly 50ms (parallel execution) rather than 150ms (sequential)
+        expect(totalTime).toBeLessThan(100)
+
+        // Verify tasks started around the same time
+        const maxStartDiff = Math.max(...startTimes) - Math.min(...startTimes)
+        expect(maxStartDiff).toBeLessThan(10)
+    })
+
+    it('should handle TaskProducer in parallel', async () => {
+        const startTimes: number[] = []
+
+        const producer = (index: number) => {
+            if (index < 3) {
+                return function* () {
+                    startTimes[index] = Date.now()
+                    yield* Eff.await(delayTime(30))
+                    return `task-${index}`
+                }
+            }
+            return undefined
+        }
+
+        const handler = async (stream: Task.TaskResultStream<string>) => {
+            const results = []
+            for await (const { value } of stream) {
+                results.push(value)
+            }
+            return results
+        }
+
+        const start = Date.now()
+        const result = await Eff.run(Task.parallel(producer, handler))
+        const totalTime = Date.now() - start
+
+        expect(result).toEqual(['task-0', 'task-1', 'task-2'])
+        expect(totalTime).toBeLessThan(60)
+
+        // Verify parallel execution
+        const maxStartDiff = Math.max(...startTimes) - Math.min(...startTimes)
+        expect(maxStartDiff).toBeLessThan(10)
+    })
+
+    it('should handle mixed sync and async tasks in parallel', async () => {
+        function* syncTask() {
+            return 'sync'
+        }
+
+        function* asyncTask() {
+            yield* Eff.await(delayTime(20))
+            return 'async'
+        }
+
+        const inputs = [syncTask(), asyncTask()]
+        const handler = async (results: Task.TaskResultStream<string>) => {
+            const streamResults = []
+            for await (const { value } of results) {
+                streamResults.push(value)
+            }
+            return streamResults
+        }
+
+        const result = await Eff.run(Task.parallel(inputs, handler))
+
+        expect(result).toContain('sync')
+        expect(result).toContain('async')
+    })
+})
+
+describe('Task.concurrent with complex error scenarios', () => {
+    it('should handle handler throwing error', async () => {
+        function* normalTask() {
+            return 'normal'
+        }
+
+        const inputs = [normalTask()]
+        const handler = async (stream: Task.TaskResultStream<string>) => {
+            throw new Error('Handler error')
+        }
+
+        await expect(Result.run(Task.concurrent(inputs, handler))).rejects.toThrow('Handler error')
+    })
+
+    it('should handle handler rejecting promise', async () => {
+        function* normalTask() {
+            return 'normal'
+        }
+
+        const inputs = [normalTask()]
+        const handler = async (stream: Task.TaskResultStream<string>) => {
+            return Promise.reject(new Error('Handler rejection'))
+        }
+
+        await expect(Result.run(Task.concurrent(inputs, handler))).rejects.toThrow('Handler rejection')
+    })
+
+    it('should handle multiple errors in stream', async () => {
+        class StreamError extends Eff.Err('StreamError')<string> {}
+
+        function* failingTask1() {
+            yield* Eff.throw(new StreamError('error 1'))
+            return 'should not reach here'
+        }
+
+        function* failingTask2() {
+            yield* Eff.throw(new StreamError('error 2'))
+            return 'should not reach here'
+        }
+
+        const inputs = [failingTask1(), failingTask2()]
+        const handler = async (stream: Task.TaskResultStream<string>) => {
+            const results = []
+            for await (const { value } of stream) {
+                results.push(value)
+            }
+            return results
+        }
+
+        const result = await Result.run(Task.concurrent(inputs, handler))
+
+        // Should get the first error that occurs
+        expect(result.type).toBe('err')
+        if (result.type === 'err') {
+            expect(result.name).toBe('StreamError')
+            expect(['error 1', 'error 2']).toContain(result.error)
+        }
+    })
+
+    it('should handle stream with no tasks', async () => {
+        const handler = async (stream: Task.TaskResultStream<string>) => {
+            const results = []
+            for await (const { value } of stream) {
+                results.push(value)
+            }
+            return results
+        }
+
+        const result = await Eff.run(Task.concurrent([], handler))
+        expect(result).toEqual([])
+    })
+
+    it('should handle TaskProducer returning undefined immediately', async () => {
+        const producer = (index: number) => {
+            return undefined // No tasks
+        }
+
+        const handler = async (stream: Task.TaskResultStream<string>) => {
+            const results = []
+            for await (const { value } of stream) {
+                results.push(value)
+            }
+            return results
+        }
+
+        const result = await Eff.run(Task.concurrent(producer, handler))
+        expect(result).toEqual([])
+    })
+})
+
+describe('Concurrent with complex async scenarios', () => {
+    it('should handle nested async operations', async () => {
+        function* nestedAsyncTask() {
+            const value1 = yield* Eff.await(Promise.resolve(1))
+            const value2 = yield* Eff.await(Promise.resolve(2))
+            const value3 = yield* Eff.await(Promise.resolve(3))
+            return value1 + value2 + value3
+        }
+
+        const inputs = [nestedAsyncTask()]
+        const handler = async (stream: Task.TaskResultStream<number>) => {
+            const results = []
+            for await (const { value } of stream) {
+                results.push(value)
+            }
+            return results
+        }
+
+        const result = await Eff.run(Task.concurrent(inputs, handler))
+        expect(result).toEqual([6])
+    })
+
+    it('should handle async operations with different timing', async () => {
+        const results: string[] = []
+
+        function* fastTask() {
+            yield* Eff.await(delayTime(10))
+            results.push('fast')
+            return 'fast'
+        }
+
+        function* slowTask() {
+            yield* Eff.await(delayTime(50))
+            results.push('slow')
+            return 'slow'
+        }
+
+        const inputs = [fastTask(), slowTask()]
+        const handler = async (stream: Task.TaskResultStream<string>) => {
+            const streamResults = []
+            for await (const { value } of stream) {
+                streamResults.push(value)
+            }
+            return streamResults
+        }
+
+        const result = await Eff.run(Task.concurrent(inputs, handler))
+
+        expect(result).toEqual(['fast', 'slow'])
+        expect(results).toEqual(['fast', 'slow'])
+    })
+
+    it('should handle stream with early termination in handler', async () => {
+        let cleanupCalled = false
+
+        function* longRunningTask() {
+            try {
+                yield* Eff.await(delayTime(100))
+                return 'long'
+            } finally {
+                cleanupCalled = true
+            }
+        }
+
+        const inputs = [longRunningTask()]
+        const handler = async (stream: Task.TaskResultStream<string>) => {
+            for await (const { value } of stream) {
+                return value // Early return
+            }
+            return 'no value'
+        }
+
+        const result = await Eff.run(Task.concurrent(inputs, handler))
+        expect(result).toBe('long')
+        expect(cleanupCalled).toBe(true)
+    })
+})
+
+describe('Concurrent with maxConcurrency edge cases', () => {
+    it('should handle maxConcurrency = 1 with many tasks', async () => {
+        const executionOrder: number[] = []
+
+        const producer = (index: number) => {
+            if (index < 5) {
+                return function* () {
+                    executionOrder.push(index)
+                    yield* Eff.await(delayTime(10))
+                    return `task-${index}`
+                }
+            }
+            return undefined
+        }
+
+        const handler = async (stream: Task.TaskResultStream<string>) => {
+            const results = []
+            for await (const { value } of stream) {
+                results.push(value)
+            }
+            return results
+        }
+
+        const result = await Eff.run(Task.concurrent(producer, handler, { maxConcurrency: 1 }))
+
+        expect(result).toEqual(['task-0', 'task-1', 'task-2', 'task-3', 'task-4'])
+        expect(executionOrder).toEqual([0, 1, 2, 3, 4]) // Sequential
+    })
+
+    it('should handle maxConcurrency larger than task count', async () => {
+        const activeTasks: number[] = []
+
+        const producer = (index: number) => {
+            if (index < 3) {
+                return function* () {
+                    activeTasks.push(index)
+                    yield* Eff.await(delayTime(20))
+                    const taskIndex = activeTasks.indexOf(index)
+                    if (taskIndex > -1) {
+                        activeTasks.splice(taskIndex, 1)
+                    }
+                    return `task-${index}`
+                }
+            }
+            return undefined
+        }
+
+        const handler = async (stream: Task.TaskResultStream<string>) => {
+            const results = []
+            for await (const { value } of stream) {
+                results.push(value)
+            }
+            return results
+        }
+
+        const result = await Eff.run(Task.concurrent(producer, handler, { maxConcurrency: 10 }))
+
+        expect(result).toEqual(['task-0', 'task-1', 'task-2'])
+        expect(activeTasks.length).toBe(0)
+    })
+
+    it('should handle maxConcurrency with mixed task types', async () => {
+        const activeCount = { value: 0 }
+        const maxActiveCount = { value: 0 }
+
+        const producer = (index: number) => {
+            if (index < 4) {
+                return function* () {
+                    activeCount.value++
+                    maxActiveCount.value = Math.max(maxActiveCount.value, activeCount.value)
+
+                    if (index % 2 === 0) {
+                        // Sync task
+                        const result = activeCount.value
+                        activeCount.value--
+                        return `sync-${result}`
+                    } else {
+                        // Async task
+                        yield* Eff.await(delayTime(10))
+                        const result = activeCount.value
+                        activeCount.value--
+                        return `async-${result}`
+                    }
+                }
+            }
+            return undefined
+        }
+
+        const handler = async (stream: Task.TaskResultStream<string>) => {
+            const results = []
+            for await (const { value } of stream) {
+                results.push(value)
+            }
+            return results
+        }
+
+        const result = await Eff.run(Task.concurrent(producer, handler, { maxConcurrency: 2 }))
+
+        expect(result.length).toBe(4)
+        expect(maxActiveCount.value).toBeLessThanOrEqual(2)
+        expect(activeCount.value).toBe(0)
+    })
+})
+
+describe('Concurrent with complex data types', () => {
+    it('should handle stream with objects', async () => {
+        function* objectTask() {
+            return { id: 1, name: 'test' }
+        }
+
+        const inputs = [objectTask()]
+        const handler = async (stream: Task.TaskResultStream<{ id: number; name: string }>) => {
+            const results = []
+            for await (const { value } of stream) {
+                results.push(value)
+            }
+            return results
+        }
+
+        const result = await Eff.run(Task.concurrent(inputs, handler))
+        expect(result).toEqual([{ id: 1, name: 'test' }])
+    })
+
+    it('should handle stream with arrays', async () => {
+        function* arrayTask() {
+            return [1, 2, 3]
+        }
+
+        const inputs = [arrayTask()]
+        const handler = async (stream: Task.TaskResultStream<number[]>) => {
+            const results = []
+            for await (const { value } of stream) {
+                results.push(value)
+            }
+            return results
+        }
+
+        const result = await Eff.run(Task.concurrent(inputs, handler))
+        expect(result).toEqual([[1, 2, 3]])
+    })
+
+    it('should handle stream with null and undefined values', async () => {
+        function* nullTask(): Generator<never, null> {
+            return null
+        }
+
+        function* undefinedTask(): Generator<never, undefined> {
+            return undefined
+        }
+
+        const inputs = [nullTask(), undefinedTask()]
+        const handler = async (stream: Task.TaskResultStream<null | undefined>) => {
+            const results = []
+            for await (const { value } of stream) {
+                results.push(value)
+            }
+            return results
+        }
+
+        const result = await Eff.run(Task.concurrent(inputs, handler))
+        expect(result).toEqual([null, undefined])
+    })
+})
+
+describe('Concurrent performance and stress tests', () => {
+    it('should handle many concurrent tasks efficiently', async () => {
+        const taskCount = 50
+        const activeTasks: number[] = []
+        const maxActiveTasks: number[] = []
+
+        const producer = (index: number) => {
+            if (index < taskCount) {
+                return function* () {
+                    activeTasks.push(index)
+                    maxActiveTasks.push(activeTasks.length)
+                    yield* Eff.await(delayTime(5))
+                    const taskIndex = activeTasks.indexOf(index)
+                    if (taskIndex > -1) {
+                        activeTasks.splice(taskIndex, 1)
+                    }
+                    return `task-${index}`
+                }
+            }
+            return undefined
+        }
+
+        const handler = async (stream: Task.TaskResultStream<string>) => {
+            const results = []
+            for await (const { value } of stream) {
+                results.push(value)
+            }
+            return results
+        }
+
+        const start = Date.now()
+        const result = await Eff.run(Task.concurrent(producer, handler, { maxConcurrency: 10 }))
+        const duration = Date.now() - start
+
+        expect(result.length).toBe(taskCount)
+        expect(Math.max(...maxActiveTasks)).toBeLessThanOrEqual(10)
+        expect(activeTasks.length).toBe(0)
+        expect(duration).toBeLessThan(100) // Should complete quickly with concurrency
+    })
+
+    it('should handle rapid task completion', async () => {
+        const taskCount = 100
+
+        const producer = (index: number) => {
+            if (index < taskCount) {
+                return function* () {
+                    return `task-${index}`
+                }
+            }
+            return undefined
+        }
+
+        const handler = async (stream: Task.TaskResultStream<string>) => {
+            const results = []
+            for await (const { value } of stream) {
+                results.push(value)
+            }
+            return results
+        }
+
+        const result = await Eff.run(Task.concurrent(producer, handler, { maxConcurrency: 20 }))
+
+        expect(result.length).toBe(taskCount)
+        for (let i = 0; i < taskCount; i++) {
+            expect(result).toContain(`task-${i}`)
+        }
+    })
+})
+
+describe('Concurrent with cleanup and resource management', () => {
+    it('should properly cleanup resources on error', async () => {
+        const cleanupCalls: number[] = []
+
+        function* taskWithCleanup(index: number) {
+            try {
+                yield* Eff.await(delayTime(10))
+                return `task-${index}`
+            } finally {
+                cleanupCalls.push(index)
+            }
+        }
+
+        function* failingTask(): Generator<Eff.Async, string, any> {
+            yield* Eff.await(delayTime(5))
+            throw new Error('Task failed')
+        }
+
+        const inputs = [taskWithCleanup(0), failingTask(), taskWithCleanup(1)]
+        const handler = async (stream: Task.TaskResultStream<string>) => {
+            const results = []
+            for await (const { value } of stream) {
+                results.push(value)
+            }
+            return results
+        }
+
+        await expect(Result.run(Task.concurrent(inputs, handler))).rejects.toThrow('Task failed')
+        expect(cleanupCalls).toEqual([0, 1])
+    })
+
+    it('should cleanup resources when handler throws', async () => {
+        const cleanupCalls: number[] = []
+
+        function* taskWithCleanup(index: number) {
+            try {
+                yield* Eff.await(delayTime(10))
+                return `task-${index}`
+            } finally {
+                cleanupCalls.push(index)
+            }
+        }
+
+        const inputs = [taskWithCleanup(0), taskWithCleanup(1)]
+        const handler = async (stream: Task.TaskResultStream<string>) => {
+            throw new Error('Handler error')
+        }
+
+        await expect(Result.run(Task.concurrent(inputs, handler))).rejects.toThrow('Handler error')
+        expect(cleanupCalls).toEqual([0, 1])
     })
 })

@@ -1,6 +1,6 @@
 import * as Eff from './koka'
 
-export const withResolvers: <T>() => PromiseWithResolvers<T> =
+const withResolvers: <T>() => PromiseWithResolvers<T> =
     Promise.withResolvers?.bind(Promise) ??
     (<T>() => {
         let resolve: (value: T) => void
@@ -15,27 +15,137 @@ export const withResolvers: <T>() => PromiseWithResolvers<T> =
         return { promise, resolve, reject }
     })
 
-export type StreamResult<T> = {
-    index: number
-    value: T
+type StreamOptions<T> = {
+    values?: T[]
 }
 
-export type StreamResults<TaskReturn> = AsyncGenerator<StreamResult<TaskReturn>, void, void>
+function createStream<T>(options?: StreamOptions<T>) {
+    const ctrl = {
+        next: withResolvers<'next'>(),
+        done: withResolvers<'done'>(),
+    }
 
-export type StreamHandler<TaskReturn, HandlerReturn> = (results: StreamResults<TaskReturn>) => Promise<HandlerReturn>
+    type Value = T | T[]
 
-export type StreamOptions = {
+    const values = [] as Value[]
+
+    const next = (value: Value) => {
+        values.push(value)
+        // Resolve the controller to allow the async generator to yield
+        const previousNext = ctrl.next
+        ctrl.next = withResolvers()
+        previousNext.resolve('next')
+    }
+
+    const done = () => {
+        ctrl.done.resolve('done')
+    }
+
+    async function* createAsyncGen() {
+        if (options?.values) {
+            for (const value of options.values) {
+                yield value
+            }
+        }
+
+        while (true) {
+            const status = await Promise.race([ctrl.next.promise, ctrl.done.promise])
+
+            while (values.length > 0) {
+                const value = values.shift()!
+
+                if (Array.isArray(value)) {
+                    for (const item of value) {
+                        yield item
+                    }
+                } else {
+                    yield value
+                }
+            }
+
+            if (status === 'done') {
+                return
+            }
+        }
+    }
+
+    const gen = createAsyncGen()
+
+    return {
+        next,
+        done,
+        gen,
+    }
+}
+
+export type TaskProducer<Yield, TaskReturn> = (index: number) => Eff.Actor<Yield, TaskReturn> | undefined
+
+export type TaskSource<Yield, TaskReturn> = TaskProducer<Yield, TaskReturn> | Array<Eff.Actor<Yield, TaskReturn>>
+
+export type TaskResult<TaskReturn> = {
+    index: number
+    value: TaskReturn
+}
+
+export type TaskResultStream<TaskReturn> = AsyncIterableIterator<TaskResult<TaskReturn>, void, void>
+
+export type TaskResultsHandler<TaskReturn, HandlerReturn> = (
+    stream: TaskResultStream<TaskReturn>,
+) => Promise<HandlerReturn>
+
+const createTaskConsumer = <Yield extends Eff.AnyEff, TaskReturn>(inputs: TaskSource<Yield, TaskReturn>) => {
+    const producer: TaskProducer<Yield, TaskReturn> = typeof inputs === 'function' ? inputs : (index) => inputs[index]
+
+    let count = 0
+    let noTask = false
+    const getNextTask = () => {
+        if (noTask) {
+            return undefined
+        }
+
+        const task = producer(count++)
+
+        if (!task) {
+            noTask = true
+            return
+        }
+
+        const gen = typeof task === 'function' ? task() : task
+
+        return gen
+    }
+
+    return {
+        next: getNextTask,
+    }
+}
+
+export function* series<Yield extends Eff.AnyEff, TaskReturn, HandlerReturn>(
+    inputs: TaskSource<Yield, TaskReturn>,
+    handler: TaskResultsHandler<TaskReturn, HandlerReturn>,
+): Generator<Yield | Eff.Async, HandlerReturn> {
+    return yield* concurrent(inputs, handler, {
+        maxConcurrency: 1,
+    })
+}
+
+export function* parallel<Yield extends Eff.AnyEff, TaskReturn, HandlerReturn>(
+    inputs: TaskSource<Yield, TaskReturn>,
+    handler: TaskResultsHandler<TaskReturn, HandlerReturn>,
+): Generator<Yield | Eff.Async, HandlerReturn> {
+    return yield* concurrent(inputs, handler, {
+        maxConcurrency: Number.POSITIVE_INFINITY,
+    })
+}
+
+export type ConcurrentOptions = {
     maxConcurrency?: number
 }
 
-export type TaskProducer<Yield, TaskReturn> = (index: number) => Eff.Task<Yield, TaskReturn> | undefined
-
-export type TaskInputs<Yield, TaskReturn> = TaskProducer<Yield, TaskReturn> | Array<Eff.Task<Yield, TaskReturn>>
-
-export function* stream<Yield extends Eff.AnyEff, TaskReturn, HandlerReturn>(
-    inputs: TaskInputs<Yield, TaskReturn>,
-    handler: StreamHandler<TaskReturn, HandlerReturn>,
-    options?: StreamOptions,
+export function* concurrent<Yield extends Eff.AnyEff, TaskReturn, HandlerReturn>(
+    inputs: TaskSource<Yield, TaskReturn>,
+    handler: TaskResultsHandler<TaskReturn, HandlerReturn>,
+    options?: ConcurrentOptions,
 ): Generator<Eff.Async | Yield, HandlerReturn> {
     const config = {
         maxConcurrency: Number.POSITIVE_INFINITY,
@@ -45,8 +155,6 @@ export function* stream<Yield extends Eff.AnyEff, TaskReturn, HandlerReturn>(
     if (config.maxConcurrency < 1) {
         throw new Error(`maxConcurrency must be greater than 0`)
     }
-
-    const producer: TaskProducer<Yield, TaskReturn> = typeof inputs === 'function' ? inputs : (index) => inputs[index]
 
     type ProcessingItem = {
         type: 'initial'
@@ -79,27 +187,10 @@ export function* stream<Yield extends Eff.AnyEff, TaskReturn, HandlerReturn>(
 
     const items = [] as ProcessItem[]
 
-    let count = 0
-    let noTask = false
-    const getNextTask = () => {
-        if (noTask) {
-            return undefined
-        }
+    const consumer = createTaskConsumer(inputs)
 
-        const task = producer(count++)
-
-        if (!task) {
-            noTask = true
-            return
-        }
-
-        const gen = typeof task === 'function' ? task() : task
-
-        return gen
-    }
-
-    while (count < config.maxConcurrency) {
-        const gen = getNextTask()
+    while (items.length < config.maxConcurrency) {
+        const gen = consumer.next()
 
         if (!gen) {
             break
@@ -112,27 +203,7 @@ export function* stream<Yield extends Eff.AnyEff, TaskReturn, HandlerReturn>(
         })
     }
 
-    let controller = withResolvers<void>()
-
-    const processedItems = [] as ProcessedItem[]
-
-    async function* createAsyncGen(): StreamResults<TaskReturn> {
-        let count = 0
-
-        while (count < items.length) {
-            await controller.promise
-            while (processedItems.length > 0) {
-                const item = processedItems.shift()!
-                yield {
-                    index: item.index,
-                    value: item.value,
-                }
-                count++
-            }
-        }
-    }
-
-    const asyncGen = createAsyncGen()
+    const stream = createStream<TaskResult<TaskReturn>>()
 
     const cleanUpAllGen = () => {
         // Clean up any remaining items
@@ -187,7 +258,7 @@ export function* stream<Yield extends Eff.AnyEff, TaskReturn, HandlerReturn>(
         const processItem = function* (
             item: ProcessItem,
             result: IteratorResult<Yield, TaskReturn>,
-        ): Generator<any, void, unknown> {
+        ): Generator<any, ProcessItem | undefined, any> {
             while (!result.done) {
                 const effect = result.value
 
@@ -207,9 +278,13 @@ export function* stream<Yield extends Eff.AnyEff, TaskReturn, HandlerReturn>(
                     value: result.value,
                 }
                 items[item.index] = processedItem
-                processedItems.push(processedItem)
 
-                const gen = getNextTask()
+                stream.next({
+                    index: item.index,
+                    value: result.value,
+                })
+
+                const gen = consumer.next()
 
                 if (!gen) {
                     return
@@ -223,7 +298,7 @@ export function* stream<Yield extends Eff.AnyEff, TaskReturn, HandlerReturn>(
 
                 items.push(newItem)
 
-                yield* processItem(newItem, newItem.gen.next())
+                return newItem
             } else if (item.type === 'completed') {
                 throw new Error(
                     `Unexpected completion of item that was already completed: ${JSON.stringify(item, null, 2)}`,
@@ -236,7 +311,7 @@ export function* stream<Yield extends Eff.AnyEff, TaskReturn, HandlerReturn>(
 
         let handlerResult: HandlerResult | undefined
 
-        const handlerPromise = handler(asyncGen).then(
+        const handlerPromise = handler(stream.gen).then(
             (value) => {
                 handlerResult = {
                     type: 'ok',
@@ -255,7 +330,10 @@ export function* stream<Yield extends Eff.AnyEff, TaskReturn, HandlerReturn>(
 
         promises.push(handlerPromise)
 
-        for (const item of items) {
+        let count = 0
+
+        while (count < items.length) {
+            const item = items[count++]
             yield* processItem(item, item.gen.next())
         }
 
@@ -284,17 +362,15 @@ export function* stream<Yield extends Eff.AnyEff, TaskReturn, HandlerReturn>(
                     result = item.gen.throw(processResult.error)
                 }
 
-                yield* processItem(item, result)
-            }
+                let newItem = yield* processItem(item, result)
 
-            if (processedItems.length > 0) {
-                // Resolve the controller to allow the async generator to yield
-                const previousController = controller
-                controller = withResolvers()
-                previousController.resolve()
+                while (newItem) {
+                    newItem = yield* processItem(newItem, newItem.gen.next())
+                }
             }
 
             if (promises.length === 1) {
+                stream.done()
                 const result = yield* Eff.await(promises[0])
 
                 if (result) {
@@ -317,35 +393,37 @@ export function* stream<Yield extends Eff.AnyEff, TaskReturn, HandlerReturn>(
     }
 }
 
-export function* combine<const T extends unknown[] | readonly unknown[] | {}>(
+export function* fromTuple<T extends unknown[] | readonly unknown[]>(
     inputs: T,
 ): Generator<Eff.ExtractYield<T> | Eff.Async, Eff.ExtractReturn<T>> {
-    if (Array.isArray(inputs)) {
-        return yield* all(inputs as any) as Generator<Eff.ExtractYield<T>, Eff.ExtractReturn<T>>
-    } else {
-        const result: Record<string, unknown> = {}
-        const gens = [] as Generator<Eff.AnyEff>[]
-        const keys = [] as string[]
+    return yield* all(inputs as any) as Generator<Eff.ExtractYield<T>, Eff.ExtractReturn<T>>
+}
 
-        for (const [key, value] of Object.entries(inputs)) {
-            if (typeof value === 'function') {
-                gens.push(value())
-            } else if (Eff.isGenerator(value)) {
-                gens.push(value as Generator<Eff.AnyEff>)
-            } else {
-                gens.push(Eff.of(value))
-            }
-            keys.push(key)
+export function* fromObject<T extends Record<string, unknown>>(
+    inputs: T,
+): Generator<Eff.ExtractYield<T> | Eff.Async, Eff.ExtractReturn<T>> {
+    const result: Record<string, unknown> = {}
+    const gens = [] as Generator<Eff.AnyEff>[]
+    const keys = [] as string[]
+
+    for (const [key, value] of Object.entries(inputs)) {
+        if (typeof value === 'function') {
+            gens.push(value())
+        } else if (Eff.isGenerator(value)) {
+            gens.push(value as Generator<Eff.AnyEff>)
+        } else {
+            gens.push(Eff.of(value))
         }
-
-        const values = (yield* all(gens) as any) as unknown[]
-
-        for (let i = 0; i < values.length; i++) {
-            result[keys[i]] = values[i]
-        }
-
-        return result as Eff.ExtractReturn<T>
+        keys.push(key)
     }
+
+    const values = (yield* all(gens) as any) as unknown[]
+
+    for (let i = 0; i < values.length; i++) {
+        result[keys[i]] = values[i]
+    }
+
+    return result as Eff.ExtractReturn<T>
 }
 
 export type AllOptions = {
@@ -353,10 +431,10 @@ export type AllOptions = {
 }
 
 export function* all<Yield extends Eff.AnyEff, Return>(
-    inputs: TaskInputs<Yield, Return>,
+    inputs: TaskSource<Yield, Return>,
     options?: AllOptions,
 ): Generator<Yield | Eff.Async, Return[]> {
-    const results = yield* stream(
+    const results = yield* concurrent(
         inputs,
         async (stream) => {
             const results = [] as Return[]
@@ -378,10 +456,10 @@ export type RaceOptions = {
 }
 
 export function* race<Yield extends Eff.AnyEff, Return>(
-    inputs: TaskInputs<Yield, Return>,
+    inputs: TaskSource<Yield, Return>,
     options?: RaceOptions,
 ): Generator<Yield | Eff.Async, Return> {
-    const result = yield* stream(
+    const result = yield* concurrent(
         inputs,
         async (stream) => {
             for await (const { value } of stream) {
