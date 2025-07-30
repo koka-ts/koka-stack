@@ -1214,12 +1214,12 @@ describe('Task.series', () => {
         }
 
         const inputs = [failingTask(), normalTask()]
-        const handler = async (results: Task.TaskResultStream<string>) => {
-            const streamResults = []
-            for await (const { value } of results) {
-                streamResults.push(value)
+        const handler = async (stream: Task.TaskResultStream<string>) => {
+            const results = [] as string[]
+            for await (const { value } of stream) {
+                results.push(value)
             }
-            return streamResults
+            return results
         }
 
         const result = await Result.run(Task.series(inputs, handler))
