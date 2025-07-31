@@ -1,4 +1,7 @@
-import * as Eff from './koka'
+import type * as Async from './async'
+import type * as Err from './err'
+import * as Gen from './gen'
+import * as Koka from './koka'
 
 export type Ok<T> = {
     type: 'ok'
@@ -7,9 +10,9 @@ export type Ok<T> = {
 
 export type AnyOk = Ok<any>
 
-export type Result<T, E> = Ok<T> | (E extends Eff.AnyErr ? E : never)
+export type Result<T, E> = Ok<T> | (E extends Err.AnyErr ? E : never)
 
-export type AnyResult = Result<any, Eff.AnyErr>
+export type AnyResult = Result<any, Err.AnyErr>
 
 export const ok = <T>(value: T): Ok<T> => {
     return {
@@ -18,7 +21,7 @@ export const ok = <T>(value: T): Ok<T> => {
     }
 }
 
-export const err = <Name extends string, T>(name: Name, error: T): Eff.Err<Name, T> => {
+export const err = <Name extends string, T>(name: Name, error: T): Err.Err<Name, T> => {
     return {
         type: 'err',
         name,
@@ -28,9 +31,9 @@ export const err = <Name extends string, T>(name: Name, error: T): Eff.Err<Name,
 
 export type InferOkValue<T> = T extends Ok<infer U> ? U : never
 
-export function* wrap<Yield extends Eff.AnyEff, Return>(
+export function* wrap<Yield extends Koka.AnyEff, Return>(
     gen: Generator<Yield, Return>,
-): Generator<Eff.ExcludeErr<Yield>, Ok<Return> | Eff.ExtractErr<Yield>> {
+): Generator<Koka.ExcludeErr<Yield>, Ok<Return> | Koka.ExtractErr<Yield>> {
     try {
         let result = gen.next()
 
@@ -38,7 +41,7 @@ export function* wrap<Yield extends Eff.AnyEff, Return>(
             const effect = result.value
 
             if (effect.type === 'err') {
-                return effect as Eff.ExtractErr<Yield>
+                return effect as Koka.ExtractErr<Yield>
             } else {
                 result = gen.next(yield effect as any)
             }
@@ -49,7 +52,7 @@ export function* wrap<Yield extends Eff.AnyEff, Return>(
             value: result.value,
         }
     } finally {
-        Eff.cleanUpGen(gen)
+        Gen.cleanUpGen(gen)
     }
 }
 
@@ -57,23 +60,24 @@ export function* wrap<Yield extends Eff.AnyEff, Return>(
  * convert a generator to a generator that returns a value
  * move the err from return to throw
  */
-export function* unwrap<Yield, Return extends AnyOk | Eff.AnyErr>(
+export function* unwrap<Yield, Return extends AnyOk | Err.AnyErr>(
     gen: Generator<Yield, Return>,
-): Generator<Yield | Eff.ExtractErr<Return>, InferOkValue<Return>> {
+): Generator<Yield | Koka.ExtractErr<Return>, InferOkValue<Return>> {
     const result = yield* gen
 
     if (result.type === 'ok') {
         return result.value
     } else {
-        throw yield result as Eff.ExtractErr<Return>
+        throw yield result as Koka.ExtractErr<Return>
     }
 }
 
 export function run<Yield, Return>(
-    input: Eff.Actor<Yield, Return>,
-): Eff.Async extends Yield ? Eff.MaybePromise<Ok<Return> | Eff.ExtractErr<Yield>> : Ok<Return> | Eff.ExtractErr<Yield> {
+    input: Koka.Actor<Yield, Return>,
+): Async.Async extends Yield
+    ? Koka.MaybePromise<Ok<Return> | Koka.ExtractErr<Yield>>
+    : Ok<Return> | Koka.ExtractErr<Yield> {
     const gen = typeof input === 'function' ? input() : input
 
-    // @ts-ignore expected
-    return Eff.run(wrap(gen))
+    return Koka.run(wrap(gen as any) as any)
 }

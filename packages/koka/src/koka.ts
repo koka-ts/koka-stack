@@ -1,37 +1,11 @@
-export type Err<Name extends string, T> = {
-    type: 'err'
-    name: Name
-    error: T
-}
+import type { Async } from './async'
+import type { Ctx } from './ctx'
+import type { AnyErr, Err } from './err'
+import * as Gen from './gen'
+import type { Msg } from './msg'
+import type { AnyOpt, Opt } from './opt'
 
-export type AnyErr = Err<string, any>
-
-export const EffSymbol = Symbol('ctx')
-
-export type EffSymbol = typeof EffSymbol
-
-export type Ctx<Name extends string, T> = {
-    type: 'ctx'
-    name: Name
-    context: EffSymbol | T
-    optional?: true
-}
-
-export interface Opt<Name extends string, T> extends Ctx<Name, T> {
-    optional: true
-}
-
-export type AnyCtx = Ctx<string, any>
-
-export type Async = {
-    type: 'async'
-    name?: undefined
-    promise: Promise<unknown>
-}
-
-export type AnyOpt = Opt<string, any>
-
-export type Eff<T> = Err<string, T> | Ctx<string, T> | Opt<string, T> | Async
+export type Eff<T> = Err<string, T> | Ctx<string, T> | Opt<string, T> | Msg<string, T> | Async
 
 export type AnyEff = Eff<any>
 
@@ -41,6 +15,8 @@ type ToHandler<Effect> = Effect extends Err<infer Name, infer U>
     ? Record<Name, (error: U) => unknown>
     : Effect extends Ctx<infer Name, infer U>
     ? Record<Name, U>
+    : Effect extends Opt<infer Name, infer U>
+    ? Record<Name, U | undefined>
     : never
 
 export type EffectHandlers<Effect> = UnionToIntersection<ToHandler<Effect>>
@@ -56,65 +32,6 @@ type ExtractErrorHandlerReturn<Handlers, Eff> = Eff extends Err<infer Name, infe
 export type Actor<Yield, Return> = Generator<Yield, Return> | (() => Generator<Yield, Return>)
 
 export type MaybePromise<T> = T extends Promise<any> ? T : T | Promise<T>
-
-export function Ctx<const Name extends string>(name: Name) {
-    return class Eff<T> {
-        static field: Name = name
-        type = 'ctx' as const
-        name = name
-        context = EffSymbol as EffSymbol | T
-        optional?: true
-    }
-}
-
-export function Err<const Name extends string>(name: Name) {
-    return class Eff<E = void> {
-        static field: Name = name
-        type = 'err' as const
-        name = name
-        error: E
-        constructor(error: E) {
-            this.error = error
-        }
-    }
-}
-
-export function Opt<const Name extends string>(name: Name) {
-    return class Eff<T> extends Ctx(name)<T> {
-        optional = true as const
-        context = EffSymbol as EffSymbol | T
-    }
-}
-
-export type CtxValue<C extends AnyCtx> = C['optional'] extends true
-    ? Exclude<C['context'], EffSymbol> | undefined
-    : Exclude<C['context'], EffSymbol>
-
-function* throwError<E extends AnyErr>(err: E): Generator<E, never> {
-    yield err
-    /* istanbul ignore next */
-    throw new Error(`Unexpected resumption of error effect [${err.name}]`)
-}
-
-export { throwError as throw }
-
-export function* of<T>(value: T) {
-    return value
-}
-
-export function* get<C extends AnyCtx>(ctx: C | (new () => C)): Generator<C, CtxValue<C>> {
-    const context = yield typeof ctx === 'function' ? new ctx() : ctx
-
-    return context as CtxValue<C>
-}
-
-export const cleanUpGen = <Yield, Return, Next>(gen: Generator<Yield, Return, Next>) => {
-    const result = (gen as Generator<Yield, Return | undefined, Next>).return(undefined)
-
-    if (!result.done) {
-        throw new Error(`You can not use yield in the finally block of a generator`)
-    }
-}
 
 function tryEffect<Yield extends AnyEff, Return>(input: Actor<Yield, Return>) {
     return {
@@ -138,10 +55,16 @@ function tryEffect<Yield extends AnyEff, Return>(input: Actor<Yield, Return>) {
                             result = gen.next(yield effect as any)
                         }
                     } else if (effect.type === 'ctx') {
-                        const context = handlers[effect.name as keyof Handlers]
+                        if (effect.name in handlers) {
+                            result = gen.next(handlers[effect.name as keyof Handlers])
+                        } else {
+                            result = gen.next(yield effect as any)
+                        }
+                    } else if (effect.type === 'opt') {
+                        const optValue = handlers[effect.name as keyof Handlers]
 
-                        if (context !== undefined) {
-                            result = gen.next(context)
+                        if (optValue !== undefined) {
+                            result = gen.next(optValue)
                         } else {
                             result = gen.next(yield effect as any)
                         }
@@ -152,7 +75,7 @@ function tryEffect<Yield extends AnyEff, Return>(input: Actor<Yield, Return>) {
 
                 return result.value
             } finally {
-                cleanUpGen(gen)
+                Gen.cleanUpGen(gen)
             }
         },
     }
@@ -178,15 +101,10 @@ export function run<Return>(input: Actor<Async | AnyOpt, Return>): MaybePromise<
                         return process(gen.throw(error))
                     },
                 ) as MaybePromise<Return>
-            } else if (effect.type === 'ctx') {
-                if (!effect.optional) {
-                    throw new Error(
-                        `Expected optional ctx, but got non-optional ctx: ${JSON.stringify(effect, null, 2)}`,
-                    )
-                }
+            } else if (effect.type === 'opt') {
                 result = gen.next()
             } else {
-                throw new Error(`Expected async effect, but got: ${JSON.stringify(effect, null, 2)}`)
+                throw new Error(`Unhandled effect: ${JSON.stringify(effect, null, 2)}`)
             }
         }
 
@@ -210,47 +128,26 @@ export function runAsync<Return>(actor: Actor<Async | AnyOpt, Return>): Promise<
     return Promise.resolve(run(actor))
 }
 
-function* awaitEffect<T>(value: T | Promise<T>): Generator<Async, T> {
-    if (!(value instanceof Promise)) {
-        return value
-    }
-
-    const result = yield {
-        type: 'async',
-        promise: value,
-    }
-
-    return result as T
-}
-
-export { awaitEffect as await }
-
-export const isGenerator = <T = unknown, TReturn = any, TNext = any>(
-    value: unknown,
-): value is Generator<T, TReturn, TNext> => {
-    return typeof value === 'object' && value !== null && 'next' in value && 'throw' in value
-}
-
 export type ExtractErr<T> = T extends AnyErr ? T : never
 
 export type ExcludeErr<T> = T extends AnyErr ? never : T
 
-export type ExtractYieldFromObject<Gens extends object> = {
+export type ExtractEffFromObject<Gens extends object> = {
     [K in keyof Gens]: Gens[K] extends Actor<infer E, any> ? E : never
 }[keyof Gens]
 
-export type ExtractYieldFromTuple<Gens> = Gens extends []
+export type ExtractEffFromTuple<Gens> = Gens extends []
     ? never
     : Gens extends [infer Head, ...infer Tail]
     ? Head extends Actor<infer Yield, any>
-        ? Yield | ExtractYieldFromTuple<Tail>
+        ? Yield | ExtractEffFromTuple<Tail>
         : never
     : never
 
-export type ExtractYield<Gens> = Gens extends unknown[]
-    ? ExtractYieldFromTuple<Gens>
+export type ExtractEff<Gens> = Gens extends unknown[]
+    ? ExtractEffFromTuple<Gens>
     : Gens extends object
-    ? ExtractYieldFromObject<Gens>
+    ? ExtractEffFromObject<Gens>
     : never
 
 export type ExtractReturnFromTuple<Gens> = Gens extends []

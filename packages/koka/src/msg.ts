@@ -1,30 +1,30 @@
-import * as Eff from './koka'
+import { EffSymbol } from './constant'
+import * as Gen from './gen'
+import type * as Koka from './koka'
 
 export type Msg<Name extends string, T> = {
     type: 'msg'
     name: Name
-    message: T | Eff.EffSymbol
+    message: T | EffSymbol
 }
 
 export type AnyMsg = Msg<string, any>
-
-export type AnyEff = Eff.AnyEff | Msg<string, any>
 
 export interface SendMsg<Name extends string, T> extends Msg<Name, T> {
     message: T
 }
 
 export interface WaitMsg<Name extends string, T> extends Msg<Name, T> {
-    message: Eff.EffSymbol
+    message: EffSymbol
 }
 
 export abstract class AbstractMsg<T> {
     static field: string = ''
     type = 'msg' as const
     abstract name: string
-    message: T | Eff.EffSymbol
+    message: T | EffSymbol
     constructor(...args: T extends undefined | void ? [] : [T]) {
-        this.message = args[0] as T | Eff.EffSymbol
+        this.message = args[0] as T | EffSymbol
     }
 }
 
@@ -38,7 +38,7 @@ export function Msg<const Name extends string>(name: Name) {
 export interface Wait<T extends AbstractMsg<any>> {
     type: 'msg'
     name: T['name']
-    message: Eff.EffSymbol
+    message: EffSymbol
 }
 
 export type MsgValue<M extends AnyMsg> = M extends Msg<string, infer T> ? T : never
@@ -55,7 +55,7 @@ export function* wait<MsgCtor extends typeof AbstractMsg<unknown>>(
     const message = yield {
         type: 'msg',
         name: msg.field,
-        message: Eff.EffSymbol,
+        message: EffSymbol,
     } as Wait<InstanceType<MsgCtor>>
 
     return message as ExtractMsgMessage<InstanceType<MsgCtor>>
@@ -63,17 +63,17 @@ export function* wait<MsgCtor extends typeof AbstractMsg<unknown>>(
 
 export function* communicate<const T extends {}>(
     inputs: T,
-): Generator<Exclude<Eff.ExtractYield<T>, { type: 'msg' }>, Eff.ExtractReturn<T>> {
-    const gens = {} as Record<string, Generator<AnyEff, unknown>>
+): Generator<Exclude<Koka.ExtractEff<T>, { type: 'msg' }>, Koka.ExtractReturn<T>> {
+    const gens = {} as Record<string, Generator<Koka.AnyEff, unknown>>
     const results = {} as Record<string, unknown>
 
     for (const [key, value] of Object.entries(inputs)) {
         if (typeof value === 'function') {
             gens[key] = value()
-        } else if (Eff.isGenerator(value)) {
-            gens[key] = value as Generator<AnyEff, unknown>
+        } else if (Gen.isGen(value)) {
+            gens[key] = value as Generator<Koka.AnyEff, unknown>
         } else {
-            gens[key] = Eff.of(value)
+            gens[key] = Gen.of(value)
         }
     }
 
@@ -81,7 +81,7 @@ export function* communicate<const T extends {}>(
         type: 'send'
         name: string
         key: string
-        gen: Generator<AnyEff, unknown>
+        gen: Generator<Koka.AnyEff, unknown>
         message: unknown
     }
 
@@ -89,7 +89,7 @@ export function* communicate<const T extends {}>(
         type: 'wait'
         name: string
         key: string
-        gen: Generator<AnyEff, unknown>
+        gen: Generator<Koka.AnyEff, unknown>
     }
 
     const sendStorage = {} as Record<string, SendStorageValue>
@@ -99,15 +99,15 @@ export function* communicate<const T extends {}>(
 
     const process = function* (
         key: string,
-        gen: Generator<AnyEff, unknown>,
-        result: IteratorResult<AnyEff, unknown>,
-    ): Generator<AnyEff, void> {
+        gen: Generator<Koka.AnyEff, unknown>,
+        result: IteratorResult<Koka.AnyEff, unknown>,
+    ): Generator<Koka.AnyEff, void> {
         while (!result.done) {
             const effect = result.value
 
             if (effect.type === 'msg') {
                 // Send a message
-                if (effect.message !== Eff.EffSymbol) {
+                if (effect.message !== EffSymbol) {
                     if (effect.name in waitStorage) {
                         const waitItem = waitStorage[effect.name]
                         delete waitStorage[effect.name]
@@ -180,10 +180,10 @@ export function* communicate<const T extends {}>(
             throw new Error(`Some messages were not processed: ${JSON.stringify(Object.keys(gens))}`)
         }
 
-        return results as Eff.ExtractReturn<T>
+        return results as Koka.ExtractReturn<T>
     } finally {
         for (const gen of Object.values(gens)) {
-            Eff.cleanUpGen(gen)
+            Gen.cleanUpGen(gen)
         }
     }
 }

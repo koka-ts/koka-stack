@@ -1,6 +1,8 @@
-import * as Eff from '../src'
+import * as Koka from '../src/koka'
 import * as Task from '../src/task'
 import * as Result from '../src/result'
+import * as Async from '../src/async'
+import * as Err from '../src/err'
 
 const delayTime = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -15,31 +17,31 @@ describe('Task.fromTuple', () => {
         }
 
         function* program() {
-            const combined: Generator<Eff.Async, [number, string]> = Task.fromTuple([effect1(), effect2()])
+            const combined: Generator<Async.Async, [number, string]> = Task.tuple([effect1(), effect2()])
             const results = yield* combined
             return results[0] + Number(results[1])
         }
 
-        const result = await Eff.runAsync(program())
+        const result = await Koka.runAsync(program())
         expect(result).toBe(3)
     })
 
     it('should handle async effects with array input', async () => {
         function* effect1() {
-            return yield* Eff.await(Promise.resolve(1))
+            return yield* Async.await(Promise.resolve(1))
         }
 
         function* effect2() {
-            return yield* Eff.await(Promise.resolve('2'))
+            return yield* Async.await(Promise.resolve('2'))
         }
 
         function* program() {
-            const combined: Generator<Eff.Async, [number, string]> = Task.fromTuple([effect1(), effect2()])
+            const combined: Generator<Async.Async, [number, string]> = Task.tuple([effect1(), effect2()])
             const results = yield* combined
             return results[0] + Number(results[1])
         }
 
-        const result = await Eff.run(program())
+        const result = await Koka.run(program())
         expect(result).toBe(3)
     })
 
@@ -49,11 +51,11 @@ describe('Task.fromTuple', () => {
         }
 
         function* asyncEffect() {
-            return yield* Eff.await(Promise.resolve(2))
+            return yield* Async.await(Promise.resolve(2))
         }
 
         function* program() {
-            const combined: Generator<Eff.Async, [number, number]> = Task.fromTuple([
+            const combined: Generator<Async.Async, [number, number]> = Task.tuple([
                 syncEffect(),
                 asyncEffect(),
             ] as const)
@@ -61,7 +63,7 @@ describe('Task.fromTuple', () => {
             return results[0] + results[1]
         }
 
-        const result = await Eff.run(program())
+        const result = await Koka.run(program())
         expect(result).toBe(3)
     })
 })
@@ -81,7 +83,7 @@ describe('Task.fromObject', () => {
                 a: number
                 b: number
                 c: number
-            } = yield* Task.fromObject({
+            } = yield* Task.object({
                 a: effect1(),
                 b: effect2(),
                 c: 3,
@@ -89,7 +91,7 @@ describe('Task.fromObject', () => {
             return results.a + results.b + results.c
         }
 
-        const result = await Eff.run(program())
+        const result = await Koka.run(program())
         expect(result).toBe(6)
     })
 
@@ -103,7 +105,7 @@ describe('Task.fromObject', () => {
                 a: number
                 b: number
                 c: number
-            } = yield* Task.fromObject({
+            } = yield* Task.object({
                 a: effect1(),
                 b: 2,
                 c: () => effect1(),
@@ -111,19 +113,19 @@ describe('Task.fromObject', () => {
             return results.a + results.b + results.c
         }
 
-        const result = await Eff.run(program())
+        const result = await Koka.run(program())
         expect(result).toBe(4)
     })
 
     it('should handle errors in object input', () => {
-        class TestErr extends Eff.Err('TestErr')<string> {}
+        class TestErr extends Err.Err('TestErr')<string> {}
 
         function* effect1() {
             return 1
         }
 
         function* effect2() {
-            yield* Eff.throw(new TestErr('error'))
+            yield* Err.throw(new TestErr('error'))
             return 2
         }
 
@@ -131,7 +133,7 @@ describe('Task.fromObject', () => {
             const results: {
                 a: number
                 b: number
-            } = yield* Task.fromObject({
+            } = yield* Task.object({
                 a: effect1(),
                 b: effect2(),
             })
@@ -147,30 +149,30 @@ describe('Task.fromObject', () => {
     })
 
     it('should handle empty object input', async () => {
-        function* program(): Generator<Eff.Async, {}> {
-            const results: {} = yield* Task.fromObject({})
+        function* program(): Generator<Async.Async, {}> {
+            const results: {} = yield* Task.object({})
             return results
         }
 
-        const result = await Eff.run(program())
+        const result = await Koka.run(program())
         expect(result).toEqual({})
     })
 
     it('should handle multiple async effects and run concurrently', async () => {
-        class DelayError extends Eff.Err('DelayError')<string> {}
+        class DelayError extends Err.Err('DelayError')<string> {}
 
         function* delayedEffect<T>(value: T, delay: number) {
             if (delay === 0) {
-                yield* Eff.throw(new DelayError('Delay cannot be zero'))
+                yield* Err.throw(new DelayError('Delay cannot be zero'))
             }
 
-            yield* Eff.await(delayTime(delay))
+            yield* Async.await(delayTime(delay))
 
             return value
         }
 
         function* program() {
-            const combined: Generator<Eff.Async | DelayError, [number, string, boolean]> = Task.fromTuple([
+            const combined: Generator<Async.Async | DelayError, [number, string, boolean]> = Task.tuple([
                 delayedEffect(1, 30),
                 delayedEffect('2', 20),
                 delayedEffect(false, 10),
@@ -194,12 +196,12 @@ describe('Task.fromObject', () => {
     })
 
     it('should handle empty array', async () => {
-        function* program(): Generator<Eff.Async, []> {
-            const results = yield* Task.fromTuple([])
+        function* program(): Generator<Async.Async, []> {
+            const results = yield* Task.tuple([])
             return results
         }
 
-        const result = await Eff.run(program())
+        const result = await Koka.run(program())
         expect(result).toEqual([])
     })
 
@@ -212,54 +214,54 @@ describe('Task.fromObject', () => {
             return 2
         }
 
-        function* program(): Generator<Eff.Async, number> {
-            const results = yield* Task.fromTuple([() => effect1(), () => effect2()])
+        function* program(): Generator<Async.Async, number> {
+            const results = yield* Task.tuple([() => effect1(), () => effect2()])
             return results[0] + results[1]
         }
 
-        const result = await Eff.run(program())
+        const result = await Koka.run(program())
         expect(result).toBe(3)
     })
 
     it('should handle async errors with native try-catch', async () => {
-        function* effectWithError(): Generator<Eff.Async, number> {
-            const value = yield* Eff.await(Promise.reject(new Error('Async error')))
+        function* effectWithError(): Generator<Async.Async, number> {
+            const value = yield* Async.await(Promise.reject(new Error('Async error')))
             return value
         }
 
         function* program() {
             try {
-                const results = yield* Task.fromTuple([effectWithError(), Eff.await(Promise.resolve(2))])
+                const results = yield* Task.tuple([effectWithError(), Async.await(Promise.resolve(2))])
                 return results[0] + results[1]
             } catch (err: unknown) {
                 return err as Error
             }
         }
 
-        const result = await Eff.run(program())
+        const result = await Koka.run(program())
 
         expect(result).toBeInstanceOf(Error)
         expect((result as Error).message).toBe('Async error')
     })
 
     it('should propagate async errors', async () => {
-        function* failingEffect(): Generator<Eff.Async, never> {
-            yield* Eff.await(Promise.reject(new Error('Async error')))
+        function* failingEffect(): Generator<Async.Async, never> {
+            yield* Async.await(Promise.reject(new Error('Async error')))
             /* istanbul ignore next */
             throw new Error('Should not reach here')
         }
 
-        function* program(): Generator<Eff.Async, number> {
-            const results = yield* Task.fromTuple([failingEffect(), Eff.await(Promise.resolve(2))])
+        function* program(): Generator<Async.Async, number> {
+            const results = yield* Task.tuple([failingEffect(), Async.await(Promise.resolve(2))])
             return results[0] + results[1]
         }
 
-        await expect(Eff.run(program())).rejects.toThrow('Async error')
+        await expect(Koka.run(program())).rejects.toThrow('Async error')
     })
 
     it('should handle thrown errors in async effects', async () => {
-        function* effectWithThrow(): Generator<Eff.Async, number> {
-            const value = yield* Eff.await(
+        function* effectWithThrow(): Generator<Async.Async, number> {
+            const value = yield* Async.await(
                 new Promise<number>((_, reject) => {
                     setTimeout(() => {
                         try {
@@ -273,9 +275,9 @@ describe('Task.fromObject', () => {
             return value
         }
 
-        function* program(): Generator<Eff.Async, number> {
+        function* program(): Generator<Async.Async, number> {
             try {
-                const results = yield* Task.fromTuple([effectWithThrow(), Eff.await(Promise.resolve(2))])
+                const results = yield* Task.tuple([effectWithThrow(), Async.await(Promise.resolve(2))])
                 return results[0] + results[1]
             } catch (err) {
                 if (err instanceof Error) {
@@ -285,7 +287,7 @@ describe('Task.fromObject', () => {
             }
         }
 
-        const result = await Eff.run(program())
+        const result = await Koka.run(program())
         expect(result).toBe(-100)
     })
 })
@@ -296,7 +298,7 @@ describe('Task.race', () => {
 
         function* slowEffect() {
             try {
-                yield* Eff.await(new Promise((resolve) => setTimeout(resolve, 100)))
+                yield* Async.await(new Promise((resolve) => setTimeout(resolve, 100)))
                 return 'slow'
             } finally {
                 cleanupCalled = true
@@ -308,7 +310,7 @@ describe('Task.race', () => {
         }
 
         const inputs = [slowEffect(), fastEffect()]
-        const result = await Eff.run(Task.race(inputs))
+        const result = await Koka.run(Task.race(inputs))
 
         expect(result).toBe('fast')
         expect(cleanupCalled).toBe(true)
@@ -317,14 +319,14 @@ describe('Task.race', () => {
 
 describe('Task.all', () => {
     it('should handle errors in effects', () => {
-        class TestErr extends Eff.Err('TestErr')<string> {}
+        class TestErr extends Err.Err('TestErr')<string> {}
 
         function* effect1() {
             return 1
         }
 
         function* effect2() {
-            yield* Eff.throw(new TestErr('error'))
+            yield* Err.throw(new TestErr('error'))
             return 2
         }
 
@@ -342,8 +344,8 @@ describe('Task.all', () => {
     })
 
     it('should handle effect list with the same item type', async () => {
-        function* effect1(): Generator<Eff.Async, number> {
-            yield* Eff.await(Promise.resolve(1))
+        function* effect1(): Generator<Async.Async, number> {
+            yield* Async.await(Promise.resolve(1))
             return 1
         }
 
@@ -357,7 +359,7 @@ describe('Task.all', () => {
             return results
         }
 
-        const result = await Eff.run(program())
+        const result = await Koka.run(program())
         expect(result).toEqual([1, 2])
     })
 })
@@ -369,7 +371,7 @@ describe('Task.concurrent', () => {
 
         function* valueGen(n: number) {
             try {
-                yield* Eff.await(Promise.resolve(1))
+                yield* Async.await(Promise.resolve(1))
                 returnFn()
                 return 1
             } finally {
@@ -383,7 +385,7 @@ describe('Task.concurrent', () => {
             return 42
         }
 
-        const result = await Eff.run(Task.concurrent(inputs, handler))
+        const result = await Koka.run(Task.concurrent(inputs, handler))
         expect(result).toBe(42)
         expect(returnFn).toHaveBeenCalledTimes(0)
         expect(cleanUp).toHaveBeenCalledTimes(4)
@@ -395,7 +397,7 @@ describe('Task.concurrent', () => {
 
         function* produce(n: number) {
             try {
-                yield* Eff.await(delayTime(n))
+                yield* Async.await(delayTime(n))
                 returnFn()
                 return n
             } finally {
@@ -419,7 +421,7 @@ describe('Task.concurrent', () => {
             throw new Error('Early return')
         }
 
-        const results = await Eff.run(Task.concurrent(inputs, handler))
+        const results = await Koka.run(Task.concurrent(inputs, handler))
 
         expect(results).toEqual([
             { index: 3, value: 10 },
@@ -447,7 +449,7 @@ describe('Task.concurrent', () => {
             return results
         })
 
-        const result = await Eff.run(program)
+        const result = await Koka.run(program)
         expect(result).toEqual([2, 4, 6])
     })
 
@@ -461,14 +463,14 @@ describe('Task.concurrent', () => {
             return results
         })
 
-        const result = await Eff.runAsync(program)
+        const result = await Koka.runAsync(program)
 
         expect(result).toEqual([])
     })
 
     it('should handle async effects in stream', async () => {
         function* asyncValueGen(value: number) {
-            const asyncValue = yield* Eff.await(Promise.resolve(value))
+            const asyncValue = yield* Async.await(Promise.resolve(value))
             return asyncValue
         }
 
@@ -484,15 +486,15 @@ describe('Task.concurrent', () => {
 
         const program = Task.concurrent(inputs, handler)
 
-        const result = await Eff.run(program)
+        const result = await Koka.run(program)
         expect(result).toEqual([2, 4, 6])
     })
 
     it('should propagate errors from stream items', async () => {
-        class StreamError extends Eff.Err('StreamError')<string> {}
+        class StreamError extends Err.Err('StreamError')<string> {}
 
         function* failingGen() {
-            yield* Eff.throw(new StreamError('stream error'))
+            yield* Err.throw(new StreamError('stream error'))
             return 1
         }
 
@@ -520,7 +522,7 @@ describe('Task.concurrent', () => {
         }
 
         function* asyncGen() {
-            return yield* Eff.await(Promise.resolve(2))
+            return yield* Async.await(Promise.resolve(2))
         }
 
         const inputs = [syncGen(), asyncGen()]
@@ -534,18 +536,18 @@ describe('Task.concurrent', () => {
             return results
         }
 
-        const result = await Eff.run(Task.concurrent(inputs, handler))
+        const result = await Koka.run(Task.concurrent(inputs, handler))
 
         expect(result).toEqual([2, 4])
     })
 
     it('should clean up generators on error', async () => {
-        class CleanupError extends Eff.Err('CleanupError')<string> {}
+        class CleanupError extends Err.Err('CleanupError')<string> {}
 
         let cleanupCalled = false
         function* failingGen() {
             try {
-                yield* Eff.throw(new CleanupError('cleanup error'))
+                yield* Err.throw(new CleanupError('cleanup error'))
                 return 1
             } finally {
                 cleanupCalled = true
@@ -588,7 +590,7 @@ describe('Task.concurrent', () => {
         }
 
         // This should not throw an unexpected completion error
-        const result = await Eff.run(Task.concurrent(inputs, handler))
+        const result = await Koka.run(Task.concurrent(inputs, handler))
         expect(result).toEqual([{ index: 0, value: 42 }])
     })
 
@@ -598,7 +600,7 @@ describe('Task.concurrent', () => {
         }
 
         function* asyncGen() {
-            const value = yield* Eff.await(Promise.resolve(2))
+            const value = yield* Async.await(Promise.resolve(2))
             return value
         }
 
@@ -611,7 +613,7 @@ describe('Task.concurrent', () => {
             return results
         }
 
-        const result = await Eff.run(Task.concurrent(inputs, handler))
+        const result = await Koka.run(Task.concurrent(inputs, handler))
         expect(result).toEqual([
             { index: 0, value: 1 },
             { index: 1, value: 2 },
@@ -631,7 +633,7 @@ describe('Task.concurrent', () => {
             return 0
         }
 
-        const result = await Eff.run(Task.concurrent(inputs, handler))
+        const result = await Koka.run(Task.concurrent(inputs, handler))
         expect(result).toBe(84)
     })
 })
@@ -646,7 +648,7 @@ describe('Stream maxConcurrency and TaskProducer', () => {
             activeTasks.push(index)
             maxActiveTasks.push(activeTasks.length)
             try {
-                yield* Eff.await(delayTime(50))
+                yield* Async.await(delayTime(50))
                 return `task-${index}`
             } finally {
                 const taskIndex = activeTasks.indexOf(index)
@@ -672,7 +674,7 @@ describe('Stream maxConcurrency and TaskProducer', () => {
             return results
         }
 
-        const result = await Eff.run(Task.concurrent(producer, handler, { maxConcurrency }))
+        const result = await Koka.run(Task.concurrent(producer, handler, { maxConcurrency }))
 
         expect(result).toEqual(['task-0', 'task-1', 'task-2', 'task-3'])
         // Verify that active task count never exceeds max concurrency limit
@@ -688,7 +690,7 @@ describe('Stream maxConcurrency and TaskProducer', () => {
             callCount++
             if (index < 3) {
                 return function* () {
-                    yield* Eff.await(delayTime(10))
+                    yield* Async.await(delayTime(10))
                     return `item-${index}`
                 }
             }
@@ -703,7 +705,7 @@ describe('Stream maxConcurrency and TaskProducer', () => {
             return results
         }
 
-        const result = await Eff.run(Task.concurrent(producer, handler, { maxConcurrency: 2 }))
+        const result = await Koka.run(Task.concurrent(producer, handler, { maxConcurrency: 2 }))
 
         expect(result).toEqual(['item-0', 'item-1', 'item-2'])
         expect(callCount).toBe(4) // 4th call returns undefined
@@ -722,7 +724,7 @@ describe('Stream maxConcurrency and TaskProducer', () => {
             return results
         }
 
-        const result = await Eff.run(Task.concurrent(producer, handler))
+        const result = await Koka.run(Task.concurrent(producer, handler))
 
         expect(result).toEqual([])
     })
@@ -731,12 +733,12 @@ describe('Stream maxConcurrency and TaskProducer', () => {
         const producer = (index: number) => {
             if (index % 2 === 0) {
                 return function* () {
-                    yield* Eff.await(delayTime(10))
+                    yield* Async.await(delayTime(10))
                     return `even-${index}`
                 }
             } else if (index < 5) {
                 return function* () {
-                    yield* Eff.await(delayTime(5))
+                    yield* Async.await(delayTime(5))
                     return `odd-${index}`
                 }
             }
@@ -751,7 +753,7 @@ describe('Stream maxConcurrency and TaskProducer', () => {
             return results
         }
 
-        const result = await Eff.run(Task.concurrent(producer, handler, { maxConcurrency: 3 }))
+        const result = await Koka.run(Task.concurrent(producer, handler, { maxConcurrency: 3 }))
 
         expect(result).toEqual(['even-0', 'odd-1', 'even-2', 'odd-3', 'even-4'])
     })
@@ -767,7 +769,7 @@ describe('All maxConcurrency and TaskProducer', () => {
             activeTasks.push(index)
             maxActiveTasks.push(activeTasks.length)
             try {
-                yield* Eff.await(delayTime(30))
+                yield* Async.await(delayTime(30))
                 return `task-${index}`
             } finally {
                 const taskIndex = activeTasks.indexOf(index)
@@ -784,7 +786,7 @@ describe('All maxConcurrency and TaskProducer', () => {
             return undefined
         }
 
-        const result = await Eff.run(Task.all(producer, { maxConcurrency }))
+        const result = await Koka.run(Task.all(producer, { maxConcurrency }))
 
         expect(result).toEqual(['task-0', 'task-1', 'task-2', 'task-3'])
         // Verify that active task count never exceeds max concurrency limit
@@ -796,14 +798,14 @@ describe('All maxConcurrency and TaskProducer', () => {
         const producer = (index: number) => {
             if (index < 2) {
                 return function* () {
-                    yield* Eff.await(delayTime(10))
+                    yield* Async.await(delayTime(10))
                     return `item-${index}`
                 }
             }
             return undefined
         }
 
-        const result = await Eff.run(Task.all(producer))
+        const result = await Koka.run(Task.all(producer))
 
         expect(result).toEqual(['item-0', 'item-1'])
     })
@@ -813,14 +815,14 @@ describe('All maxConcurrency and TaskProducer', () => {
             if (index < 3) {
                 return function* () {
                     // Simulate different delays, but results should maintain index order
-                    yield* Eff.await(delayTime((3 - index) * 10))
+                    yield* Async.await(delayTime((3 - index) * 10))
                     return `item-${index}`
                 }
             }
             return undefined
         }
 
-        const result = await Eff.run(Task.all(producer, { maxConcurrency: 2 }))
+        const result = await Koka.run(Task.all(producer, { maxConcurrency: 2 }))
 
         expect(result).toEqual(['item-0', 'item-1', 'item-2'])
     })
@@ -836,7 +838,7 @@ describe('Race maxConcurrency and TaskProducer', () => {
             activeTasks.push(index)
             maxActiveTasks.push(activeTasks.length)
             try {
-                yield* Eff.await(delayTime((index + 1) * 20))
+                yield* Async.await(delayTime((index + 1) * 20))
                 return `task-${index}`
             } finally {
                 const taskIndex = activeTasks.indexOf(index)
@@ -853,7 +855,7 @@ describe('Race maxConcurrency and TaskProducer', () => {
             return undefined
         }
 
-        const result = await Eff.run(Task.race(producer, { maxConcurrency }))
+        const result = await Koka.run(Task.race(producer, { maxConcurrency }))
 
         // Should return the fastest task (task-0, 20ms delay)
         expect(result).toBe('task-0')
@@ -866,14 +868,14 @@ describe('Race maxConcurrency and TaskProducer', () => {
         const producer = (index: number) => {
             if (index === 0) {
                 return function* () {
-                    yield* Eff.await(delayTime(10))
+                    yield* Async.await(delayTime(10))
                     return 'fast'
                 }
             }
             return undefined
         }
 
-        const result = await Eff.run(Task.race(producer))
+        const result = await Koka.run(Task.race(producer))
 
         expect(result).toBe('fast')
     })
@@ -886,7 +888,7 @@ describe('Race maxConcurrency and TaskProducer', () => {
                         // Fastest task
                         return 'fastest'
                     } else {
-                        yield* Eff.await(delayTime(50))
+                        yield* Async.await(delayTime(50))
                         return `slow-${index}`
                     }
                 }
@@ -894,7 +896,7 @@ describe('Race maxConcurrency and TaskProducer', () => {
             return undefined
         }
 
-        const result = await Eff.run(Task.race(producer, { maxConcurrency: 2 }))
+        const result = await Koka.run(Task.race(producer, { maxConcurrency: 2 }))
 
         expect(result).toBe('fastest')
     })
@@ -920,12 +922,12 @@ describe('Edge cases for maxConcurrency', () => {
         }
 
         // Test maxConcurrency = 0
-        expect(() => Eff.run(Task.concurrent(producer, handler, { maxConcurrency: 0 }))).toThrow(
+        expect(() => Koka.run(Task.concurrent(producer, handler, { maxConcurrency: 0 }))).toThrow(
             'maxConcurrency must be greater than 0',
         )
 
         // Test maxConcurrency = -1
-        expect(() => Eff.run(Task.concurrent(producer, handler, { maxConcurrency: -1 }))).toThrow(
+        expect(() => Koka.run(Task.concurrent(producer, handler, { maxConcurrency: -1 }))).toThrow(
             'maxConcurrency must be greater than 0',
         )
     })
@@ -942,7 +944,7 @@ describe('Edge cases for maxConcurrency', () => {
                     maxActiveTasks.push(activeTasks.length)
                     executionOrder.push(index)
                     try {
-                        yield* Eff.await(delayTime(10))
+                        yield* Async.await(delayTime(10))
                         return `item-${index}`
                     } finally {
                         const taskIndex = activeTasks.indexOf(index)
@@ -963,7 +965,7 @@ describe('Edge cases for maxConcurrency', () => {
             return results
         }
 
-        const result = await Eff.run(Task.concurrent(producer, handler, { maxConcurrency: 1 }))
+        const result = await Koka.run(Task.concurrent(producer, handler, { maxConcurrency: 1 }))
 
         expect(result).toEqual(['item-0', 'item-1', 'item-2'])
         // Verify that max concurrency is indeed 1
@@ -983,7 +985,7 @@ describe('Edge cases for maxConcurrency', () => {
                     activeTasks.push(index)
                     maxActiveTasks.push(activeTasks.length)
                     try {
-                        yield* Eff.await(delayTime(10))
+                        yield* Async.await(delayTime(10))
                         return `item-${index}`
                     } finally {
                         const taskIndex = activeTasks.indexOf(index)
@@ -1004,7 +1006,7 @@ describe('Edge cases for maxConcurrency', () => {
             return results
         }
 
-        const result = await Eff.run(Task.concurrent(producer, handler, { maxConcurrency: 1000 }))
+        const result = await Koka.run(Task.concurrent(producer, handler, { maxConcurrency: 1000 }))
 
         expect(result).toEqual(['item-0', 'item-1', 'item-2', 'item-3', 'item-4'])
         // Verify all tasks can execute concurrently (max active tasks should equal total tasks)
@@ -1015,17 +1017,17 @@ describe('Edge cases for maxConcurrency', () => {
 
 describe('TaskProducer with error handling', () => {
     it('should handle errors in TaskProducer', async () => {
-        class ProducerError extends Eff.Err('ProducerError')<string> {}
+        class ProducerError extends Err.Err('ProducerError')<string> {}
 
-        const producer: Task.TaskProducer<ProducerError | Eff.Async, string> = (index: number) => {
+        const producer: Task.TaskProducer<ProducerError | Async.Async, string> = (index: number) => {
             if (index === 1) {
                 return function* () {
-                    yield* Eff.throw(new ProducerError('Producer failed'))
+                    yield* Err.throw(new ProducerError('Producer failed'))
                     return 'should not reach here'
                 }
             } else if (index < 3) {
                 return function* () {
-                    yield* Eff.await(delayTime(10))
+                    yield* Async.await(delayTime(10))
                     return `item-${index}`
                 }
             }
@@ -1049,8 +1051,8 @@ describe('TaskProducer with error handling', () => {
 
         const program = Task.concurrent(producer, handler, { maxConcurrency: 2 })
 
-        const result = await Eff.runAsync(
-            Eff.try(program).handle({
+        const result = await Koka.runAsync(
+            Koka.try(program).handle({
                 ProducerError: (error) => `Error: ${error}`,
             }),
         )
@@ -1075,7 +1077,7 @@ describe('TaskProducer with error handling', () => {
 
                     try {
                         // Simulate workload
-                        yield* Eff.await(delayTime(20))
+                        yield* Async.await(delayTime(20))
                         return `task-${index}`
                     } finally {
                         // Record task end
@@ -1095,7 +1097,7 @@ describe('TaskProducer with error handling', () => {
             return results
         }
 
-        const result = await Eff.run(Task.concurrent(producer, handler, { maxConcurrency }))
+        const result = await Koka.run(Task.concurrent(producer, handler, { maxConcurrency }))
 
         expect(result).toEqual(['task-0', 'task-1', 'task-2', 'task-3', 'task-4'])
 
@@ -1140,7 +1142,7 @@ describe('TaskProducer with error handling', () => {
             return results
         }
 
-        const result = await Eff.run(Task.concurrent(producer, handler))
+        const result = await Koka.run(Task.concurrent(producer, handler))
 
         expect(result).toEqual(['function', 'generator'])
     })
@@ -1152,7 +1154,7 @@ describe('Task.series', () => {
 
         function* task(index: number) {
             executionOrder.push(index)
-            yield* Eff.await(delayTime(10))
+            yield* Async.await(delayTime(10))
             return `task-${index}`
         }
 
@@ -1167,7 +1169,7 @@ describe('Task.series', () => {
             return streamResults
         }
 
-        const result = await Eff.run(Task.series(inputs, handler))
+        const result = await Koka.run(Task.series(inputs, handler))
 
         expect(result).toEqual(['task-0', 'task-1', 'task-2'])
         expect(executionOrder).toEqual([0, 1, 2]) // Sequential execution
@@ -1180,7 +1182,7 @@ describe('Task.series', () => {
             if (index < 3) {
                 return function* () {
                     executionOrder.push(index)
-                    yield* Eff.await(delayTime(10))
+                    yield* Async.await(delayTime(10))
                     return `task-${index}`
                 }
             }
@@ -1195,17 +1197,17 @@ describe('Task.series', () => {
             return streamResults
         }
 
-        const result = await Eff.run(Task.series(producer, handler))
+        const result = await Koka.run(Task.series(producer, handler))
 
         expect(result).toEqual(['task-0', 'task-1', 'task-2'])
         expect(executionOrder).toEqual([0, 1, 2])
     })
 
     it('should handle errors in series', async () => {
-        class SeriesError extends Eff.Err('SeriesError')<string> {}
+        class SeriesError extends Err.Err('SeriesError')<string> {}
 
         function* failingTask() {
-            yield* Eff.throw(new SeriesError('series error'))
+            yield* Err.throw(new SeriesError('series error'))
             return 'should not reach here'
         }
 
@@ -1239,7 +1241,7 @@ describe('Task.parallel', () => {
 
         function* task(index: number) {
             startTimes[index] = Date.now()
-            yield* Eff.await(delayTime(50))
+            yield* Async.await(delayTime(50))
             endTimes[index] = Date.now()
             return `task-${index}`
         }
@@ -1254,7 +1256,7 @@ describe('Task.parallel', () => {
         }
 
         const start = Date.now()
-        const result = await Eff.run(Task.parallel(inputs, handler))
+        const result = await Koka.run(Task.parallel(inputs, handler))
         const totalTime = Date.now() - start
 
         expect(result).toEqual(['task-0', 'task-1', 'task-2'])
@@ -1273,7 +1275,7 @@ describe('Task.parallel', () => {
             if (index < 3) {
                 return function* () {
                     startTimes[index] = Date.now()
-                    yield* Eff.await(delayTime(30))
+                    yield* Async.await(delayTime(30))
                     return `task-${index}`
                 }
             }
@@ -1289,7 +1291,7 @@ describe('Task.parallel', () => {
         }
 
         const start = Date.now()
-        const result = await Eff.run(Task.parallel(producer, handler))
+        const result = await Koka.run(Task.parallel(producer, handler))
         const totalTime = Date.now() - start
 
         expect(result).toEqual(['task-0', 'task-1', 'task-2'])
@@ -1306,7 +1308,7 @@ describe('Task.parallel', () => {
         }
 
         function* asyncTask() {
-            yield* Eff.await(delayTime(20))
+            yield* Async.await(delayTime(20))
             return 'async'
         }
 
@@ -1319,7 +1321,7 @@ describe('Task.parallel', () => {
             return streamResults
         }
 
-        const result = await Eff.run(Task.parallel(inputs, handler))
+        const result = await Koka.run(Task.parallel(inputs, handler))
 
         expect(result).toContain('sync')
         expect(result).toContain('async')
@@ -1354,15 +1356,15 @@ describe('Task.concurrent with complex error scenarios', () => {
     })
 
     it('should handle multiple errors in stream', async () => {
-        class StreamError extends Eff.Err('StreamError')<string> {}
+        class StreamError extends Err.Err('StreamError')<string> {}
 
         function* failingTask1() {
-            yield* Eff.throw(new StreamError('error 1'))
+            yield* Err.throw(new StreamError('error 1'))
             return 'should not reach here'
         }
 
         function* failingTask2() {
-            yield* Eff.throw(new StreamError('error 2'))
+            yield* Err.throw(new StreamError('error 2'))
             return 'should not reach here'
         }
 
@@ -1394,7 +1396,7 @@ describe('Task.concurrent with complex error scenarios', () => {
             return results
         }
 
-        const result = await Eff.run(Task.concurrent([], handler))
+        const result = await Koka.run(Task.concurrent([], handler))
         expect(result).toEqual([])
     })
 
@@ -1411,7 +1413,7 @@ describe('Task.concurrent with complex error scenarios', () => {
             return results
         }
 
-        const result = await Eff.run(Task.concurrent(producer, handler))
+        const result = await Koka.run(Task.concurrent(producer, handler))
         expect(result).toEqual([])
     })
 })
@@ -1419,9 +1421,9 @@ describe('Task.concurrent with complex error scenarios', () => {
 describe('Concurrent with complex async scenarios', () => {
     it('should handle nested async operations', async () => {
         function* nestedAsyncTask() {
-            const value1 = yield* Eff.await(Promise.resolve(1))
-            const value2 = yield* Eff.await(Promise.resolve(2))
-            const value3 = yield* Eff.await(Promise.resolve(3))
+            const value1 = yield* Async.await(Promise.resolve(1))
+            const value2 = yield* Async.await(Promise.resolve(2))
+            const value3 = yield* Async.await(Promise.resolve(3))
             return value1 + value2 + value3
         }
 
@@ -1434,7 +1436,7 @@ describe('Concurrent with complex async scenarios', () => {
             return results
         }
 
-        const result = await Eff.run(Task.concurrent(inputs, handler))
+        const result = await Koka.run(Task.concurrent(inputs, handler))
         expect(result).toEqual([6])
     })
 
@@ -1442,13 +1444,13 @@ describe('Concurrent with complex async scenarios', () => {
         const results: string[] = []
 
         function* fastTask() {
-            yield* Eff.await(delayTime(10))
+            yield* Async.await(delayTime(10))
             results.push('fast')
             return 'fast'
         }
 
         function* slowTask() {
-            yield* Eff.await(delayTime(50))
+            yield* Async.await(delayTime(50))
             results.push('slow')
             return 'slow'
         }
@@ -1462,7 +1464,7 @@ describe('Concurrent with complex async scenarios', () => {
             return streamResults
         }
 
-        const result = await Eff.run(Task.concurrent(inputs, handler))
+        const result = await Koka.run(Task.concurrent(inputs, handler))
 
         expect(result).toEqual(['fast', 'slow'])
         expect(results).toEqual(['fast', 'slow'])
@@ -1473,7 +1475,7 @@ describe('Concurrent with complex async scenarios', () => {
 
         function* longRunningTask() {
             try {
-                yield* Eff.await(delayTime(100))
+                yield* Async.await(delayTime(100))
                 return 'long'
             } finally {
                 cleanupCalled = true
@@ -1488,7 +1490,7 @@ describe('Concurrent with complex async scenarios', () => {
             return 'no value'
         }
 
-        const result = await Eff.run(Task.concurrent(inputs, handler))
+        const result = await Koka.run(Task.concurrent(inputs, handler))
         expect(result).toBe('long')
         expect(cleanupCalled).toBe(true)
     })
@@ -1502,7 +1504,7 @@ describe('Concurrent with maxConcurrency edge cases', () => {
             if (index < 5) {
                 return function* () {
                     executionOrder.push(index)
-                    yield* Eff.await(delayTime(10))
+                    yield* Async.await(delayTime(10))
                     return `task-${index}`
                 }
             }
@@ -1517,7 +1519,7 @@ describe('Concurrent with maxConcurrency edge cases', () => {
             return results
         }
 
-        const result = await Eff.run(Task.concurrent(producer, handler, { maxConcurrency: 1 }))
+        const result = await Koka.run(Task.concurrent(producer, handler, { maxConcurrency: 1 }))
 
         expect(result).toEqual(['task-0', 'task-1', 'task-2', 'task-3', 'task-4'])
         expect(executionOrder).toEqual([0, 1, 2, 3, 4]) // Sequential
@@ -1530,7 +1532,7 @@ describe('Concurrent with maxConcurrency edge cases', () => {
             if (index < 3) {
                 return function* () {
                     activeTasks.push(index)
-                    yield* Eff.await(delayTime(20))
+                    yield* Async.await(delayTime(20))
                     const taskIndex = activeTasks.indexOf(index)
                     if (taskIndex > -1) {
                         activeTasks.splice(taskIndex, 1)
@@ -1549,7 +1551,7 @@ describe('Concurrent with maxConcurrency edge cases', () => {
             return results
         }
 
-        const result = await Eff.run(Task.concurrent(producer, handler, { maxConcurrency: 10 }))
+        const result = await Koka.run(Task.concurrent(producer, handler, { maxConcurrency: 10 }))
 
         expect(result).toEqual(['task-0', 'task-1', 'task-2'])
         expect(activeTasks.length).toBe(0)
@@ -1572,7 +1574,7 @@ describe('Concurrent with maxConcurrency edge cases', () => {
                         return `sync-${result}`
                     } else {
                         // Async task
-                        yield* Eff.await(delayTime(10))
+                        yield* Async.await(delayTime(10))
                         const result = activeCount.value
                         activeCount.value--
                         return `async-${result}`
@@ -1590,7 +1592,7 @@ describe('Concurrent with maxConcurrency edge cases', () => {
             return results
         }
 
-        const result = await Eff.run(Task.concurrent(producer, handler, { maxConcurrency: 2 }))
+        const result = await Koka.run(Task.concurrent(producer, handler, { maxConcurrency: 2 }))
 
         expect(result.length).toBe(4)
         expect(maxActiveCount.value).toBeLessThanOrEqual(2)
@@ -1613,7 +1615,7 @@ describe('Concurrent with complex data types', () => {
             return results
         }
 
-        const result = await Eff.run(Task.concurrent(inputs, handler))
+        const result = await Koka.run(Task.concurrent(inputs, handler))
         expect(result).toEqual([{ id: 1, name: 'test' }])
     })
 
@@ -1631,7 +1633,7 @@ describe('Concurrent with complex data types', () => {
             return results
         }
 
-        const result = await Eff.run(Task.concurrent(inputs, handler))
+        const result = await Koka.run(Task.concurrent(inputs, handler))
         expect(result).toEqual([[1, 2, 3]])
     })
 
@@ -1653,7 +1655,7 @@ describe('Concurrent with complex data types', () => {
             return results
         }
 
-        const result = await Eff.run(Task.concurrent(inputs, handler))
+        const result = await Koka.run(Task.concurrent(inputs, handler))
         expect(result).toEqual([null, undefined])
     })
 })
@@ -1669,7 +1671,7 @@ describe('Concurrent performance and stress tests', () => {
                 return function* () {
                     activeTasks.push(index)
                     maxActiveTasks.push(activeTasks.length)
-                    yield* Eff.await(delayTime(5))
+                    yield* Async.await(delayTime(5))
                     const taskIndex = activeTasks.indexOf(index)
                     if (taskIndex > -1) {
                         activeTasks.splice(taskIndex, 1)
@@ -1689,7 +1691,7 @@ describe('Concurrent performance and stress tests', () => {
         }
 
         const start = Date.now()
-        const result = await Eff.run(Task.concurrent(producer, handler, { maxConcurrency: 10 }))
+        const result = await Koka.run(Task.concurrent(producer, handler, { maxConcurrency: 10 }))
         const duration = Date.now() - start
 
         expect(result.length).toBe(taskCount)
@@ -1718,7 +1720,7 @@ describe('Concurrent performance and stress tests', () => {
             return results
         }
 
-        const result = await Eff.run(Task.concurrent(producer, handler, { maxConcurrency: 20 }))
+        const result = await Koka.run(Task.concurrent(producer, handler, { maxConcurrency: 20 }))
 
         expect(result.length).toBe(taskCount)
         for (let i = 0; i < taskCount; i++) {
@@ -1733,15 +1735,15 @@ describe('Concurrent with cleanup and resource management', () => {
 
         function* taskWithCleanup(index: number) {
             try {
-                yield* Eff.await(delayTime(10))
+                yield* Async.await(delayTime(10))
                 return `task-${index}`
             } finally {
                 cleanupCalls.push(index)
             }
         }
 
-        function* failingTask(): Generator<Eff.Async, string, any> {
-            yield* Eff.await(delayTime(5))
+        function* failingTask(): Generator<Async.Async, string, any> {
+            yield* Async.await(delayTime(5))
             throw new Error('Task failed')
         }
 
@@ -1763,7 +1765,7 @@ describe('Concurrent with cleanup and resource management', () => {
 
         function* taskWithCleanup(index: number) {
             try {
-                yield* Eff.await(delayTime(10))
+                yield* Async.await(delayTime(10))
                 return `task-${index}`
             } finally {
                 cleanupCalls.push(index)

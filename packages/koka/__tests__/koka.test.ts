@@ -1,12 +1,17 @@
-import * as Eff from '../src'
+import * as Koka from '../src/koka'
 import * as Result from '../src/result'
+import * as Err from '../src/err'
+import * as Ctx from '../src/ctx'
+import * as Opt from '../src/opt'
+import * as Async from '../src/async'
+import * as Gen from '../src/gen'
 
 describe('Eff.throw', () => {
     it('should throw error effect', () => {
-        class TestError extends Eff.Err('TestError')<string> {}
+        class TestError extends Err.Err('TestError')<string> {}
 
         function* test() {
-            yield* Eff.throw(new TestError('error message'))
+            yield* Err.throw(new TestError('error message'))
             return 'should not reach here'
         }
 
@@ -20,45 +25,45 @@ describe('Eff.throw', () => {
     })
 })
 
-describe('Eff.get', () => {
+describe('Ctx.get', () => {
     it('should get context value', () => {
-        class TestCtx extends Eff.Ctx('TestCtx')<number> {}
-        class Num extends Eff.Ctx('Num')<number> {}
+        class TestCtx extends Ctx.Ctx('TestCtx')<number> {}
+        class Num extends Ctx.Ctx('Num')<number> {}
 
         function* test() {
-            const value = yield* Eff.get(TestCtx)
-            const num = yield* Eff.get(Num)
+            const value = yield* Ctx.get(TestCtx)
+            const num = yield* Ctx.get(Num)
             return value * num
         }
 
-        const program0 = Eff.try(test()).handle({
+        const program0 = Koka.try(test()).handle({
             Num: 2,
         })
 
-        const program1 = Eff.try(program0).handle({
+        const program1 = Koka.try(program0).handle({
             TestCtx: 21,
         })
 
-        const result = Eff.run(program1)
+        const result = Koka.run(program1)
         expect(result).toBe(42)
     })
 
     it('should propagate context when not handled', () => {
-        class TestCtx extends Eff.Ctx('TestCtx')<number> {}
+        class TestCtx extends Ctx.Ctx('TestCtx')<number> {}
 
         function* inner() {
-            return yield* Eff.get(TestCtx)
+            return yield* Ctx.get(TestCtx)
         }
 
         function* outer() {
             return yield* inner()
         }
 
-        const program = Eff.try(outer()).handle({
+        const program = Koka.try(outer()).handle({
             TestCtx: 42,
         })
 
-        const result = Eff.run(program)
+        const result = Koka.run(program)
         expect(result).toBe(42)
     })
 })
@@ -71,38 +76,38 @@ describe('Eff.try', () => {
         }
 
         expect(() => {
-            Eff.run(Eff.try(test()).handle({}))
+            Koka.run(Koka.try(test()).handle({}))
         }).toThrow()
     })
 
     it('should catch error effect', () => {
-        class TestError extends Eff.Err('TestError')<string> {}
+        class TestError extends Err.Err('TestError')<string> {}
 
         function* test() {
-            yield* Eff.throw(new TestError('error'))
+            yield* Err.throw(new TestError('error'))
             return 'should not reach here'
         }
 
-        const program = Eff.try(test()).handle({
+        const program = Koka.try(test()).handle({
             TestError: (error) => `Caught: ${error}`,
         })
 
-        const result = Eff.run(program)
+        const result = Koka.run(program)
         expect(result).toBe('Caught: error')
     })
 
     it('should propagate unhandled error', () => {
-        class UnhandledError extends Eff.Err('UnhandledError')<string> {}
+        class UnhandledError extends Err.Err('UnhandledError')<string> {}
 
         function* test() {
-            yield* Eff.throw(new UnhandledError('error'))
+            yield* Err.throw(new UnhandledError('error'))
             return 'should not reach here'
         }
 
-        const program = Eff.try(test()).handle({})
+        const program = Koka.try(test()).handle({})
 
-        const result = Eff.run(
-            Eff.try(program).handle({
+        const result = Koka.run(
+            Koka.try(program).handle({
                 UnhandledError: (error) => ({ error }),
             }),
         )
@@ -113,32 +118,32 @@ describe('Eff.try', () => {
     })
 
     it('should handle multiple catches', () => {
-        class TestCtx extends Eff.Ctx('TestCtx')<() => 1> {}
-        class FirstError extends Eff.Err('FirstError')<string> {}
-        class SecondError extends Eff.Err('SecondError')<string> {}
+        class TestCtx extends Ctx.Ctx('TestCtx')<() => 1> {}
+        class FirstError extends Err.Err('FirstError')<string> {}
+        class SecondError extends Err.Err('SecondError')<string> {}
 
         function* test() {
-            yield* Eff.get(TestCtx)
-            yield* Eff.throw(new FirstError('first error'))
-            yield* Eff.throw(new SecondError('second error'))
+            yield* Ctx.get(TestCtx)
+            yield* Err.throw(new FirstError('first error'))
+            yield* Err.throw(new SecondError('second error'))
             return 'should not reach here'
         }
 
-        const program = Eff.try(test()).handle({
+        const program = Koka.try(test()).handle({
             FirstError: (error) => `Caught first: ${error}`,
             SecondError: (error) => `Caught second: ${error}`,
             TestCtx: () => 1,
         })
 
-        const result = Eff.runSync(program)
+        const result = Koka.runSync(program)
         expect(result).toBe('Caught first: first error')
     })
 
     it('should handle nested try/catch', () => {
-        class InnerError extends Eff.Err('InnerError')<string> {}
+        class InnerError extends Err.Err('InnerError')<string> {}
 
         function* inner() {
-            yield* Eff.throw(new InnerError('inner error'))
+            yield* Err.throw(new InnerError('inner error'))
             return 'should not reach here'
         }
 
@@ -146,8 +151,8 @@ describe('Eff.try', () => {
             return yield* inner()
         }
 
-        const result = Eff.run(
-            Eff.try(outer()).handle({
+        const result = Koka.run(
+            Koka.try(outer()).handle({
                 InnerError: (error) => `Caught inner: ${error}`,
             }),
         )
@@ -158,29 +163,29 @@ describe('Eff.try', () => {
 describe('Eff.run', () => {
     it('should handle async effects', async () => {
         function* test() {
-            const value = yield* Eff.await(Promise.resolve(42))
-            const syncValue = yield* Eff.await(2)
+            const value = yield* Async.await(Promise.resolve(42))
+            const syncValue = yield* Async.await(2)
             return value * syncValue
         }
 
-        const result = await Eff.runAsync(test())
+        const result = await Koka.runAsync(test())
         expect(result).toBe(84)
     })
 
     it('should handle mixed sync/async effects', async () => {
         function* test() {
             const syncValue = 21
-            const asyncValue = yield* Eff.await(Promise.resolve(21))
+            const asyncValue = yield* Async.await(Promise.resolve(21))
             return syncValue + asyncValue
         }
 
-        const result = await Eff.run(test())
+        const result = await Koka.run(test())
         expect(result).toBe(42)
     })
 
     it('should handle errors in async effects', async () => {
         function* testThrow() {
-            yield* Eff.await(Promise.reject(new Error('Async error')))
+            yield* Async.await(Promise.reject(new Error('Async error')))
         }
 
         function* test() {
@@ -193,40 +198,40 @@ describe('Eff.run', () => {
             }
         }
 
-        const result = await Eff.run(test())
+        const result = await Koka.run(test())
         expect(result).toBe('Caught: Async error')
     })
 
     it('should throw error when received unexpected effect type', () => {
-        class TestErr extends Eff.Err('TestErr')<string> {}
-        class TestCtx extends Eff.Ctx('TestCtx')<string> {}
-        class TestOpt extends Eff.Opt('TestOpt')<string> {}
+        class TestErr extends Err.Err('TestErr')<string> {}
+        class TestCtx extends Ctx.Ctx('TestCtx')<string> {}
+        class TestOpt extends Opt.Opt('TestOpt')<string> {}
 
         function* testErr(): Generator<TestErr, string> {
-            yield* Eff.throw(new TestErr('error'))
+            yield* Err.throw(new TestErr('error'))
             return 'should not reach here'
         }
 
         function* testCtx(): Generator<TestCtx, string> {
-            const ctx = yield* Eff.get(TestCtx)
+            const ctx = yield* Ctx.get(TestCtx)
             return ctx
         }
 
         function* testOpt(): Generator<TestOpt, string> {
-            const opt = yield* Eff.get(TestOpt)
+            const opt = yield* Opt.get(TestOpt)
             return opt ?? 'default'
         }
 
         // @ts-expect-error for test
-        expect(() => Eff.run(testErr())).toThrow(/\w+/)
+        expect(() => Koka.run(testErr())).toThrow(/\w+/)
         // @ts-expect-error for test
-        expect(() => Eff.run(testCtx())).toThrow(/\w+/)
+        expect(() => Koka.run(testCtx())).toThrow(/\w+/)
 
-        expect(Eff.run(testOpt())).toBe('default')
+        expect(Koka.run(testOpt())).toBe('default')
 
         expect(
-            Eff.run(
-                Eff.try(testOpt()).handle({
+            Koka.run(
+                Koka.try(testOpt()).handle({
                     [TestOpt.field]: 'custom value',
                 }),
             ),
@@ -240,33 +245,33 @@ describe('Eff.runSync', () => {
             return 42
         }
 
-        const result = Eff.runSync(test())
+        const result = Koka.runSync(test())
         expect(result).toBe(42)
     })
 
     it('should throw for async effects', () => {
-        function* test(): Generator<Eff.Async, number> {
-            yield* Eff.await(Promise.resolve(42))
+        function* test(): Generator<Async.Async, number> {
+            yield* Async.await(Promise.resolve(42))
             return 42
         }
 
         // @ts-expect-error for test
-        expect(() => Eff.runSync(test())).toThrow(/Expected synchronous effect, but got asynchronous effect/)
+        expect(() => Koka.runSync(test())).toThrow(/Expected synchronous effect, but got asynchronous effect/)
     })
 })
 
 describe('Result.fromErr', () => {
     it('should convert generator to Result', () => {
-        class TestCtx extends Eff.Ctx('TestCtx')<string> {}
-        class TestError extends Eff.Err('TestError')<string> {}
+        class TestCtx extends Ctx.Ctx('TestCtx')<string> {}
+        class TestError extends Err.Err('TestError')<string> {}
 
         function* success() {
             return 42
         }
 
         function* failure() {
-            const message = yield* Eff.get(TestCtx)
-            yield* Eff.throw(new TestError(message))
+            const message = yield* Ctx.get(TestCtx)
+            yield* Err.throw(new TestError(message))
             return 'should not reach here'
         }
 
@@ -277,8 +282,8 @@ describe('Result.fromErr', () => {
             value: 42,
         })
 
-        const failureResult = Eff.run(
-            Eff.try(Result.wrap(failure())).handle({
+        const failureResult = Koka.run(
+            Koka.try(Result.wrap(failure())).handle({
                 TestCtx: 'error',
             }),
         )
@@ -316,16 +321,16 @@ describe('Result.fromErr', () => {
 
 describe('Complex scenarios', () => {
     it('should handle successful nested effects', async () => {
-        class TestCtx extends Eff.Ctx('TestCtx')<number> {}
+        class TestCtx extends Ctx.Ctx('TestCtx')<number> {}
 
         function* program() {
-            const ctxValue = yield* Eff.get(TestCtx)
-            const asyncValue = yield* Eff.await(Promise.resolve(ctxValue * 2))
+            const ctxValue = yield* Ctx.get(TestCtx)
+            const asyncValue = yield* Async.await(Promise.resolve(ctxValue * 2))
             return asyncValue + 1
         }
 
-        const result = await Eff.run(
-            Eff.try(program()).handle({
+        const result = await Koka.run(
+            Koka.try(program()).handle({
                 TestCtx: 21,
             }),
         )
@@ -333,20 +338,20 @@ describe('Complex scenarios', () => {
     })
 
     it('should handle error in nested effects', async () => {
-        class TestCtx extends Eff.Ctx('TestCtx')<number> {}
-        class ZeroError extends Eff.Err('ZeroError')<string> {}
+        class TestCtx extends Ctx.Ctx('TestCtx')<number> {}
+        class ZeroError extends Err.Err('ZeroError')<string> {}
 
         function* program() {
-            const ctxValue = yield* Eff.get(TestCtx)
+            const ctxValue = yield* Ctx.get(TestCtx)
             if (ctxValue === 0) {
-                yield* Eff.throw(new ZeroError('ctx is zero'))
+                yield* Err.throw(new ZeroError('ctx is zero'))
             }
-            const asyncValue = yield* Eff.await(Promise.resolve(ctxValue * 2))
+            const asyncValue = yield* Async.await(Promise.resolve(ctxValue * 2))
             return asyncValue + 1
         }
 
-        const result = await Eff.run(
-            Eff.try(program()).handle({
+        const result = await Koka.run(
+            Koka.try(program()).handle({
                 TestCtx: 0,
                 e: 1,
                 ZeroError: (error) => `Handled: ${error}`,
@@ -359,7 +364,7 @@ describe('Complex scenarios', () => {
 
 describe('Eff.Ctx/Eff.Err', () => {
     it('should create context effect class', () => {
-        class TestCtx extends Eff.Ctx('TestCtx')<number> {}
+        class TestCtx extends Ctx.Ctx('TestCtx')<number> {}
 
         const ctx = new TestCtx()
         ctx.context = 42
@@ -370,7 +375,7 @@ describe('Eff.Ctx/Eff.Err', () => {
     })
 
     it('should create error effect class', () => {
-        class TestErr extends Eff.Err('TestErr')<string> {}
+        class TestErr extends Err.Err('TestErr')<string> {}
         const err = new TestErr('error')
 
         expect(err.type).toBe('err')
@@ -381,10 +386,10 @@ describe('Eff.Ctx/Eff.Err', () => {
 
 describe('Eff.throw', () => {
     it('should throw error effect', () => {
-        class TestErr extends Eff.Err('TestErr')<string> {}
+        class TestErr extends Err.Err('TestErr')<string> {}
 
         function* test() {
-            yield* Eff.throw(new TestErr('error'))
+            yield* Err.throw(new TestErr('error'))
             return 'should not reach here'
         }
 
@@ -394,10 +399,10 @@ describe('Eff.throw', () => {
     })
 
     it('should propagate error through nested calls', () => {
-        const TestErr = Eff.Err('TestErr')<string>
+        const TestErr = Err.Err('TestErr')<string>
 
         function* inner() {
-            yield* Eff.throw(new TestErr('inner error'))
+            yield* Err.throw(new TestErr('inner error'))
             return 'should not reach here'
         }
 
@@ -412,37 +417,37 @@ describe('Eff.throw', () => {
 
 describe('Eff.get', () => {
     it('should get context value', () => {
-        const TestCtx = Eff.Ctx('TestCtx')<number>
+        const TestCtx = Ctx.Ctx('TestCtx')<number>
 
         function* test() {
-            const value = yield* Eff.get(TestCtx)
+            const value = yield* Ctx.get(TestCtx)
             return value * 2
         }
 
-        const program = Eff.try(test()).handle({
+        const program = Koka.try(test()).handle({
             TestCtx: 42,
         })
 
-        const result = Eff.run(program)
+        const result = Koka.run(program)
         expect(result).toBe(84)
     })
 
     it('should propagate context when not handled', () => {
-        const TestCtx = Eff.Ctx('TestCtx')<number>
+        const TestCtx = Ctx.Ctx('TestCtx')<number>
 
         function* inner() {
-            return yield* Eff.get(TestCtx)
+            return yield* Ctx.get(TestCtx)
         }
 
         function* outer() {
             return yield* inner()
         }
 
-        const program = Eff.try(outer()).handle({
+        const program = Koka.try(outer()).handle({
             TestCtx: 42,
         })
 
-        const result = Eff.run(program)
+        const result = Koka.run(program)
         expect(result).toBe(42)
     })
 })
@@ -452,81 +457,81 @@ describe('helpers', () => {
         function* gen() {}
         const notGen = () => {}
 
-        expect(Eff.isGenerator(gen())).toBe(true)
-        expect(Eff.isGenerator(notGen())).toBe(false)
+        expect(Gen.isGen(gen())).toBe(true)
+        expect(Gen.isGen(notGen())).toBe(false)
     })
 })
 
 describe('Eff.opt', () => {
     it('should return undefined when no value provided', () => {
-        class TestOpt extends Eff.Opt('TestOpt')<number> {}
+        class TestOpt extends Opt.Opt('TestOpt')<number> {}
 
         function* test() {
-            return yield* Eff.get(TestOpt)
+            return yield* Opt.get(TestOpt)
         }
 
-        const result = Eff.run(test())
+        const result = Koka.run(test())
         expect(result).toBeUndefined()
     })
 
     it('should return value when provided', () => {
-        class TestOpt extends Eff.Opt('TestOpt')<number> {}
+        class TestOpt extends Opt.Opt('TestOpt')<number> {}
 
         function* test() {
-            const optValue = yield* Eff.get(TestOpt)
+            const optValue = yield* Opt.get(TestOpt)
             return optValue ?? 42
         }
 
-        const result = Eff.run(Eff.try(test()).handle({ TestOpt: 21 }))
+        const result = Koka.run(Koka.try(test()).handle({ TestOpt: 21 }))
         expect(result).toBe(21)
     })
 
     it('should work with async effects', async () => {
-        class TestOpt extends Eff.Opt('TestOpt')<number> {}
+        class TestOpt extends Opt.Opt('TestOpt')<number> {}
 
         function* test() {
-            const optValue = yield* Eff.get(TestOpt)
-            const asyncValue = yield* Eff.await(Promise.resolve(optValue ?? 42))
+            const optValue = yield* Opt.get(TestOpt)
+            const asyncValue = yield* Async.await(Promise.resolve(optValue ?? 42))
             return asyncValue
         }
 
-        const result = await Eff.run(test())
+        const result = await Koka.run(test())
         expect(result).toBe(42)
     })
 
     it('should handle undefined context value', () => {
-        class TestOpt extends Eff.Opt('TestOpt')<number> {}
+        class TestOpt extends Opt.Opt('TestOpt')<number> {}
 
         function* test() {
-            const optValue = yield* Eff.get(TestOpt)
+            const optValue = yield* Opt.get(TestOpt)
             return optValue ?? 100
         }
 
-        const result = Eff.run(Eff.try(test()).handle({ TestOpt: undefined }))
+        const result = Koka.run(Koka.try(test()).handle({ TestOpt: undefined }))
         expect(result).toBe(100)
     })
 })
 
 describe('design first approach', () => {
     // predefined error effects
-    class UserNotFound extends Eff.Err('UserNotFound')<string> {}
-    class UserInvalid extends Eff.Err('UserInvalid')<{ reason: string }> {}
+    class UserNotFound extends Err.Err('UserNotFound')<string> {}
+    class UserInvalid extends Err.Err('UserInvalid')<{ reason: string }> {}
 
     // predefined context effects
-    class AuthToken extends Eff.Ctx('AuthToken')<string> {}
-    class UserId extends Eff.Ctx('UserId')<string> {}
+    class AuthToken extends Ctx.Ctx('AuthToken')<string> {}
+    class UserId extends Ctx.Ctx('UserId')<string> {}
 
     // predefined option effects
-    class LoggerOpt extends Eff.Opt('Logger')<(message: string) => void> {}
+    class LoggerOpt extends Opt.Opt('Logger')<(message: string) => void> {}
 
     // Helper functions using the defined types
     function* requireUserId() {
-        const logger = yield* Eff.get(LoggerOpt)
-        const userId = yield* Eff.get(UserId)
+        const logger = yield* Opt.get(LoggerOpt)
+        const userId = yield* Ctx.get(UserId)
 
         if (!userId) {
             logger?.('User ID is missing, throwing UserInvalidErr')
-            throw yield* Eff.throw(new UserInvalid({ reason: 'Missing user ID' }))
+            throw yield* Err.throw(new UserInvalid({ reason: 'Missing user ID' }))
         }
 
         logger?.(`User ID: ${userId}`)
@@ -537,31 +542,31 @@ describe('design first approach', () => {
     function* getUser() {
         const userId = yield* requireUserId()
 
-        const authToken = yield* Eff.get(AuthToken)
+        const authToken = yield* Ctx.get(AuthToken)
 
         if (!authToken) {
-            yield* Eff.throw(new UserInvalid({ reason: 'Missing auth token' }))
+            yield* Err.throw(new UserInvalid({ reason: 'Missing auth token' }))
         }
 
         // Simulate fetching user logic
-        const user: { id: string; name: string } | null = yield* Eff.await(null)
+        const user: { id: string; name: string } | null = yield* Async.await(null)
 
         if (!user) {
-            yield* Eff.throw(new UserNotFound(`User with ID ${userId} not found`))
+            yield* Err.throw(new UserNotFound(`User with ID ${userId} not found`))
         }
 
         return user
     }
 
     it('should support design first approach', async () => {
-        const program = Eff.try(getUser()).handle({
+        const program = Koka.try(getUser()).handle({
             [UserNotFound.field]: (error) => `Error: ${error}`,
             [UserInvalid.field]: (error) => `Invalid user: ${JSON.stringify(error)}`,
             [AuthToken.field]: 'valid-token',
             [UserId.field]: '12345',
         })
 
-        const result = await Eff.run(program)
+        const result = await Koka.run(program)
 
         expect(result).toBe('Error: User with ID 12345 not found')
     })
@@ -572,7 +577,7 @@ describe('design first approach', () => {
             logs.push(message)
         }
 
-        const program = Eff.try(getUser()).handle({
+        const program = Koka.try(getUser()).handle({
             UserNotFound: (error) => `Error: ${error}`,
             UserInvalid: (error) => `Invalid user: ${JSON.stringify(error, null, 2)}`,
             AuthToken: 'valid-token',
@@ -580,13 +585,13 @@ describe('design first approach', () => {
             Logger: logger,
         })
 
-        let result = await Eff.run(program)
+        let result = await Koka.run(program)
 
         expect(result).toBe('Error: User with ID 12345 not found')
         expect(logs).toEqual(['User ID: 12345'])
 
-        result = await Eff.run(
-            Eff.try(getUser()).handle({
+        result = await Koka.run(
+            Koka.try(getUser()).handle({
                 UserNotFound: (error) => `Error: ${error}`,
                 UserInvalid: (error) => `Invalid user: ${JSON.stringify(error, null, 2)}`,
                 AuthToken: 'valid-token',

@@ -6,18 +6,43 @@
     "repository": "github:koka-ts/koka",
     "bugs": "https://github.com/koka-ts/koka/issues",
     "author": "https://github.com/koka-ts",
-    "main": "cjs/index.js",
-    "types": "cjs/index.d.ts",
+    "main": "cjs/koka.js",
+    "types": "cjs/koka.d.ts",
     "exports": {
         ".": {
-            "import": "./esm/index.js",
-            "require": "./cjs/index.js",
-            "types": "./cjs/index.d.ts"
+            "import": "./esm/koka.js",
+            "require": "./cjs/koka.js",
+            "types": "./cjs/koka.d.ts"
+        },
+        "./err": {
+            "import": "./esm/err.js",
+            "require": "./cjs/err.js",
+            "types": "./cjs/err.d.ts"
+        },
+        "./ctx": {
+            "import": "./esm/ctx.js",
+            "require": "./cjs/ctx.js",
+            "types": "./cjs/ctx.d.ts"
+        },
+        "./async": {
+            "import": "./esm/async.js",
+            "require": "./cjs/async.js",
+            "types": "./cjs/async.d.ts"
         },
         "./msg": {
             "import": "./esm/msg.js",
             "require": "./cjs/msg.js",
             "types": "./cjs/msg.d.ts"
+        },
+        "./task": {
+            "import": "./esm/task.js",
+            "require": "./cjs/task.js",
+            "types": "./cjs/task.d.ts"
+        },
+        "./gen": {
+            "import": "./esm/gen.js",
+            "require": "./cjs/gen.js",
+            "types": "./cjs/gen.d.ts"
         }
     },
     "files": [

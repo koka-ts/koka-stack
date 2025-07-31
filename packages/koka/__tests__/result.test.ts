@@ -1,5 +1,7 @@
-import * as Eff from '../src'
+import * as Koka from '../src/koka'
+import * as Err from '../src/err'
 import * as Result from '../src/result'
+import * as Async from '../src/async'
 
 describe('Result', () => {
     it('should create ok result', () => {
@@ -27,20 +29,20 @@ describe('Result.toErr', () => {
             return value
         }
 
-        const result = Eff.run(testSuccess)
+        const result = Koka.run(testSuccess)
 
         expect(result).toBe(42)
     })
 
     it('test failure', () => {
-        class TestError extends Eff.Err('TestError')<string> {}
+        class TestError extends Err.Err('TestError')<string> {}
 
         function* testFailure() {
-            yield* Result.unwrap(Result.wrap(Eff.throw(new TestError('error'))))
+            yield* Result.unwrap(Result.wrap(Err.throw(new TestError('error'))))
         }
 
-        const failureResult = Eff.run(
-            Eff.try(testFailure).handle({
+        const failureResult = Koka.run(
+            Koka.try(testFailure).handle({
                 TestError: (error) => `Caught: ${error}`,
             }),
         )
@@ -51,13 +53,13 @@ describe('Result.toErr', () => {
 
 describe('Result.run', () => {
     it('should run generator and return Result', async () => {
-        class ZeroError extends Eff.Err('ZeroError')<string> {}
+        class ZeroError extends Err.Err('ZeroError')<string> {}
 
         function* program(input: number) {
-            const value = yield* Eff.await(Promise.resolve(input))
+            const value = yield* Async.await(Promise.resolve(input))
 
             if (value === 0) {
-                yield* Eff.throw(new ZeroError('value is zero'))
+                yield* Err.throw(new ZeroError('value is zero'))
             }
 
             return value
@@ -72,10 +74,10 @@ describe('Result.run', () => {
     })
 
     it('should handle error in generator', () => {
-        class TestError extends Eff.Err('TestError')<string> {}
+        class TestError extends Err.Err('TestError')<string> {}
 
         function* program() {
-            yield* Eff.throw(new TestError('error message'))
+            yield* Err.throw(new TestError('error message'))
             return 'should not reach here'
         }
 

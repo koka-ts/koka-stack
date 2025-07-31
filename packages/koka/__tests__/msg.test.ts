@@ -1,5 +1,8 @@
-import * as Eff from '../src'
+import * as Koka from '../src/koka'
 import * as Msg from '../src/msg'
+import * as Err from '../src/err'
+import * as Ctx from '../src/ctx'
+import * as Async from '../src/async'
 
 type Resource = {
     open: () => void
@@ -26,7 +29,7 @@ describe('Msg.communicate', () => {
             return `received: ${message}`
         }
 
-        const result = Eff.run(
+        const result = Koka.run(
             Msg.communicate({
                 sender,
                 receiver,
@@ -52,7 +55,7 @@ describe('Msg.communicate', () => {
             return `consumed: ${data.id} - ${data.value}`
         }
 
-        const result = Eff.runSync(
+        const result = Koka.runSync(
             Msg.communicate({
                 producer,
                 consumer,
@@ -81,7 +84,7 @@ describe('Msg.communicate', () => {
             return `server: handled ${request}`
         }
 
-        const result = Eff.runSync(
+        const result = Koka.runSync(
             Msg.communicate({
                 client,
                 server,
@@ -119,7 +122,7 @@ describe('Msg.communicate', () => {
             return `Logger: ${log1}, ${log2}`
         }
 
-        const result = Eff.runSync(
+        const result = Koka.runSync(
             Msg.communicate({
                 apiClient,
                 apiServer,
@@ -149,7 +152,7 @@ describe('Msg.communicate', () => {
             return `worker2: processed ${status.status}`
         }
 
-        const result = Eff.runSync(
+        const result = Koka.runSync(
             Msg.communicate({
                 worker1,
                 worker2,
@@ -164,18 +167,18 @@ describe('Msg.communicate', () => {
         class AsyncData extends Msg.Msg('AsyncData')<string> {}
 
         function* asyncProducer() {
-            const data = yield* Eff.await(Promise.resolve('async data'))
+            const data = yield* Async.await(Promise.resolve('async data'))
             yield* Msg.send(new AsyncData(data))
             return 'async produced'
         }
 
         function* asyncConsumer() {
             const data = yield* Msg.wait(AsyncData)
-            const processed = yield* Eff.await(Promise.resolve(`processed: ${data}`))
+            const processed = yield* Async.await(Promise.resolve(`processed: ${data}`))
             return processed
         }
 
-        const result = await Eff.runAsync(
+        const result = await Koka.runAsync(
             Msg.communicate({
                 asyncProducer,
                 asyncConsumer,
@@ -201,7 +204,7 @@ describe('Msg.communicate', () => {
         }
 
         expect(() =>
-            Eff.runSync(
+            Koka.runSync(
                 Msg.communicate({
                     sender,
                     receiver,
@@ -223,7 +226,7 @@ describe('Msg.communicate', () => {
             return `received`
         }
 
-        const result = Eff.runSync(
+        const result = Koka.runSync(
             Msg.communicate({
                 sender,
                 receiver,
@@ -249,7 +252,7 @@ describe('Msg.communicate', () => {
         }
 
         expect(() =>
-            Eff.runSync(
+            Koka.runSync(
                 Msg.communicate({
                     sender,
                     receiver,
@@ -279,7 +282,7 @@ describe('Msg.communicate', () => {
         }
 
         expect(() =>
-            Eff.runSync(
+            Koka.runSync(
                 Msg.communicate({
                     sender1,
                     sender2,
@@ -306,7 +309,7 @@ describe('Msg.communicate', () => {
         }
 
         expect(() =>
-            Eff.runSync(
+            Koka.runSync(
                 Msg.communicate({
                     sender,
                     receiver,
@@ -328,7 +331,7 @@ describe('Msg.communicate', () => {
             return `received: ${msg}`
         }
 
-        const result = Eff.runSync(
+        const result = Koka.runSync(
             Msg.communicate({
                 sender: sender(),
                 receiver: receiver(),
@@ -354,7 +357,7 @@ describe('Msg.communicate', () => {
             return `consumed: ${data.value}`
         }
 
-        const result = Eff.runSync(
+        const result = Koka.runSync(
             Msg.communicate({
                 producer: producer(),
                 consumer,
@@ -398,7 +401,7 @@ describe('Msg.communicate', () => {
             return `Logger: ${log1} | ${log2}`
         }
 
-        const result = Eff.runSync(
+        const result = Koka.runSync(
             Msg.communicate({
                 commandProcessor,
                 commandClient,
@@ -414,7 +417,7 @@ describe('Msg.communicate', () => {
     })
 
     it('should handle message passing with context', () => {
-        class UserCtx extends Eff.Ctx('User')<{ id: string; name: string }> {}
+        class UserCtx extends Ctx.Ctx('User')<{ id: string; name: string }> {}
 
         function* configProvider() {
             yield* Msg.send(new ConfigMsg({ apiKey: 'secret-key' }))
@@ -423,11 +426,11 @@ describe('Msg.communicate', () => {
 
         function* service() {
             const config = yield* Msg.wait(ConfigMsg)
-            const user = yield* Eff.get(UserCtx)
+            const user = yield* Ctx.get(UserCtx)
             return `service: ${user.name} with key ${config.apiKey.slice(0, 5)}...`
         }
 
-        const program = Eff.try(
+        const program = Koka.try(
             Msg.communicate({
                 configProvider,
                 service,
@@ -436,7 +439,7 @@ describe('Msg.communicate', () => {
             User: { id: '1', name: 'Alice' },
         })
 
-        const result = Eff.runSync(program)
+        const result = Koka.runSync(program)
 
         expect(result).toEqual({
             configProvider: 'config provided',
@@ -445,7 +448,7 @@ describe('Msg.communicate', () => {
     })
 
     it('should handle message passing with error handling', () => {
-        class ValidationError extends Eff.Err('ValidationError')<string> {}
+        class ValidationError extends Err.Err('ValidationError')<string> {}
 
         class RequestMsg extends Msg.Msg('Request')<{ id: string }> {}
         class ResponseMsg extends Msg.Msg('Response')<{ success: boolean; data?: any; error?: string }> {}
@@ -460,7 +463,7 @@ describe('Msg.communicate', () => {
                         error: 'Invalid ID',
                     }),
                 )
-                yield* Eff.throw(new ValidationError('ID validation failed'))
+                yield* Err.throw(new ValidationError('ID validation failed'))
                 return 'validation failed'
             }
 
@@ -484,11 +487,11 @@ describe('Msg.communicate', () => {
             client,
         })
 
-        const program = Eff.try(program0).handle({
+        const program = Koka.try(program0).handle({
             ValidationError: (error) => `Handled: ${error}`,
         })
 
-        const result = Eff.runSync(program)
+        const result = Koka.runSync(program)
 
         expect(result).toEqual('Handled: ID validation failed')
     })
@@ -510,7 +513,7 @@ describe('Msg.communicate', () => {
             return 'received without waiting'
         }
 
-        const result = Eff.runSync(
+        const result = Koka.runSync(
             Msg.communicate({
                 sender,
                 receiver,
@@ -540,7 +543,7 @@ describe('Msg.communicate', () => {
             }
         }
 
-        const result = Eff.runSync(
+        const result = Koka.runSync(
             Msg.communicate({
                 sender,
                 receiver,
@@ -593,7 +596,7 @@ describe('Msg.communicate', () => {
             }
         }
 
-        const result = Eff.runSync(
+        const result = Koka.runSync(
             Msg.communicate({
                 sender1,
                 sender2,
@@ -638,7 +641,7 @@ describe('Msg.communicate', () => {
             return 'extra processed'
         }
 
-        const result = Eff.runSync(
+        const result = Koka.runSync(
             Msg.communicate({
                 sender,
                 receiver,
@@ -676,7 +679,7 @@ describe('Msg.communicate', () => {
             }
         }
 
-        const result = Eff.runSync(
+        const result = Koka.runSync(
             Msg.communicate({
                 sender,
                 receiver,
@@ -731,7 +734,7 @@ describe('Msg.communicate', () => {
             }
         }
 
-        const result = Eff.runSync(
+        const result = Koka.runSync(
             Msg.communicate({
                 sender,
                 receiver,
@@ -773,7 +776,7 @@ describe('Msg.communicate', () => {
             return 'producer2 done'
         }
 
-        const result = Eff.runSync(
+        const result = Koka.runSync(
             Msg.communicate({
                 logger,
                 producer1,
@@ -789,10 +792,10 @@ describe('Msg.communicate', () => {
     })
 
     it('should implement shared resources and cleanup correctly', () => {
-        class ResourceCtx extends Eff.Ctx('Resource')<Resource> {}
+        class ResourceCtx extends Ctx.Ctx('Resource')<Resource> {}
 
         function* resourceProvider() {
-            const resource = yield* Eff.get(ResourceCtx)
+            const resource = yield* Ctx.get(ResourceCtx)
             let count = 0
             try {
                 resource.open()
@@ -833,7 +836,7 @@ describe('Msg.communicate', () => {
         const logs = [] as string[]
         let count = 0
 
-        const program = Eff.try(
+        const program = Koka.try(
             Msg.communicate({
                 resource: resourceProvider,
                 consumer1,
@@ -851,7 +854,7 @@ describe('Msg.communicate', () => {
             },
         })
 
-        const result = Eff.runSync(program)
+        const result = Koka.runSync(program)
 
         expect(logs).toEqual(['Resource: open', 'Resource: get', 'Resource: get', 'Resource: get', 'Resource: close'])
         expect(result).toEqual({
@@ -900,7 +903,7 @@ describe('Msg.communicate', () => {
             }
         }
 
-        const result = Eff.runSync(
+        const result = Koka.runSync(
             Msg.communicate({
                 logger,
                 sender,
@@ -950,7 +953,7 @@ describe('Msg.communicate', () => {
             }
         }
 
-        const result = Eff.runSync(
+        const result = Koka.runSync(
             Msg.communicate({
                 sender1,
                 sender2,

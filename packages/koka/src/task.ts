@@ -1,4 +1,6 @@
-import * as Eff from './koka'
+import * as Async from './async'
+import * as Gen from './gen'
+import type * as Koka from './koka'
 
 const withResolvers: <T>() => PromiseWithResolvers<T> =
     Promise.withResolvers?.bind(Promise) ??
@@ -78,9 +80,9 @@ function createStream<T>(options?: StreamOptions<T>) {
     }
 }
 
-export type TaskProducer<Yield, TaskReturn> = (index: number) => Eff.Actor<Yield, TaskReturn> | undefined
+export type TaskProducer<Yield, TaskReturn> = (index: number) => Koka.Actor<Yield, TaskReturn> | undefined
 
-export type TaskSource<Yield, TaskReturn> = TaskProducer<Yield, TaskReturn> | Array<Eff.Actor<Yield, TaskReturn>>
+export type TaskSource<Yield, TaskReturn> = TaskProducer<Yield, TaskReturn> | Array<Koka.Actor<Yield, TaskReturn>>
 
 export type TaskResult<TaskReturn> = {
     index: number
@@ -93,7 +95,7 @@ export type TaskResultsHandler<TaskReturn, HandlerReturn> = (
     stream: TaskResultStream<TaskReturn>,
 ) => Promise<HandlerReturn>
 
-const createTaskConsumer = <Yield extends Eff.AnyEff, TaskReturn>(inputs: TaskSource<Yield, TaskReturn>) => {
+const createTaskConsumer = <Yield extends Koka.AnyEff, TaskReturn>(inputs: TaskSource<Yield, TaskReturn>) => {
     const producer: TaskProducer<Yield, TaskReturn> = typeof inputs === 'function' ? inputs : (index) => inputs[index]
 
     let count = 0
@@ -120,19 +122,19 @@ const createTaskConsumer = <Yield extends Eff.AnyEff, TaskReturn>(inputs: TaskSo
     }
 }
 
-export function* series<Yield extends Eff.AnyEff, TaskReturn, HandlerReturn>(
+export function* series<Yield extends Koka.AnyEff, TaskReturn, HandlerReturn>(
     inputs: TaskSource<Yield, TaskReturn>,
     handler: TaskResultsHandler<TaskReturn, HandlerReturn>,
-): Generator<Yield | Eff.Async, HandlerReturn> {
+): Generator<Yield | Async.Async, HandlerReturn> {
     return yield* concurrent(inputs, handler, {
         maxConcurrency: 1,
     })
 }
 
-export function* parallel<Yield extends Eff.AnyEff, TaskReturn, HandlerReturn>(
+export function* parallel<Yield extends Koka.AnyEff, TaskReturn, HandlerReturn>(
     inputs: TaskSource<Yield, TaskReturn>,
     handler: TaskResultsHandler<TaskReturn, HandlerReturn>,
-): Generator<Yield | Eff.Async, HandlerReturn> {
+): Generator<Yield | Async.Async, HandlerReturn> {
     return yield* concurrent(inputs, handler, {
         maxConcurrency: Number.POSITIVE_INFINITY,
     })
@@ -142,11 +144,11 @@ export type ConcurrentOptions = {
     maxConcurrency?: number
 }
 
-export function* concurrent<Yield extends Eff.AnyEff, TaskReturn, HandlerReturn>(
+export function* concurrent<Yield extends Koka.AnyEff, TaskReturn, HandlerReturn>(
     inputs: TaskSource<Yield, TaskReturn>,
     handler: TaskResultsHandler<TaskReturn, HandlerReturn>,
     options?: ConcurrentOptions,
-): Generator<Eff.Async | Yield, HandlerReturn> {
+): Generator<Async.Async | Yield, HandlerReturn> {
     const config = {
         maxConcurrency: Number.POSITIVE_INFINITY,
         ...options,
@@ -209,7 +211,7 @@ export function* concurrent<Yield extends Eff.AnyEff, TaskReturn, HandlerReturn>
         // Clean up any remaining items
         for (const item of items) {
             if (item.type !== 'completed') {
-                Eff.cleanUpGen(item.gen)
+                Gen.cleanUpGen(item.gen)
             }
         }
     }
@@ -343,7 +345,7 @@ export function* concurrent<Yield extends Eff.AnyEff, TaskReturn, HandlerReturn>
             }
 
             if (promises.length !== 1) {
-                const result = yield* Eff.await(Promise.race(promises))
+                const result = yield* Async.await(Promise.race(promises))
 
                 if (result) {
                     break
@@ -371,7 +373,7 @@ export function* concurrent<Yield extends Eff.AnyEff, TaskReturn, HandlerReturn>
 
             if (promises.length === 1) {
                 stream.done()
-                const result = yield* Eff.await(promises[0])
+                const result = yield* Async.await(promises[0])
 
                 if (result) {
                     break
@@ -393,26 +395,26 @@ export function* concurrent<Yield extends Eff.AnyEff, TaskReturn, HandlerReturn>
     }
 }
 
-export function* fromTuple<T extends unknown[] | readonly unknown[]>(
+export function* tuple<T extends unknown[] | readonly unknown[]>(
     inputs: T,
-): Generator<Eff.ExtractYield<T> | Eff.Async, Eff.ExtractReturn<T>> {
-    return yield* all(inputs as any) as Generator<Eff.ExtractYield<T>, Eff.ExtractReturn<T>>
+): Generator<Koka.ExtractEff<T> | Async.Async, Koka.ExtractReturn<T>> {
+    return yield* all(inputs as any) as Generator<Koka.ExtractEff<T>, Koka.ExtractReturn<T>>
 }
 
-export function* fromObject<T extends Record<string, unknown>>(
+export function* object<T extends Record<string, unknown>>(
     inputs: T,
-): Generator<Eff.ExtractYield<T> | Eff.Async, Eff.ExtractReturn<T>> {
+): Generator<Koka.ExtractEff<T> | Async.Async, Koka.ExtractReturn<T>> {
     const result: Record<string, unknown> = {}
-    const gens = [] as Generator<Eff.AnyEff>[]
+    const gens = [] as Generator<Koka.AnyEff>[]
     const keys = [] as string[]
 
     for (const [key, value] of Object.entries(inputs)) {
         if (typeof value === 'function') {
             gens.push(value())
-        } else if (Eff.isGenerator(value)) {
-            gens.push(value as Generator<Eff.AnyEff>)
+        } else if (Gen.isGen(value)) {
+            gens.push(value as Generator<Koka.AnyEff>)
         } else {
-            gens.push(Eff.of(value))
+            gens.push(Gen.of(value))
         }
         keys.push(key)
     }
@@ -423,17 +425,17 @@ export function* fromObject<T extends Record<string, unknown>>(
         result[keys[i]] = values[i]
     }
 
-    return result as Eff.ExtractReturn<T>
+    return result as Koka.ExtractReturn<T>
 }
 
 export type AllOptions = {
     maxConcurrency?: number
 }
 
-export function* all<Yield extends Eff.AnyEff, Return>(
+export function* all<Yield extends Koka.AnyEff, Return>(
     inputs: TaskSource<Yield, Return>,
     options?: AllOptions,
-): Generator<Yield | Eff.Async, Return[]> {
+): Generator<Yield | Async.Async, Return[]> {
     const results = yield* concurrent(
         inputs,
         async (stream) => {
@@ -455,10 +457,10 @@ export type RaceOptions = {
     maxConcurrency?: number
 }
 
-export function* race<Yield extends Eff.AnyEff, Return>(
+export function* race<Yield extends Koka.AnyEff, Return>(
     inputs: TaskSource<Yield, Return>,
     options?: RaceOptions,
-): Generator<Yield | Eff.Async, Return> {
+): Generator<Yield | Async.Async, Return> {
     const result = yield* concurrent(
         inputs,
         async (stream) => {
