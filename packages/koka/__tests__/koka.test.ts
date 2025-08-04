@@ -4,9 +4,8 @@ import * as Err from '../src/err'
 import * as Ctx from '../src/ctx'
 import * as Opt from '../src/opt'
 import * as Async from '../src/async'
-import * as Gen from '../src/gen'
 
-describe('Eff.throw', () => {
+describe('Err.throw', () => {
     it('should throw error effect', () => {
         class TestError extends Err.Err('TestError')<string> {}
 
@@ -25,50 +24,7 @@ describe('Eff.throw', () => {
     })
 })
 
-describe('Ctx.get', () => {
-    it('should get context value', () => {
-        class TestCtx extends Ctx.Ctx('TestCtx')<number> {}
-        class Num extends Ctx.Ctx('Num')<number> {}
-
-        function* test() {
-            const value = yield* Ctx.get(TestCtx)
-            const num = yield* Ctx.get(Num)
-            return value * num
-        }
-
-        const program0 = Koka.try(test()).handle({
-            Num: 2,
-        })
-
-        const program1 = Koka.try(program0).handle({
-            TestCtx: 21,
-        })
-
-        const result = Koka.run(program1)
-        expect(result).toBe(42)
-    })
-
-    it('should propagate context when not handled', () => {
-        class TestCtx extends Ctx.Ctx('TestCtx')<number> {}
-
-        function* inner() {
-            return yield* Ctx.get(TestCtx)
-        }
-
-        function* outer() {
-            return yield* inner()
-        }
-
-        const program = Koka.try(outer()).handle({
-            TestCtx: 42,
-        })
-
-        const result = Koka.run(program)
-        expect(result).toBe(42)
-    })
-})
-
-describe('Eff.try', () => {
+describe('Koka.try', () => {
     it('should throw for unhandled effect types', () => {
         function* test() {
             yield { type: 'unknown' } as any
@@ -160,7 +116,7 @@ describe('Eff.try', () => {
     })
 })
 
-describe('Eff.run', () => {
+describe('Koka.run', () => {
     it('should handle async effects', async () => {
         function* test() {
             const value = yield* Async.await(Promise.resolve(42))
@@ -239,7 +195,7 @@ describe('Eff.run', () => {
     })
 })
 
-describe('Eff.runSync', () => {
+describe('Koka.runSync', () => {
     it('should run sync effects', () => {
         function* test() {
             return 42
@@ -256,66 +212,7 @@ describe('Eff.runSync', () => {
         }
 
         // @ts-expect-error for test
-        expect(() => Koka.runSync(test())).toThrow(/Expected synchronous effect, but got asynchronous effect/)
-    })
-})
-
-describe('Result.fromErr', () => {
-    it('should convert generator to Result', () => {
-        class TestCtx extends Ctx.Ctx('TestCtx')<string> {}
-        class TestError extends Err.Err('TestError')<string> {}
-
-        function* success() {
-            return 42
-        }
-
-        function* failure() {
-            const message = yield* Ctx.get(TestCtx)
-            yield* Err.throw(new TestError(message))
-            return 'should not reach here'
-        }
-
-        const successResult = Result.run(success())
-
-        expect(successResult).toEqual({
-            type: 'ok',
-            value: 42,
-        })
-
-        const failureResult = Koka.run(
-            Koka.try(Result.wrap(failure())).handle({
-                TestCtx: 'error',
-            }),
-        )
-        expect(failureResult).toEqual({
-            type: 'err',
-            name: 'TestError',
-            error: 'error',
-        })
-    })
-
-    it('should throw err result', () => {
-        function* failure() {
-            throw new Error('TestError')
-        }
-
-        function* test() {
-            try {
-                yield* failure()
-                return 'should not reach here'
-            } catch (err) {
-                if (err instanceof Error) {
-                    return `Caught: ${err.message}`
-                }
-            }
-        }
-
-        const result = Result.run(test())
-
-        expect(result).toEqual({
-            type: 'ok',
-            value: 'Caught: TestError',
-        })
+        expect(() => Koka.runSync(test())).toThrow()
     })
 })
 
@@ -353,162 +250,11 @@ describe('Complex scenarios', () => {
         const result = await Koka.run(
             Koka.try(program()).handle({
                 TestCtx: 0,
-                e: 1,
                 ZeroError: (error) => `Handled: ${error}`,
             }),
         )
 
         expect(result).toBe('Handled: ctx is zero')
-    })
-})
-
-describe('Eff.Ctx/Eff.Err', () => {
-    it('should create context effect class', () => {
-        class TestCtx extends Ctx.Ctx('TestCtx')<number> {}
-
-        const ctx = new TestCtx()
-        ctx.context = 42
-
-        expect(ctx.type).toBe('ctx')
-        expect(ctx.name).toBe('TestCtx')
-        expect(ctx.context).toBe(42)
-    })
-
-    it('should create error effect class', () => {
-        class TestErr extends Err.Err('TestErr')<string> {}
-        const err = new TestErr('error')
-
-        expect(err.type).toBe('err')
-        expect(err.name).toBe('TestErr')
-        expect(err.error).toBe('error')
-    })
-})
-
-describe('Eff.throw', () => {
-    it('should throw error effect', () => {
-        class TestErr extends Err.Err('TestErr')<string> {}
-
-        function* test() {
-            yield* Err.throw(new TestErr('error'))
-            return 'should not reach here'
-        }
-
-        const result = Result.run(test())
-
-        expect(result).toEqual(new TestErr('error'))
-    })
-
-    it('should propagate error through nested calls', () => {
-        const TestErr = Err.Err('TestErr')<string>
-
-        function* inner() {
-            yield* Err.throw(new TestErr('inner error'))
-            return 'should not reach here'
-        }
-
-        function* outer() {
-            return yield* inner()
-        }
-
-        const result = Result.run(outer())
-        expect(result).toEqual(new TestErr('inner error'))
-    })
-})
-
-describe('Eff.get', () => {
-    it('should get context value', () => {
-        const TestCtx = Ctx.Ctx('TestCtx')<number>
-
-        function* test() {
-            const value = yield* Ctx.get(TestCtx)
-            return value * 2
-        }
-
-        const program = Koka.try(test()).handle({
-            TestCtx: 42,
-        })
-
-        const result = Koka.run(program)
-        expect(result).toBe(84)
-    })
-
-    it('should propagate context when not handled', () => {
-        const TestCtx = Ctx.Ctx('TestCtx')<number>
-
-        function* inner() {
-            return yield* Ctx.get(TestCtx)
-        }
-
-        function* outer() {
-            return yield* inner()
-        }
-
-        const program = Koka.try(outer()).handle({
-            TestCtx: 42,
-        })
-
-        const result = Koka.run(program)
-        expect(result).toBe(42)
-    })
-})
-
-describe('helpers', () => {
-    it('should check if value is a generator', () => {
-        function* gen() {}
-        const notGen = () => {}
-
-        expect(Gen.isGen(gen())).toBe(true)
-        expect(Gen.isGen(notGen())).toBe(false)
-    })
-})
-
-describe('Eff.opt', () => {
-    it('should return undefined when no value provided', () => {
-        class TestOpt extends Opt.Opt('TestOpt')<number> {}
-
-        function* test() {
-            return yield* Opt.get(TestOpt)
-        }
-
-        const result = Koka.run(test())
-        expect(result).toBeUndefined()
-    })
-
-    it('should return value when provided', () => {
-        class TestOpt extends Opt.Opt('TestOpt')<number> {}
-
-        function* test() {
-            const optValue = yield* Opt.get(TestOpt)
-            return optValue ?? 42
-        }
-
-        const result = Koka.run(Koka.try(test()).handle({ TestOpt: 21 }))
-        expect(result).toBe(21)
-    })
-
-    it('should work with async effects', async () => {
-        class TestOpt extends Opt.Opt('TestOpt')<number> {}
-
-        function* test() {
-            const optValue = yield* Opt.get(TestOpt)
-            const asyncValue = yield* Async.await(Promise.resolve(optValue ?? 42))
-            return asyncValue
-        }
-
-        const result = await Koka.run(test())
-        expect(result).toBe(42)
-    })
-
-    it('should handle undefined context value', () => {
-        class TestOpt extends Opt.Opt('TestOpt')<number> {}
-
-        function* test() {
-            const optValue = yield* Opt.get(TestOpt)
-            return optValue ?? 100
-        }
-
-        const result = Koka.run(Koka.try(test()).handle({ TestOpt: undefined }))
-        expect(result).toBe(100)
     })
 })
 

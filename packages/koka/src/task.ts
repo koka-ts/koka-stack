@@ -1,6 +1,6 @@
-import * as Async from './async'
-import * as Gen from './gen'
-import type * as Koka from './koka'
+import * as Async from './async.ts'
+import * as Gen from './gen.ts'
+import type * as Koka from './koka.ts'
 
 const withResolvers: <T>() => PromiseWithResolvers<T> =
     Promise.withResolvers?.bind(Promise) ??

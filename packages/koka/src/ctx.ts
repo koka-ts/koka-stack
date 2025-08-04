@@ -1,4 +1,4 @@
-import { EffSymbol } from './constant'
+import { EffSymbol } from './constant.ts'
 
 export type Ctx<Name extends string, T> = {
     type: 'ctx'

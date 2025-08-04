@@ -4,7 +4,8 @@
         "rootDir": "./src",
         "outDir": "./cjs",
         "composite": true,
-        "module": "CommonJS"
+        "module": "CommonJS",
+        "noEmit": false
     },
     "references": [],
     "include": ["src"]

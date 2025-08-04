@@ -2,6 +2,7 @@ import * as Koka from '../src/koka'
 import * as Err from '../src/err'
 import * as Result from '../src/result'
 import * as Async from '../src/async'
+import * as Gen from '../src/gen'
 
 describe('Result', () => {
     it('should create ok result', () => {
@@ -15,6 +16,21 @@ describe('Result', () => {
         expect(err.type).toBe('err')
         expect(err.name).toBe('TestError')
         expect(err.error).toBe('error message')
+    })
+
+    it('should handle complex ok values', () => {
+        const complexValue = { id: 1, name: 'test', data: [1, 2, 3] }
+        const ok = Result.ok(complexValue)
+        expect(ok.type).toBe('ok')
+        expect(ok.value).toEqual(complexValue)
+    })
+
+    it('should handle complex error values', () => {
+        const errorData = { code: 404, message: 'Not found', details: 'Resource not found' }
+        const err = Result.err('NotFoundError', errorData)
+        expect(err.type).toBe('err')
+        expect(err.name).toBe('NotFoundError')
+        expect(err.error).toEqual(errorData)
     })
 })
 
@@ -88,5 +104,87 @@ describe('Result.run', () => {
             name: 'TestError',
             error: 'error message',
         })
+    })
+})
+
+describe('Result.wrap', () => {
+    it('should wrap successful generator', () => {
+        function* success() {
+            return 42
+        }
+
+        const result = Koka.run(Result.wrap(success()))
+        expect(result).toEqual({
+            type: 'ok',
+            value: 42,
+        })
+    })
+
+    it('should wrap failing generator', () => {
+        class TestError extends Err.Err('TestError')<string> {}
+
+        function* failure() {
+            yield* Err.throw(new TestError('error'))
+            return 'should not reach here'
+        }
+
+        const result = Koka.run(Result.wrap(failure()))
+        expect(result).toEqual({
+            type: 'err',
+            name: 'TestError',
+            error: 'error',
+        })
+    })
+
+    it('should wrap async generator', async () => {
+        function* asyncSuccess() {
+            const value = yield* Async.await(Promise.resolve(42))
+            return value * 2
+        }
+
+        const result = await Koka.run(Result.wrap(asyncSuccess()))
+        expect(result).toEqual({
+            type: 'ok',
+            value: 84,
+        })
+    })
+})
+
+describe('Result.unwrap', () => {
+    it('should unwrap ok result', () => {
+        function* test() {
+            const value = yield* Result.unwrap(Result.wrap(Gen.of(42)))
+            return value * 2
+        }
+
+        const result = Koka.run(test())
+        expect(result).toBe(84)
+    })
+
+    it('should propagate err result', () => {
+        class TestError extends Err.Err('TestError')<string> {}
+
+        function* test() {
+            yield* Result.unwrap(Result.wrap(Err.throw(new TestError('error'))))
+            return 'should not reach here'
+        }
+
+        const result = Result.run(test())
+        expect(result).toEqual({
+            type: 'err',
+            name: 'TestError',
+            error: 'error',
+        })
+    })
+
+    it('should handle nested unwrapping', () => {
+        function* test() {
+            const value1 = yield* Result.unwrap(Result.wrap(Gen.of(10)))
+            const value2 = yield* Result.unwrap(Result.wrap(Gen.of(32)))
+            return value1 + value2
+        }
+
+        const result = Koka.run(test())
+        expect(result).toBe(42)
     })
 })

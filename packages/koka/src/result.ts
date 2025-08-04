@@ -1,7 +1,7 @@
-import type * as Async from './async'
-import type * as Err from './err'
-import * as Gen from './gen'
-import * as Koka from './koka'
+import type * as Async from './async.ts'
+import type * as Err from './err.ts'
+import * as Gen from './gen.ts'
+import * as Koka from './koka.ts'
 
 export type Ok<T> = {
     type: 'ok'

@@ -6,43 +6,115 @@
     "repository": "github:koka-ts/koka",
     "bugs": "https://github.com/koka-ts/koka/issues",
     "author": "https://github.com/koka-ts",
+    "type": "module",
     "main": "cjs/koka.js",
     "types": "cjs/koka.d.ts",
     "exports": {
         ".": {
-            "import": "./esm/koka.js",
-            "require": "./cjs/koka.js",
-            "types": "./cjs/koka.d.ts"
+            "import": {
+                "types": "./esm/koka.d.ts",
+                "default": "./esm/koka.js"
+            },
+            "require": {
+                "types": "./cjs/koka.d.ts",
+                "default": "./cjs/koka.js"
+            }
         },
         "./err": {
-            "import": "./esm/err.js",
-            "require": "./cjs/err.js",
-            "types": "./cjs/err.d.ts"
+            "import": {
+                "types": "./esm/err.d.ts",
+                "default": "./esm/err.js"
+            },
+            "require": {
+                "types": "./cjs/err.d.ts",
+                "default": "./cjs/err.js"
+            }
         },
         "./ctx": {
-            "import": "./esm/ctx.js",
-            "require": "./cjs/ctx.js",
-            "types": "./cjs/ctx.d.ts"
+            "import": {
+                "types": "./esm/ctx.d.ts",
+                "default": "./esm/ctx.js"
+            },
+            "require": {
+                "types": "./cjs/ctx.d.ts",
+                "default": "./cjs/ctx.js"
+            }
+        },
+        "./opt": {
+            "import": {
+                "types": "./esm/opt.d.ts",
+                "default": "./esm/opt.js"
+            },
+            "require": {
+                "types": "./cjs/opt.d.ts",
+                "default": "./cjs/opt.js"
+            }
         },
         "./async": {
-            "import": "./esm/async.js",
-            "require": "./cjs/async.js",
-            "types": "./cjs/async.d.ts"
+            "import": {
+                "types": "./esm/async.d.ts",
+                "default": "./esm/async.js"
+            },
+            "require": {
+                "types": "./cjs/async.d.ts",
+                "default": "./cjs/async.js"
+            }
+        },
+        "./result": {
+            "import": {
+                "types": "./esm/result.d.ts",
+                "default": "./esm/result.js"
+            },
+            "require": {
+                "types": "./cjs/result.d.ts",
+                "default": "./cjs/result.js"
+            }
         },
         "./msg": {
-            "import": "./esm/msg.js",
-            "require": "./cjs/msg.js",
-            "types": "./cjs/msg.d.ts"
+            "import": {
+                "types": "./esm/msg.d.ts",
+                "default": "./esm/msg.js"
+            },
+            "require": {
+                "types": "./cjs/msg.d.ts",
+                "default": "./cjs/msg.js"
+            }
         },
         "./task": {
-            "import": "./esm/task.js",
-            "require": "./cjs/task.js",
-            "types": "./cjs/task.d.ts"
+            "import": {
+                "types": "./esm/task.d.ts",
+                "default": "./esm/task.js"
+            },
+            "require": {
+                "types": "./cjs/task.d.ts",
+                "default": "./cjs/task.js"
+            }
         },
         "./gen": {
-            "import": "./esm/gen.js",
-            "require": "./cjs/gen.js",
-            "types": "./cjs/gen.d.ts"
+            "import": {
+                "types": "./esm/gen.d.ts",
+                "default": "./esm/gen.js"
+            },
+            "require": {
+                "types": "./cjs/gen.d.ts",
+                "default": "./cjs/gen.js"
+            }
+        },
+        "./esm": {
+            "types": "./esm/koka.d.ts",
+            "default": "./esm/koka.js"
+        },
+        "./cjs": {
+            "types": "./cjs/koka.d.ts",
+            "default": "./cjs/koka.js"
+        },
+        "./esm/*": {
+            "types": "./esm/*.d.ts",
+            "default": "./esm/*.js"
+        },
+        "./cjs/*": {
+            "types": "./cjs/*.d.ts",
+            "default": "./cjs/*.js"
         }
     },
     "files": [
@@ -72,7 +144,7 @@
         "rimraf": "^3.0.2",
         "shx": "^0.3.4",
         "tsx": "^4.7.0",
-        "typescript": "^5.0.0",
+        "typescript": "^5.8.0",
         "npm-run-all": "^4.1.5"
     },
     "publishConfig": {

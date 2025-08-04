@@ -1,9 +1,9 @@
-import type { Async } from './async'
-import type { Ctx } from './ctx'
-import type { AnyErr, Err } from './err'
-import * as Gen from './gen'
-import type { Msg } from './msg'
-import type { AnyOpt, Opt } from './opt'
+import type { Async } from './async.ts'
+import type { Ctx } from './ctx.ts'
+import type { AnyErr, Err } from './err.ts'
+import * as Gen from './gen.ts'
+import type { Msg } from './msg.ts'
+import type { AnyOpt, Opt } from './opt.ts'
 
 export type Eff<T> = Err<string, T> | Ctx<string, T> | Opt<string, T> | Msg<string, T> | Async
 

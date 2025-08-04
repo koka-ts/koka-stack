@@ -16,7 +16,11 @@
         "sourceMap": true,
         "esModuleInterop": true,
         "stripInternal": true,
-        "lib": ["ESNext", "DOM"]
+        "lib": ["ESNext", "DOM"],
+        "noEmit": true,
+        "allowImportingTsExtensions": true,
+        "verbatimModuleSyntax": true,
+        "erasableSyntaxOnly": true
     },
     "include": ["./src", "./__tests__"]
 }

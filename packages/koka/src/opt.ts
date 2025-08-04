@@ -1,4 +1,4 @@
-import { EffSymbol } from './constant'
+import { EffSymbol } from './constant.ts'
 
 export type Opt<Name extends string, T> = {
     type: 'opt'

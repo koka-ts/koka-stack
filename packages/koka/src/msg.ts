@@ -1,6 +1,6 @@
-import { EffSymbol } from './constant'
-import * as Gen from './gen'
-import type * as Koka from './koka'
+import { EffSymbol } from './constant.ts'
+import * as Gen from './gen.ts'
+import type * as Koka from './koka.ts'
 
 export type Msg<Name extends string, T> = {
     type: 'msg'
