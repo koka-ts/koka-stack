@@ -7,130 +7,23 @@
     "bugs": "https://github.com/koka-ts/koka/issues",
     "author": "https://github.com/koka-ts",
     "type": "module",
-    "main": "cjs/koka.js",
-    "types": "cjs/koka.d.ts",
     "exports": {
-        ".": {
-            "import": {
-                "types": "./esm/koka.d.ts",
-                "default": "./esm/koka.js"
-            },
-            "require": {
-                "types": "./cjs/koka.d.ts",
-                "default": "./cjs/koka.js"
-            }
-        },
-        "./err": {
-            "import": {
-                "types": "./esm/err.d.ts",
-                "default": "./esm/err.js"
-            },
-            "require": {
-                "types": "./cjs/err.d.ts",
-                "default": "./cjs/err.js"
-            }
-        },
-        "./ctx": {
-            "import": {
-                "types": "./esm/ctx.d.ts",
-                "default": "./esm/ctx.js"
-            },
-            "require": {
-                "types": "./cjs/ctx.d.ts",
-                "default": "./cjs/ctx.js"
-            }
-        },
-        "./opt": {
-            "import": {
-                "types": "./esm/opt.d.ts",
-                "default": "./esm/opt.js"
-            },
-            "require": {
-                "types": "./cjs/opt.d.ts",
-                "default": "./cjs/opt.js"
-            }
-        },
-        "./async": {
-            "import": {
-                "types": "./esm/async.d.ts",
-                "default": "./esm/async.js"
-            },
-            "require": {
-                "types": "./cjs/async.d.ts",
-                "default": "./cjs/async.js"
-            }
-        },
-        "./result": {
-            "import": {
-                "types": "./esm/result.d.ts",
-                "default": "./esm/result.js"
-            },
-            "require": {
-                "types": "./cjs/result.d.ts",
-                "default": "./cjs/result.js"
-            }
-        },
-        "./msg": {
-            "import": {
-                "types": "./esm/msg.d.ts",
-                "default": "./esm/msg.js"
-            },
-            "require": {
-                "types": "./cjs/msg.d.ts",
-                "default": "./cjs/msg.js"
-            }
-        },
-        "./task": {
-            "import": {
-                "types": "./esm/task.d.ts",
-                "default": "./esm/task.js"
-            },
-            "require": {
-                "types": "./cjs/task.d.ts",
-                "default": "./cjs/task.js"
-            }
-        },
-        "./gen": {
-            "import": {
-                "types": "./esm/gen.d.ts",
-                "default": "./esm/gen.js"
-            },
-            "require": {
-                "types": "./cjs/gen.d.ts",
-                "default": "./cjs/gen.js"
-            }
-        },
-        "./esm": {
-            "types": "./esm/koka.d.ts",
-            "default": "./esm/koka.js"
-        },
-        "./cjs": {
-            "types": "./cjs/koka.d.ts",
-            "default": "./cjs/koka.js"
-        },
-        "./esm/*": {
-            "types": "./esm/*.d.ts",
-            "default": "./esm/*.js"
-        },
-        "./cjs/*": {
-            "types": "./cjs/*.d.ts",
-            "default": "./cjs/*.js"
-        }
+        ".": "./src/koka.ts",
+        "./err": "./src/err.ts",
+        "./ctx": "./src/ctx.ts",
+        "./opt": "./src/opt.ts",
+        "./async": "./src/async.ts",
+        "./result": "./src/result.ts",
+        "./task": "./src/task.ts",
+        "./gen": "./src/gen.ts"
     },
     "files": [
-        "cjs",
-        "esm",
-        "src",
-        "modules"
+        "src"
     ],
     "engines": {
-        "node": ">=14.x"
+        "node": ">=22.18"
     },
     "scripts": {
-        "build": "run-s clean build:cjs build:esm",
-        "build:cjs": "tsc -p tsconfig.cjs.json --composite false",
-        "build:esm": "tsc -p tsconfig.esm.json --composite false",
-        "clean": "shx rm -rf ./cjs ./esm",
         "test": "jest",
         "test:coverage": "jest --collectCoverage --coverage"
     },

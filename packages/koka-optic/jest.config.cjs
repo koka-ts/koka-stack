@@ -16,7 +16,10 @@ module.exports = {
     collectCoverageFrom: ['./src/**/*.{ts,tsx}'],
     rootDir: __dirname,
     testEnvironment: 'jsdom',
-    moduleNameMapper: {},
+    moduleNameMapper: {
+        '^koka$': 'koka/src/koka.ts',
+        '^koka/(.*)$': 'koka/src/$1.ts',
+    },
     testPathIgnorePatterns: ['/node_modules/', '/examples/'],
     globals: {
         'ts-jest': {

@@ -1,16 +1,17 @@
-import { Optic, OpticErr, OpticProxy } from '../src/koka-optic'
-import { Eff } from 'koka'
+import * as Koka from 'koka'
+import * as Result from 'koka/result'
+import * as Optic from '../src/koka-optic.ts'
 
 describe('Optic', () => {
     describe('root()', () => {
         it('should create root optic', () => {
             const rootOptic = Optic.root<number>()
-            expect(rootOptic).toBeInstanceOf(Optic)
+            expect(rootOptic).toBeInstanceOf(Optic.Optic)
         })
 
         it('should get root value', () => {
             const rootOptic = Optic.root<number>()
-            const result = Eff.runResult(Optic.get(42, rootOptic))
+            const result = Result.run(Optic.get(42, rootOptic))
 
             if (result.type === 'err') {
                 throw new Error('Expected a number but got an error')
@@ -22,7 +23,7 @@ describe('Optic', () => {
         it('should set root value', () => {
             const rootOptic = Optic.root<number>()
             const updateRoot = Optic.set(42, rootOptic, (number) => number + 58)
-            const result = Eff.runResult(updateRoot)
+            const result = Result.run(updateRoot)
 
             if (result.type === 'err') {
                 throw new Error('Expected a number but got an error')
@@ -36,7 +37,7 @@ describe('Optic', () => {
         const propOptic = Optic.root<{ a: number }>().prop('a')
 
         it('should get object property', () => {
-            const result = Eff.runResult(Optic.get({ a: 42 }, propOptic))
+            const result = Result.run(Optic.get({ a: 42 }, propOptic))
 
             if (result.type === 'err') {
                 throw new Error('Expected a number but got an error')
@@ -46,7 +47,7 @@ describe('Optic', () => {
         })
 
         it('should set object property', () => {
-            const result = Eff.runResult(Optic.set({ a: 42 }, propOptic, 100))
+            const result = Result.run(Optic.set({ a: 42 }, propOptic, 100))
 
             if (result.type === 'err') {
                 throw new Error('Expected an object but got an error')
@@ -60,7 +61,7 @@ describe('Optic', () => {
         const indexOptic = Optic.root<number[]>().index(0)
 
         it('should get array index', () => {
-            const result = Eff.runResult(Optic.get([42], indexOptic))
+            const result = Result.run(Optic.get([42], indexOptic))
 
             if (result.type === 'err') {
                 throw new Error('Expected a number but got an error')
@@ -70,7 +71,7 @@ describe('Optic', () => {
         })
 
         it('should set array index', () => {
-            const result = Eff.runResult(Optic.set([42], indexOptic, 100))
+            const result = Result.run(Optic.set([42], indexOptic, 100))
 
             if (result.type === 'err') {
                 throw new Error('Expected an array but got an error')
@@ -80,9 +81,9 @@ describe('Optic', () => {
         })
 
         it('should throw when index out of bounds', () => {
-            const result = Eff.run(
-                Eff.try(Optic.get([], indexOptic)).catch({
-                    [OpticErr.field]: (message) => {
+            const result = Koka.run(
+                Koka.try(Optic.get([], indexOptic)).handle({
+                    [Optic.OpticErr.field]: (message) => {
                         return message
                     },
                 }),
@@ -95,7 +96,7 @@ describe('Optic', () => {
         const findOptic = Optic.root<number[]>().find((n) => n === 42)
 
         it('should find array item', () => {
-            const result = Eff.runResult(Optic.get([1, 2, 3, 42], findOptic))
+            const result = Result.run(Optic.get([1, 2, 3, 42], findOptic))
 
             if (result.type === 'err') {
                 throw new Error('Expected a number but got an error')
@@ -105,7 +106,7 @@ describe('Optic', () => {
         })
 
         it('should throw when item not found', () => {
-            const result = Eff.runResult(Optic.get([1, 2, 3], findOptic))
+            const result = Result.run(Optic.get([1, 2, 3], findOptic))
 
             if (result.type === 'ok') {
                 throw new Error('Expected an error but got a number')
@@ -119,7 +120,7 @@ describe('Optic', () => {
         const matchOptic = Optic.root<string | number>().match((v): v is number => typeof v === 'number')
 
         it('should match type predicate', () => {
-            const result = Eff.runResult(Optic.get(42, matchOptic))
+            const result = Result.run(Optic.get(42, matchOptic))
 
             if (result.type === 'err') {
                 throw new Error('Expected a number but got an error')
@@ -129,7 +130,7 @@ describe('Optic', () => {
         })
 
         it('should throw when not matched', () => {
-            const result = Eff.runResult(Optic.get('test', matchOptic))
+            const result = Result.run(Optic.get('test', matchOptic))
 
             if (result.type === 'ok') {
                 throw new Error('Expected an error but got a string')
@@ -146,7 +147,7 @@ describe('Optic', () => {
         })
 
         it('should map array items', () => {
-            const result = Eff.runResult(Optic.get([1, 2, 3], mapOptic))
+            const result = Result.run(Optic.get([1, 2, 3], mapOptic))
 
             if (result.type === 'err') {
                 throw new Error('Expected a number but got an error')
@@ -156,7 +157,7 @@ describe('Optic', () => {
         })
 
         it('should set mapped array', () => {
-            const result = Eff.runResult(Optic.set([1, 2, 3], mapOptic, [4, 6, 8]))
+            const result = Result.run(Optic.set([1, 2, 3], mapOptic, [4, 6, 8]))
 
             if (result.type === 'err') {
                 throw new Error('Expected an array but got an error')
@@ -170,7 +171,7 @@ describe('Optic', () => {
         const filterOptic = Optic.root<number[]>().filter((n) => n > 2)
 
         it('should filter array items', () => {
-            const result = Eff.runResult(Optic.get([1, 2, 3, 4], filterOptic))
+            const result = Result.run(Optic.get([1, 2, 3, 4], filterOptic))
 
             if (result.type === 'err') {
                 throw new Error('Expected a number but got an error')
@@ -180,7 +181,7 @@ describe('Optic', () => {
         })
 
         it('should set filtered array', () => {
-            const result = Eff.runResult(Optic.set([1, 2, 3, 4], filterOptic, [30, 40]))
+            const result = Result.run(Optic.set([1, 2, 3, 4], filterOptic, [30, 40]))
 
             if (result.type === 'err') {
                 throw new Error('Expected an array but got an error')
@@ -200,7 +201,7 @@ describe('Optic', () => {
 
         it('should create object optic', () => {
             const rootValue = { a: 42, b: 'test' }
-            const result = Eff.runResult(Optic.get(rootValue, objOptic))
+            const result = Result.run(Optic.get(rootValue, objOptic))
 
             if (result.type === 'err') {
                 throw new Error('Expected an object but got an error')
@@ -210,7 +211,7 @@ describe('Optic', () => {
         })
 
         it('should set object properties', () => {
-            const result = Eff.runResult(Optic.set({ a: 42, b: 'test' }, objOptic, { a: 100, b: 'updated' }))
+            const result = Result.run(Optic.set({ a: 42, b: 'test' }, objOptic, { a: 100, b: 'updated' }))
 
             if (result.type === 'err') {
                 throw new Error('Expected an object but got an error')
@@ -224,7 +225,7 @@ describe('Optic', () => {
         const optOptic = Optic.optional(Optic.root<number>().refine((n) => n > 10))
 
         it('should handle undefined value', () => {
-            const result = Eff.runResult(Optic.get(5, optOptic))
+            const result = Result.run(Optic.get(5, optOptic))
 
             if (result.type === 'err') {
                 throw new Error('Expected an undefined value but got an error')
@@ -234,7 +235,7 @@ describe('Optic', () => {
         })
 
         it('should preserve defined value', () => {
-            const result = Eff.runResult(Optic.get(42, optOptic))
+            const result = Result.run(Optic.get(42, optOptic))
 
             if (result.type === 'err') {
                 throw new Error('Expected a number but got an error')
@@ -255,14 +256,14 @@ describe('Optic', () => {
             }
 
             // First access - should cache
-            const result1 = Eff.runResult(Optic.get(obj, optic))
+            const result1 = Result.run(Optic.get(obj, optic))
 
             if (result1.type === 'err') {
                 throw new Error('Expected number but got error')
             }
 
             // Second access - should use cache
-            const result2 = Eff.runResult(Optic.get(obj, optic))
+            const result2 = Result.run(Optic.get(obj, optic))
 
             if (result2.type === 'err') {
                 throw new Error('Expected number but got error')
@@ -275,14 +276,14 @@ describe('Optic', () => {
             const arr = [{ value: 42 }]
 
             // First access - should cache
-            const result1 = Eff.runResult(Optic.get(arr, optic))
+            const result1 = Result.run(Optic.get(arr, optic))
 
             if (result1.type === 'err') {
                 throw new Error('Expected number but got error')
             }
 
             // Second access - should use cache
-            const result2 = Eff.runResult(Optic.get(arr, optic))
+            const result2 = Result.run(Optic.get(arr, optic))
 
             if (result2.type === 'err') {
                 throw new Error('Expected number but got error')
@@ -299,14 +300,14 @@ describe('Optic', () => {
             const arr = [1, 2, 3, 4].map((n) => ({ value: n }))
 
             // First access - should cache
-            const result1 = Eff.runResult(Optic.get(arr, optic))
+            const result1 = Result.run(Optic.get(arr, optic))
 
             if (result1.type === 'err') {
                 throw new Error('Expected array but got error')
             }
 
             // Second access - should use cache
-            const result2 = Eff.runResult(Optic.get(arr, optic))
+            const result2 = Result.run(Optic.get(arr, optic))
 
             if (result2.type === 'err') {
                 throw new Error('Expected array but got error')
@@ -326,14 +327,14 @@ describe('Optic', () => {
             const arr = [1, 2, 3].map((n) => ({ value: n }))
 
             // First access - should cache
-            const result1 = Eff.runResult(Optic.get(arr, optic))
+            const result1 = Result.run(Optic.get(arr, optic))
 
             if (result1.type === 'err') {
                 throw new Error('Expected array but got error')
             }
 
             // Second access - should use cache
-            const result2 = Eff.runResult(Optic.get(arr, optic))
+            const result2 = Result.run(Optic.get(arr, optic))
             if (result2.type === 'err') {
                 throw new Error('Expected array but got error')
             }
@@ -347,14 +348,14 @@ describe('Optic', () => {
             const arr = [1, 42, 3].map((n) => ({ value: n }))
 
             // First access - should cache
-            const result1 = Eff.runResult(Optic.get(arr, optic))
+            const result1 = Result.run(Optic.get(arr, optic))
 
             if (result1.type === 'err') {
                 throw new Error('Expected number but got error')
             }
 
             // Second access - should use cache
-            const result2 = Eff.runResult(Optic.get(arr, optic))
+            const result2 = Result.run(Optic.get(arr, optic))
 
             if (result2.type === 'err') {
                 throw new Error('Expected number but got error')
@@ -381,8 +382,8 @@ describe('Optic', () => {
             }
 
             // First access - should cache
-            const result1 = Eff.runResult(Optic.get(okObj, optic))
-            const result2 = Eff.runResult(Optic.get(errObj, optic))
+            const result1 = Result.run(Optic.get(okObj, optic))
+            const result2 = Result.run(Optic.get(errObj, optic))
 
             if (result1.type === 'err') {
                 throw new Error('Expected number but got error')
@@ -393,8 +394,8 @@ describe('Optic', () => {
             }
 
             // Second access - should use cache
-            const result3 = Eff.runResult(Optic.get(okObj, optic))
-            const result4 = Eff.runResult(Optic.get(errObj, optic))
+            const result3 = Result.run(Optic.get(okObj, optic))
+            const result4 = Result.run(Optic.get(errObj, optic))
 
             if (result3.type === 'err') {
                 throw new Error('Expected number but got error')
@@ -416,7 +417,7 @@ describe('Optic', () => {
             }
 
             // First access - should cache
-            const result1 = Eff.runResult(Optic.get(obj, optic))
+            const result1 = Result.run(Optic.get(obj, optic))
 
             if (result1.type === 'err') {
                 throw new Error('Expected number but got error')
@@ -424,7 +425,7 @@ describe('Optic', () => {
 
             // Second access - should use cache
 
-            const result2 = Eff.runResult(Optic.get(obj, optic))
+            const result2 = Result.run(Optic.get(obj, optic))
 
             if (result2.type === 'err') {
                 throw new Error('Expected number but got error')
@@ -444,7 +445,7 @@ describe('Optic', () => {
                     set: (newValue: number) => newValue / 2,
                 })
 
-            const result = Eff.runResult(Optic.get({ a: [1, 2, 3] }, optic))
+            const result = Result.run(Optic.get({ a: [1, 2, 3] }, optic))
 
             if (result.type === 'err') {
                 throw new Error('Expected array but got error')
@@ -452,7 +453,7 @@ describe('Optic', () => {
 
             expect(result.value).toEqual([2, 4, 6])
 
-            const setResult = Eff.runResult(Optic.set({ a: [1, 2, 3] }, optic, [4, 6, 8]))
+            const setResult = Result.run(Optic.set({ a: [1, 2, 3] }, optic, [4, 6, 8]))
 
             if (setResult.type === 'err') {
                 throw new Error('Expected array but got error')
@@ -460,7 +461,7 @@ describe('Optic', () => {
 
             expect(setResult.value).toEqual({ a: [2, 3, 4] })
 
-            const errResult = Eff.runResult(Optic.get({ a: [] }, optic))
+            const errResult = Result.run(Optic.get({ a: [] }, optic))
 
             expect(errResult.type).toBe('err')
         })
@@ -470,7 +471,7 @@ describe('Optic', () => {
                 .filter((v) => typeof v === 'number')
                 .index(0)
 
-            let result = Eff.runResult(Optic.get([42, 'test', 100], optic))
+            let result = Result.run(Optic.get([42, 'test', 100], optic))
 
             if (result.type === 'err') {
                 throw new Error('Expected number but got error')
@@ -478,7 +479,7 @@ describe('Optic', () => {
 
             expect(result.value).toBe(42)
 
-            result = Eff.runResult(Optic.get(['test', 42], optic))
+            result = Result.run(Optic.get(['test', 42], optic))
 
             if (result.type === 'err') {
                 throw new Error('Expected number but got error')
@@ -486,7 +487,7 @@ describe('Optic', () => {
 
             expect(result.value).toBe(42)
 
-            result = Eff.runResult(Optic.get(['test', 'test'], optic))
+            result = Result.run(Optic.get(['test', 'test'], optic))
 
             if (result.type === 'ok') {
                 throw new Error('Expected error but got number')
@@ -500,7 +501,7 @@ describe('Optic', () => {
                 .prop('user')
                 .prop('profile')
 
-            const result = Eff.runResult(Optic.get({ user: { profile: { name: 'Alice', age: 25 } } }, optic))
+            const result = Result.run(Optic.get({ user: { profile: { name: 'Alice', age: 25 } } }, optic))
 
             if (result.type === 'err') {
                 throw new Error('Expected object but got error')
@@ -508,7 +509,7 @@ describe('Optic', () => {
 
             expect(result.value).toEqual({ name: 'Alice', age: 25 })
 
-            const setResult = Eff.runResult(
+            const setResult = Result.run(
                 Optic.set({ user: { profile: { name: 'Alice', age: 25 } } }, optic, {
                     name: 'Bob',
                     age: 30,
@@ -527,7 +528,7 @@ describe('Optic', () => {
         it('fails when updating a non-existent array item', () => {
             const optic = Optic.root<{ items: { value: number }[] }>().prop('items').index(5)
 
-            const result = Eff.runResult(Optic.set({ items: [{ value: 1 }, { value: 2 }] }, optic, { value: 100 }))
+            const result = Result.run(Optic.set({ items: [{ value: 1 }, { value: 2 }] }, optic, { value: 100 }))
 
             expect(result.type).toBe('err')
         })
@@ -537,7 +538,7 @@ describe('Optic', () => {
         it('should do nothing if no operations are provided', () => {
             const rootOptic = Optic.root<number>()
             const optic = rootOptic.select((p) => p)
-            const result = Eff.runResult(Optic.get(42, optic))
+            const result = Result.run(Optic.get(42, optic))
 
             expect(optic === rootOptic).toBe(true)
 
@@ -551,7 +552,7 @@ describe('Optic', () => {
         it('should create optic from property access', () => {
             const optic = Optic.root<{ a: number }>().select((p) => p.a)
 
-            const result = Eff.runResult(Optic.get({ a: 42 }, optic))
+            const result = Result.run(Optic.get({ a: 42 }, optic))
 
             if (result.type === 'err') {
                 throw new Error('Expected number but got error')
@@ -562,7 +563,7 @@ describe('Optic', () => {
 
         it('should create optic from index access', () => {
             const optic = Optic.root<number[]>().select((p) => p[0])
-            const result = Eff.runResult(Optic.get([42], optic))
+            const result = Result.run(Optic.get([42], optic))
 
             if (result.type === 'err') {
                 throw new Error('Expected number but got error')
@@ -574,7 +575,7 @@ describe('Optic', () => {
         it('should chain multiple operations', () => {
             const optic = Optic.root<{ items: { value: number }[] }>().select((p) => p.items[0].value)
 
-            const result = Eff.runResult(Optic.get({ items: [{ value: 42 }] }, optic))
+            const result = Result.run(Optic.get({ items: [{ value: 42 }] }, optic))
 
             if (result.type === 'err') {
                 throw new Error('Expected number but got error')
@@ -586,7 +587,7 @@ describe('Optic', () => {
         it('should maintain type inference', () => {
             const optic = Optic.root<{ a: { b: string } }>().select((p) => p.a.b)
 
-            const result = Eff.runResult(Optic.get({ a: { b: 'test' } }, optic))
+            const result = Result.run(Optic.get({ a: { b: 'test' } }, optic))
 
             if (result.type === 'err') {
                 throw new Error('Expected string but got error')
@@ -611,8 +612,8 @@ describe('Optic', () => {
                     }
                 }
             }
-            const optic: Optic<string, State> = Optic.root<State>().select(
-                (p: OpticProxy<State>): OpticProxy<string> => p.a.b.c[1].e.f.g[2].h,
+            const optic: Optic.Optic<string, State> = Optic.root<State>().select(
+                (p: Optic.OpticProxy<State>): Optic.OpticProxy<string> => p.a.b.c[1].e.f.g[2].h,
             )
 
             const state: State = {
@@ -626,7 +627,7 @@ describe('Optic', () => {
                 },
             }
 
-            const result = Eff.runResult(Optic.get(state, optic)) // should return 'target'
+            const result = Result.run(Optic.get(state, optic)) // should return 'target'
 
             if (result.type === 'err') {
                 throw new Error('Expected string but got error')

@@ -1,29 +1,32 @@
-import { Ctx, Eff, AnyErr, Async, MaybePromise, Result, AnyEff } from 'koka'
-import { Updater, Optic, OpticOptions, OpticErr, getOpticValue, GetKey } from 'koka-optic'
-
-export * from 'koka-optic'
+import * as Koka from 'koka'
+import * as Result from 'koka/result'
+import * as Err from 'koka/err'
+import * as Opt from 'koka/opt'
+import * as Ctx from 'koka/ctx'
+import * as Async from 'koka/async'
+import * as Optic from 'koka-optic'
 
 export class Domain<State, Root> {
-    $: Optic<State, Root>
+    $: Optic.Optic<State, Root>
 
-    constructor(options: OpticOptions<State, Root>) {
-        this.$ = new Optic<State, Root>(options)
+    constructor(options: Optic.OpticOptions<State, Root>) {
+        this.$ = new Optic.Optic<State, Root>(options)
 
         Object.defineProperty(this.$, 'getKey', {
             get: () => this.getKey,
         })
     }
 
-    getKey?: GetKey<State>
+    getKey?: Optic.GetKey<State>
 }
 
-export type SetStateInput<S> = S | Updater<S> | ((state: S) => S)
+export type SetStateInput<S> = S | Optic.Updater<S> | ((state: S) => S)
 
-export class GetRoot<Root> extends Eff.Ctx('koka-ddd/get-root')<() => Root> {}
+export class GetRoot<Root> extends Ctx.Ctx('koka-store/get-root')<() => Root> {}
 
-export class SetRoot<Root> extends Eff.Ctx('koka-ddd/set-root')<(Root: Root) => void> {}
+export class SetRoot<Root> extends Ctx.Ctx('koka-store/set-root')<(Root: Root) => void> {}
 
-export type QueryEff<Root> = OpticErr | GetRoot<Root> | ExecutionTreeOpt
+export type QueryEff<Root> = Optic.OpticErr | GetRoot<Root> | ExecutionTreeOpt
 
 export type RootAccessor<Root> = GetRoot<Root> | SetRoot<Root>
 
@@ -56,22 +59,24 @@ export type QueryExecutionTree = {
     queries: QueryExecutionTree[]
 }
 
-export class ExecutionTreeOpt extends Eff.Opt('koka-ddd/execution-tree')<ExecutionTree> {}
+export class ExecutionTreeOpt extends Opt.Opt('koka-store/execution-tree')<ExecutionTree> {}
 
-export type CommandEff<Root> = OpticErr | RootAccessor<Root> | ExecutionTreeOpt
+export type CommandEff<Root> = Optic.OpticErr | RootAccessor<Root> | ExecutionTreeOpt
 
 export type MaybeFunction<T> = T | (() => T)
 
-export type DomainQuery<Return, Root, E extends AnyEff = never> = Generator<QueryEff<Root> | E, Return>
+export type DomainQuery<Return, Root, E extends Koka.AnyEff = never> = Generator<QueryEff<Root> | E, Return>
 
-export type DomainCommand<Return, Root, E extends AnyEff = never> = Generator<CommandEff<Root> | E, Return>
+export type DomainCommand<Return, Root, E extends Koka.AnyEff = never> = Generator<CommandEff<Root> | E, Return>
 
-export function* get<State, Root>(domainOrOptic: Domain<State, Root> | Optic<State, Root>): DomainQuery<State, Root> {
+export function* get<State, Root>(
+    domainOrOptic: Domain<State, Root> | Optic.Optic<State, Root>,
+): DomainQuery<State, Root> {
     const optic = domainOrOptic instanceof Domain ? domainOrOptic.$ : domainOrOptic
 
-    const executionTree = yield* Eff.get(ExecutionTreeOpt)
+    const executionTree = yield* Opt.get(ExecutionTreeOpt)
 
-    const getRoot = yield* Eff.get(GetRoot<Root>)
+    const getRoot = yield* Ctx.get(GetRoot<Root>)
 
     const root = getRoot()
 
@@ -83,12 +88,12 @@ export function* get<State, Root>(domainOrOptic: Domain<State, Root> | Optic<Sta
 }
 
 export function* set<State, Root>(
-    domainOrOptic: Domain<State, Root> | Optic<State, Root>,
+    domainOrOptic: Domain<State, Root> | Optic.Optic<State, Root>,
     setStateInput: SetStateInput<State>,
 ): DomainCommand<void, Root> {
     const optic = domainOrOptic instanceof Domain ? domainOrOptic.$ : domainOrOptic
 
-    const executionTree = yield* Eff.get(ExecutionTreeOpt)
+    const executionTree = yield* Opt.get(ExecutionTreeOpt)
 
     const updateRoot = optic.set(function* (state) {
         if (typeof setStateInput !== 'function') {
@@ -101,9 +106,9 @@ export function* set<State, Root>(
             return setStateInput
         }
 
-        const result = (setStateInput as Updater<State> | ((state: State) => State))(state)
+        const result = (setStateInput as Optic.Updater<State> | ((state: State) => State))(state)
 
-        const nextState = yield* getOpticValue(result)
+        const nextState = yield* Optic.getOpticValue(result)
 
         if (executionTree?.type === 'command') {
             executionTree.changes.push({
@@ -115,13 +120,13 @@ export function* set<State, Root>(
         return nextState
     })
 
-    const getRoot = yield* Eff.get(GetRoot<Root>)
+    const getRoot = yield* Ctx.get(GetRoot<Root>)
 
     const root = getRoot()
 
     const newRoot = yield* updateRoot(root)
 
-    const setRoot = yield* Eff.get(SetRoot<Root>)
+    const setRoot = yield* Ctx.get(SetRoot<Root>)
 
     setRoot(newRoot)
 }
@@ -141,7 +146,7 @@ type KokaClassMethodDecoratorContext<
 }
 
 export function query() {
-    return function <This, Args extends any[], Root, Return, E extends AnyEff>(
+    return function <This, Args extends any[], Root, Return, E extends Koka.AnyEff>(
         target: (this: This, ...args: Args) => Generator<Exclude<E, SetRoot<any>>, Return>,
         context: KokaClassMethodDecoratorContext<This, typeof target>,
     ): (this: This, ...args: Args) => Generator<Exclude<E, SetRoot<any>> | ExecutionTreeOpt | QueryEff<Root>, Return> {
@@ -151,7 +156,7 @@ export function query() {
             this: This,
             ...args: Args
         ): Generator<Exclude<E, SetRoot<any>> | ExecutionTreeOpt | QueryEff<Root>, Return> {
-            const parent: ExecutionTree | undefined = yield* Eff.get(ExecutionTreeOpt)
+            const parent: ExecutionTree | undefined = yield* Opt.get(ExecutionTreeOpt)
 
             const name = `${(this as any).constructor?.name ?? 'UnknownDomain'}.${methodName}`
             const executionTree: QueryExecutionTree = {
@@ -168,7 +173,7 @@ export function query() {
                 parent.queries.push(executionTree)
             }
 
-            const gen = Eff.try(target.call(this, ...args)).catch({
+            const gen = Koka.try(target.call(this, ...args)).handle({
                 [ExecutionTreeOpt.field]: executionTree,
             } as any)
 
@@ -195,14 +200,14 @@ export function query() {
 }
 
 export function command() {
-    return function <This, Args extends any[], Root, Return, E extends AnyEff>(
+    return function <This, Args extends any[], Root, Return, E extends Koka.AnyEff>(
         target: (this: This, ...args: Args) => Generator<E | CommandEff<Root>, Return>,
         context: KokaClassMethodDecoratorContext<This, typeof target>,
     ): typeof target {
         const methodName = context.name
 
         function* replacementMethod(this: This, ...args: Args): Generator<any, Return, unknown> {
-            const parent: ExecutionTree | undefined = yield* Eff.get(ExecutionTreeOpt)
+            const parent: ExecutionTree | undefined = yield* Opt.get(ExecutionTreeOpt)
 
             const name = `${(this as any).constructor?.name ?? 'UnknownDomain'}.${methodName}`
             const executionTree: CommandExecutionTree = {
@@ -221,7 +226,7 @@ export function command() {
                 parent.commands.push(executionTree)
             }
 
-            const gen = Eff.try(target.call(this, ...args)).catch({
+            const gen = Koka.try(target.call(this, ...args)).handle({
                 [ExecutionTreeOpt.field]: executionTree,
             } as any)
 
@@ -250,7 +255,7 @@ export function command() {
 export type StoreContext = Record<string, unknown>
 
 type ToCtxEff<T extends StoreContext> = {
-    [K in keyof T]: K extends string ? Ctx<K, T[K]> : never
+    [K in keyof T]: K extends string ? Ctx.Ctx<K, T[K]> : never
 }[keyof T]
 
 export type StoreEnhancer<State> = (store: Store<State>) => void
@@ -345,19 +350,22 @@ export class Store<State> {
         }
     }
 
-    get<T>(domainOrOptic: Optic<T, State> | Domain<T, State>): Result<T, OpticErr> {
+    get<T>(domainOrOptic: Optic.Optic<T, State> | Domain<T, State>): Result.Result<T, Optic.OpticErr> {
         const result = this.runQuery(get(domainOrOptic))
         return result
     }
 
-    set<T>(domainOrOptic: Optic<T, State> | Domain<T, State>, input: SetStateInput<T>): Result<void, OpticErr> {
+    set<T>(
+        domainOrOptic: Optic.Optic<T, State> | Domain<T, State>,
+        input: SetStateInput<T>,
+    ): Result.Result<void, Optic.OpticErr> {
         const result = this.runCommand(set(domainOrOptic, input))
         return result
     }
 
-    runQuery<T, E extends QueryEff<State> | AnyErr | Async | ToCtxEff<this['context']>>(
+    runQuery<T, E extends QueryEff<State> | Err.AnyErr | Async.Async | ToCtxEff<this['context']>>(
         input: MaybeFunction<Generator<Exclude<E, SetRoot<any>>, T>>,
-    ): Async extends E ? MaybePromise<Result<T, E>> : Result<T, E> {
+    ): Async.Async extends E ? Async.MaybePromise<Result.Result<T, E>> : Result.Result<T, E> {
         const query = typeof input === 'function' ? input() : input
 
         const executionTree: QueryExecutionTree | undefined =
@@ -373,13 +381,13 @@ export class Store<State> {
                   }
                 : undefined
 
-        const withRoot = Eff.try(query as Generator<QueryEff<State>, T>).catch({
+        const withRoot = Koka.try(query as Generator<QueryEff<State>, T>).handle({
             ...this.context,
             [GetRoot.field]: this.getState,
             [ExecutionTreeOpt.field]: executionTree,
         })
 
-        const result = Eff.runResult(withRoot) as any
+        const result = Result.run(withRoot) as any
 
         const handleResult = (result: any) => {
             if (executionTree) {
@@ -396,9 +404,9 @@ export class Store<State> {
         return handleResult(result) as any
     }
 
-    runCommand<T, E extends CommandEff<State> | AnyErr | Async | ToCtxEff<this['context']>>(
+    runCommand<T, E extends CommandEff<State> | Err.AnyErr | Async.Async | ToCtxEff<this['context']>>(
         input: MaybeFunction<Generator<E, T>>,
-    ): Async extends E ? MaybePromise<Result<T, E>> : Result<T, E> {
+    ): Async.Async extends E ? Async.MaybePromise<Result.Result<T, E>> : Result.Result<T, E> {
         const command = typeof input === 'function' ? input() : input
 
         const executionTree: CommandExecutionTree | undefined =
@@ -416,7 +424,7 @@ export class Store<State> {
                   }
                 : undefined
 
-        const withRoot = Eff.try(command as Generator<RootAccessor<State> | CommandEff<State>, any>).catch({
+        const withRoot = Koka.try(command as Generator<RootAccessor<State> | CommandEff<State>, any>).handle({
             ...this.context,
             [SetRoot.field]: this.setState,
             [GetRoot.field]: this.getState,
@@ -424,7 +432,7 @@ export class Store<State> {
         })
 
         try {
-            const result = Eff.runResult(withRoot) as any
+            const result = Result.run(withRoot) as any
 
             const handleResult = (result: any) => {
                 if (executionTree) {

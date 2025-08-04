@@ -127,6 +127,8 @@ dist
 cjs
 esm
 
+.kiro
+
 # Uncomment the public line if your project uses Gatsby
 # https://nextjs.org/blog/next-9-1#public-directory-support
 # https://create-react-app.dev/docs/using-the-public-folder/#docsNav

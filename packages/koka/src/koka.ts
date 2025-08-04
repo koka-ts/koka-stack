@@ -1,8 +1,10 @@
-import type { Async } from './async.ts'
+import type { Async, MaybePromise } from './async.ts'
 import type { Ctx } from './ctx.ts'
 import type { AnyErr, Err } from './err.ts'
 import * as Gen from './gen.ts'
 import type { AnyOpt, Opt } from './opt.ts'
+
+export * from './constant.ts'
 
 export type Eff<T> = Err<string, T> | Ctx<string, T> | Opt<string, T> | Async
 
@@ -30,13 +32,11 @@ type ExtractErrorHandlerReturn<Handlers, Eff> = Eff extends Err<infer Name, infe
 
 export type Actor<Yield, Return> = Generator<Yield, Return> | (() => Generator<Yield, Return>)
 
-export type MaybePromise<T> = T extends Promise<any> ? T : T | Promise<T>
-
 function tryEffect<Yield extends AnyEff, Return>(input: Actor<Yield, Return>) {
     return {
         *handle<Handlers extends Partial<EffectHandlers<Yield>>>(
             handlers: Handlers,
-        ): Actor<Exclude<Yield, { name: keyof Handlers }>, Return | ExtractErrorHandlerReturn<Handlers, Yield>> {
+        ): Generator<Exclude<Yield, { name: keyof Handlers }>, Return | ExtractErrorHandlerReturn<Handlers, Yield>> {
             const gen = typeof input === 'function' ? input() : input
 
             try {

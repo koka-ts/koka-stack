@@ -1,5 +1,6 @@
-import { Eff } from 'koka'
-import { Store, Domain, Optic, get, set } from '../src/koka-ddd'
+import * as Err from 'koka/err'
+import * as Optic from 'koka-optic'
+import * as Store from '../src/koka-store.ts'
 
 type UserEntity = {
     id: string
@@ -26,30 +27,30 @@ type RootState = {
     products: Record<string, ProductEntity>
 }
 
-class UserStorageDomain<Root extends RootState> extends Domain<Root['users'], Root> {
+class UserStorageDomain<Root extends RootState> extends Store.Domain<Root['users'], Root> {
     constructor() {
         super(Optic.root<Root>().prop('users'))
     }
     *getUser(id: string) {
-        const users = yield* get(this)
+        const users = yield* Store.get(this)
         if (id in users) {
             return users[id]
         }
-        class DomainErr extends Eff.Err('DomainErr')<string> {}
-        throw yield* Eff.throw(new DomainErr(`User ${id} not found`))
+        class DomainErr extends Err.Err('DomainErr')<string> {}
+        throw yield* Err.throw(new DomainErr(`User ${id} not found`))
     }
     *addUser(user: UserEntity) {
-        const users = yield* get(this)
+        const users = yield* Store.get(this)
         if (user.id in users) {
-            class DomainErr extends Eff.Err('DomainErr')<string> {}
-            throw yield* Eff.throw(new DomainErr(`User ${user.id} exists`))
+            class DomainErr extends Err.Err('DomainErr')<string> {}
+            throw yield* Err.throw(new DomainErr(`User ${user.id} exists`))
         }
-        yield* set(this, { ...users, [user.id]: user })
+        yield* Store.set(this, { ...users, [user.id]: user })
     }
     *addOrder(userId: string, orderId: string) {
         const user = yield* this.getUser(userId)
-        yield* set(this, {
-            ...(yield* get(this)),
+        yield* Store.set(this, {
+            ...(yield* Store.get(this)),
             [userId]: {
                 ...user,
                 orderIds: [...user.orderIds, orderId],
@@ -58,30 +59,30 @@ class UserStorageDomain<Root extends RootState> extends Domain<Root['users'], Ro
     }
 }
 
-class OrderStorageDomain<Root extends RootState> extends Domain<Root['orders'], Root> {
+class OrderStorageDomain<Root extends RootState> extends Store.Domain<Root['orders'], Root> {
     constructor() {
         super(Optic.root<Root>().prop('orders'))
     }
     *getOrder(id: string) {
-        const orders = yield* get(this)
+        const orders = yield* Store.get(this)
         if (id in orders) {
             return orders[id]
         }
-        class DomainErr extends Eff.Err('DomainErr')<string> {}
-        throw yield* Eff.throw(new DomainErr(`Order ${id} not found`))
+        class DomainErr extends Err.Err('DomainErr')<string> {}
+        throw yield* Err.throw(new DomainErr(`Order ${id} not found`))
     }
     *addOrder(order: OrderEntity) {
-        const orders = yield* get(this)
+        const orders = yield* Store.get(this)
         if (order.id in orders) {
-            class DomainErr extends Eff.Err('DomainErr')<string> {}
-            throw yield* Eff.throw(new DomainErr(`Order ${order.id} exists`))
+            class DomainErr extends Err.Err('DomainErr')<string> {}
+            throw yield* Err.throw(new DomainErr(`Order ${order.id} exists`))
         }
-        yield* set(this, { ...orders, [order.id]: order })
+        yield* Store.set(this, { ...orders, [order.id]: order })
     }
     *addProduct(orderId: string, productId: string) {
         const order = yield* this.getOrder(orderId)
-        yield* set(this, {
-            ...(yield* get(this)),
+        yield* Store.set(this, {
+            ...(yield* Store.get(this)),
             [orderId]: {
                 ...order,
                 productIds: [...order.productIds, productId],
@@ -90,25 +91,25 @@ class OrderStorageDomain<Root extends RootState> extends Domain<Root['orders'], 
     }
 }
 
-class ProductStorageDomain<Root extends RootState> extends Domain<Root['products'], Root> {
+class ProductStorageDomain<Root extends RootState> extends Store.Domain<Root['products'], Root> {
     constructor() {
         super(Optic.root<Root>().prop('products'))
     }
     *getProduct(id: string) {
-        const products = yield* get(this)
+        const products = yield* Store.get(this)
         if (id in products) {
             return products[id]
         }
-        class DomainErr extends Eff.Err('DomainErr')<string> {}
-        throw yield* Eff.throw(new DomainErr(`Product ${id} not found`))
+        class DomainErr extends Err.Err('DomainErr')<string> {}
+        throw yield* Err.throw(new DomainErr(`Product ${id} not found`))
     }
     *addProduct(product: ProductEntity) {
-        const products = yield* get(this)
+        const products = yield* Store.get(this)
         if (product.id in products) {
-            class DomainErr extends Eff.Err('DomainErr')<string> {}
-            throw yield* Eff.throw(new DomainErr(`Product ${product.id} exists`))
+            class DomainErr extends Err.Err('DomainErr')<string> {}
+            throw yield* Err.throw(new DomainErr(`Product ${product.id} exists`))
         }
-        yield* set(this, { ...products, [product.id]: product })
+        yield* Store.set(this, { ...products, [product.id]: product })
     }
     *getCollectors(productId: string) {
         const product = yield* this.getProduct(productId)
@@ -126,7 +127,7 @@ const orderStorage = new OrderStorageDomain()
 const productStorage = new ProductStorageDomain()
 
 describe('Graph Domain Operations', () => {
-    let store: Store<RootState>
+    let store: Store.Store<RootState>
 
     beforeEach(() => {
         const initialState: RootState = {
@@ -153,7 +154,7 @@ describe('Graph Domain Operations', () => {
                 },
             },
         }
-        store = new Store<RootState>({ state: initialState })
+        store = new Store.Store<RootState>({ state: initialState })
     })
 
     describe('User Operations', () => {

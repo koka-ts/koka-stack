@@ -1,3 +1,5 @@
+export type MaybePromise<T> = T extends Promise<any> ? T : T | Promise<T>
+
 export type Async = {
     type: 'async'
     name?: undefined

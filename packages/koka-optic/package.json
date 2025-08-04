@@ -6,22 +6,17 @@
     "repository": "github:koka-ts/koka",
     "bugs": "https://github.com/koka-ts/koka/issues",
     "author": "https://github.com/koka-ts",
-    "main": "cjs/index.js",
-    "types": "cjs/index.d.ts",
+    "type": "module",
+    "exports": {
+        ".": "./src/koka-optic.ts"
+    },
     "files": [
-        "cjs",
-        "esm",
-        "src",
-        "modules"
+        "src"
     ],
     "engines": {
-        "node": ">=14.x"
+        "node": ">=22.18"
     },
     "scripts": {
-        "build": "run-s clean build:cjs build:esm",
-        "build:cjs": "tsc -p tsconfig.cjs.json --composite false",
-        "build:esm": "tsc -p tsconfig.esm.json --composite false",
-        "clean": "shx rm -rf ./cjs ./esm",
         "test": "jest",
         "test:coverage": "jest --collectCoverage --coverage"
     },

@@ -6,7 +6,7 @@
         "downlevelIteration": true,
         "importHelpers": true,
         "module": "esnext",
-        "moduleResolution": "node",
+        "moduleResolution": "bundler",
         "newLine": "LF",
         "allowJs": true,
         "strict": true,

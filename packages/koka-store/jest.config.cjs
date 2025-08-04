@@ -13,14 +13,25 @@ module.exports = {
             statements: 95,
         },
     },
-    collectCoverageFrom: ['packages/*/src/**/*.{ts,tsx}'],
+    collectCoverageFrom: ['./src/**/*.{ts,tsx}'],
     rootDir: __dirname,
     testEnvironment: 'jsdom',
-    moduleNameMapper: {},
+    moduleNameMapper: {
+        '^koka$': 'koka/src/koka.ts',
+        '^koka/(.*)$': 'koka/src/$1.ts',
+        '^koka-optic$': 'koka-optic/src/koka-optic.ts',
+        '^koka-optic/(.*)$': 'koka-optic/src/$1.ts',
+    },
     testPathIgnorePatterns: ['/node_modules/', '/examples/'],
     globals: {
         'ts-jest': {
             diagnostics: false,
         },
     },
+    displayName: {
+        name: 'koka-optic',
+        color: 'blue',
+    },
+    collectCoverageFrom: ['src/**/*.{ts,tsx}'],
+    rootDir: __dirname,
 }

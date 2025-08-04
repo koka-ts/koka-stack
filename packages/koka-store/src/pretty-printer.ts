@@ -1,4 +1,4 @@
-import { ExecutionTree, Store } from './koka-ddd'
+import { ExecutionTree, Store } from './koka-store.ts'
 
 export const PrettyPrinter = () => {
     return <State>(store: Store<State>) => {

@@ -1,6 +1,8 @@
-import { Eff, isGenerator } from 'koka'
+import * as Err from 'koka/err'
+import * as Gen from 'koka/gen'
+import * as Result from 'koka/result'
 
-export class OpticErr extends Eff.Err('koka-optic/optic-err')<string> {}
+export class OpticErr extends Err.Err('koka-optic/optic-err')<string> {}
 
 export type Getter<State, Root> = (root: Root) => Generator<OpticErr, State, unknown>
 
@@ -20,7 +22,7 @@ export type GetKey<T> = (item: ArrayItem<T>) => string | number
 export type MaybeOpticEff<T> = T | Generator<OpticErr, T, unknown>
 
 export function* getOpticValue<T>(value: MaybeOpticEff<T>): Generator<OpticErr, T, unknown> {
-    if (isGenerator(value)) {
+    if (Gen.isGen(value)) {
         return yield* value
     } else {
         return value
@@ -85,7 +87,7 @@ const getOpticProxyPath = (proxy: object): OpticProxyPath => {
     return path
 }
 
-export function createOpticProxy<State>(path: OpticProxyPath = []): OpticProxy<State> {
+function createOpticProxy<State>(path: OpticProxyPath = []): OpticProxy<State> {
     const proxy: OpticProxy<State> = new Proxy(
         {},
         {
@@ -110,114 +112,114 @@ export function createOpticProxy<State>(path: OpticProxyPath = []): OpticProxy<S
     return proxy
 }
 
-export class Optic<State, Root> {
-    static root<Root>(): Optic<Root, Root> {
-        return new Optic({
-            *get(root) {
-                return root
-            },
-            set: (updater) => {
-                return function* (root) {
-                    const newRoot = yield* updater(root)
+export function root<Root>(): Optic<Root, Root> {
+    return new Optic({
+        *get(root) {
+            return root
+        },
+        set: (updater) => {
+            return function* (root) {
+                const newRoot = yield* updater(root)
 
-                    return newRoot
+                return newRoot
+            }
+        },
+    })
+}
+
+export function object<T extends Record<string, AnyOptic>>(
+    optics: T,
+): Optic<{ [K in keyof T]: InferOpticState<T[K]> }, InferOpticRoot<T[keyof T]>> {
+    return root<InferOpticRoot<T[keyof T]>>()
+        .transform({
+            *get(root) {
+                const object = {} as { [K in keyof T]: InferOpticState<T[K]> }
+
+                for (const key in optics) {
+                    // @ts-ignore
+                    object[key] = yield* optics[key].get(root)
                 }
-            },
-        })
-    }
 
-    static object<T extends Record<string, AnyOptic>>(
-        optics: T,
-    ): Optic<{ [K in keyof T]: InferOpticState<T[K]> }, InferOpticRoot<T[keyof T]>> {
-        return this.root<InferOpticRoot<T[keyof T]>>()
-            .transform({
-                *get(root) {
-                    const object = {} as { [K in keyof T]: InferOpticState<T[K]> }
-
-                    for (const key in optics) {
-                        // @ts-ignore
-                        object[key] = yield* optics[key].get(root)
-                    }
-
-                    return {
-                        oldObject: object,
-                        newObject: object,
-                    }
-                },
-                *set(state, root) {
-                    for (const key in state.newObject) {
-                        const newValue = state.newObject[key]
-                        const oldValue = state.oldObject[key]
-
-                        if (newValue === oldValue) {
-                            continue
-                        }
-
-                        // @ts-ignore expected
-                        root = yield* optics[key].set(function* () {
-                            return newValue as any
-                        })(root)
-                    }
-
-                    return root
-                },
-            })
-            .prop('newObject')
-    }
-
-    static optional<State, Root>(optic: Optic<State, Root>): Optic<State | undefined, Root> {
-        return Optic.root<Root>().transform<State | undefined>({
-            *get(root) {
-                const result = yield* Eff.result(optic.get(root))
-
-                if (result.type === 'ok') {
-                    return result.value
+                return {
+                    oldObject: object,
+                    newObject: object,
                 }
             },
             *set(state, root) {
-                if (state === undefined) {
-                    return root
+                for (const key in state.newObject) {
+                    const newValue = state.newObject[key]
+                    const oldValue = state.oldObject[key]
+
+                    if (newValue === oldValue) {
+                        continue
+                    }
+
+                    // @ts-ignore expected
+                    root = yield* optics[key].set(function* () {
+                        return newValue as any
+                    })(root)
                 }
 
-                const newState = state as State
-
-                const newRoot = yield* optic.set(function* () {
-                    return newState
-                })(root)
-
-                return newRoot
+                return root
             },
         })
-    }
+        .prop('newObject')
+}
 
-    static get<State, Root>(root: Root, optic: Optic<State, Root>): Generator<OpticErr, State> {
-        return optic.get(root)
-    }
+export function optional<State, Root>(optic: Optic<State, Root>): Optic<State | undefined, Root> {
+    return root<Root>().transform<State | undefined>({
+        *get(root) {
+            const result = yield* Result.wrap(optic.get(root))
 
-    static set<State, Root>(
-        root: Root,
-        optic: Optic<State, Root>,
-        stateOrUpdater: State | ((state: State) => State) | Updater<State>,
-    ): Generator<OpticErr, Root> {
-        if (typeof stateOrUpdater === 'function') {
-            const updater = stateOrUpdater as ((state: State) => State) | Updater<State>
-            return optic.set(function* (state) {
-                const newState = updater(state)
+            if (result.type === 'ok') {
+                return result.value
+            }
+        },
+        *set(state, root) {
+            if (state === undefined) {
+                return root
+            }
 
-                if (isGenerator(newState)) {
-                    return yield* newState
-                }
+            const newState = state as State
 
+            const newRoot = yield* optic.set(function* () {
                 return newState
             })(root)
-        } else {
-            const state = stateOrUpdater as State
-            return optic.set(function* () {
-                return state
-            })(root)
-        }
-    }
 
+            return newRoot
+        },
+    })
+}
+
+export function get<State, Root>(root: Root, optic: Optic<State, Root>): Generator<OpticErr, State> {
+    return optic.get(root)
+}
+
+export function set<State, Root>(
+    root: Root,
+    optic: Optic<State, Root>,
+    stateOrUpdater: State | ((state: State) => State) | Updater<State>,
+): Generator<OpticErr, Root> {
+    if (typeof stateOrUpdater === 'function') {
+        const updater = stateOrUpdater as ((state: State) => State) | Updater<State>
+        return optic.set(function* (state) {
+            const newState = updater(state)
+
+            if (Gen.isGen(newState)) {
+                return yield* newState
+            }
+
+            return newState
+        })(root)
+    } else {
+        const state = stateOrUpdater as State
+        return optic.set(function* () {
+            return state
+        })(root)
+    }
+}
+
+export class Optic<State, Root> {
     get: Getter<State, Root>
     set: Setter<State, Root>
 
@@ -328,11 +330,11 @@ export class Optic<State, Root> {
         return this.transform({
             *get(state) {
                 if (!Array.isArray(state)) {
-                    throw yield* Eff.throw(new OpticErr(`[koka-optic] Index ${index} is not applied for an array`))
+                    throw yield* Err.throw(new OpticErr(`[koka-optic] Index ${index} is not applied for an array`))
                 }
 
                 if (index < 0 || index >= state.length) {
-                    throw yield* Eff.throw(
+                    throw yield* Err.throw(
                         new OpticErr(`[koka-optic] Index ${index} is out of bounds: ${state.length}`),
                     )
                 }
@@ -361,13 +363,13 @@ export class Optic<State, Root> {
         return this.transform<TargetInfo>({
             *get(list) {
                 if (!Array.isArray(list)) {
-                    throw yield* Eff.throw(new OpticErr(`[koka-optic] Find ${predicate} is not applied for an array`))
+                    throw yield* Err.throw(new OpticErr(`[koka-optic] Find ${predicate} is not applied for an array`))
                 }
 
                 const index = list.findIndex(predicate)
 
                 if (index === -1) {
-                    throw yield* Eff.throw(new OpticErr(`[koka-optic] Item not found`))
+                    throw yield* Err.throw(new OpticErr(`[koka-optic] Item not found`))
                 }
 
                 const target = list[index]
@@ -390,7 +392,7 @@ export class Optic<State, Root> {
         return this.transform({
             *get(state) {
                 if (!predicate(state)) {
-                    throw yield* Eff.throw(new OpticErr(`[koka-optic] State does not match by ${predicate}`))
+                    throw yield* Err.throw(new OpticErr(`[koka-optic] State does not match by ${predicate}`))
                 }
 
                 return state
@@ -405,7 +407,7 @@ export class Optic<State, Root> {
         return this.transform({
             *get(state) {
                 if (!predicate(state)) {
-                    throw yield* Eff.throw(new OpticErr(`[koka-optic] State does not match by ${predicate}`))
+                    throw yield* Err.throw(new OpticErr(`[koka-optic] State does not match by ${predicate}`))
                 }
 
                 return state
@@ -426,7 +428,7 @@ export class Optic<State, Root> {
             | Optic<Target, ArrayItem<State>>
             | ((state: Optic<ArrayItem<State>, ArrayItem<State>>) => Optic<Target, ArrayItem<State>>),
     ): Optic<Target[], Root> {
-        const from = Optic.root<ArrayItem<State>>()
+        const from = root<ArrayItem<State>>()
 
         let mapper$: Optic<Target, ArrayItem<State>>
 
@@ -458,7 +460,7 @@ export class Optic<State, Root> {
                 const newList = [] as ArrayItem<State>[]
 
                 if (list.length !== targetList.length) {
-                    throw yield* Eff.throw(
+                    throw yield* Err.throw(
                         new OpticErr(`[koka-optic] List length mismatch: ${list.length} !== ${targetList.length}`),
                     )
                 }
@@ -506,7 +508,7 @@ export class Optic<State, Root> {
         return this.transform<FilteredInfo>({
             *get(list) {
                 if (!Array.isArray(list)) {
-                    throw yield* Eff.throw(new OpticErr(`[koka-optic] Filter ${predicate} is not applied for an array`))
+                    throw yield* Err.throw(new OpticErr(`[koka-optic] Filter ${predicate} is not applied for an array`))
                 }
 
                 let indexRecord: IndexRecord | undefined

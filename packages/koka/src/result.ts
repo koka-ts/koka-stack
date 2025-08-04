@@ -75,7 +75,7 @@ export function* unwrap<Yield, Return extends AnyOk | Err.AnyErr>(
 export function run<Yield, Return>(
     input: Koka.Actor<Yield, Return>,
 ): Async.Async extends Yield
-    ? Koka.MaybePromise<Ok<Return> | Koka.ExtractErr<Yield>>
+    ? Async.MaybePromise<Ok<Return> | Koka.ExtractErr<Yield>>
     : Ok<Return> | Koka.ExtractErr<Yield> {
     const gen = typeof input === 'function' ? input() : input
 

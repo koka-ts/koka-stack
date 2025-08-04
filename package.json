@@ -5,17 +5,9 @@
     "author": "https://github.com/Lucifier129",
     "private": true,
     "engines": {
-        "node": ">=14.x"
+        "node": ">=22.18"
     },
     "scripts": {
-        "build": "run-s clean:build build:source clean:tests",
-        "build:cjs": "tsc -b ./tsconfig.cjs.json",
-        "build:esm": "tsc -b ./tsconfig.esm.json && node build-esm.mjs",
-        "build:source": "run-s build:cjs build:esm",
-        "build:all": "pnpm --filter \"./packages/**\" run build",
-        "clean": "run-p clean:build",
-        "clean:build": "shx rm -rf ./packages/*/*.tsbuildinfo && shx rm -rf ./packages/*/{dist,cjs,esm}",
-        "clean:tests": "shx rm -rf ./packages/*/{dist,cjs,esm}/**/__tests__",
         "clean:deps": "shx rm -rf ./node_modules && shx rm -rf ./packages/*/node_modules && shx rm -rf ./projects/*/node_modules",
         "lint": "eslint --report-unused-disable-directives ./packages",
         "format": "run-p format:source format:other",

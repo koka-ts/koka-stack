@@ -1,4 +1,4 @@
-import { ExecutionTree, Store } from './koka-ddd'
+import { ExecutionTree, Store } from './koka-store.ts'
 import chalk from 'chalk'
 
 type LoggerOptions = {

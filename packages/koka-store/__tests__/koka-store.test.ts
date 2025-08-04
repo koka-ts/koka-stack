@@ -1,7 +1,9 @@
-import { Eff } from 'koka'
-import { Store, Domain, get, set, query, command, Optic } from '../src/koka-ddd'
-import { PrettyPrinter } from '../src/pretty-printer'
-import { PrettyLogger as CliPrettyLogger } from '../src/pretty-cli-logger'
+import * as Async from 'koka/async'
+import * as Ctx from 'koka/ctx'
+import * as Optic from 'koka-optic'
+import * as Store from '../src/koka-store.ts'
+import { PrettyPrinter } from '../src/pretty-printer.ts'
+import { PrettyLogger as CliPrettyLogger } from '../src/pretty-cli-logger.ts'
 
 type Todo = {
     id: number
@@ -15,39 +17,39 @@ type TodoApp = {
     input: string
 }
 
-class TextDomain<Root> extends Domain<string, Root> {
-    @command()
+class TextDomain<Root> extends Store.Domain<string, Root> {
+    @Store.command()
     *updateText(text: string) {
-        yield* set(this, text)
+        yield* Store.set(this, text)
         return 'text updated'
     }
-    @command()
+    @Store.command()
     *clearText() {
-        yield* set(this, '')
+        yield* Store.set(this, '')
         return 'text cleared'
     }
 }
 
-class BoolDomain<Root> extends Domain<boolean, Root> {
-    @command()
+class BoolDomain<Root> extends Store.Domain<boolean, Root> {
+    @Store.command()
     *toggle() {
-        yield* set(this, (value) => !value)
+        yield* Store.set(this, (value) => !value)
         return 'bool toggled'
     }
 }
 
-class TodoDomain<Root> extends Domain<Todo, Root> {
+class TodoDomain<Root> extends Store.Domain<Todo, Root> {
     text = new TextDomain(this.$.prop('text'))
     done = new BoolDomain(this.$.prop('done'));
 
-    @command()
+    @Store.command()
     *updateTodoText(text: string) {
-        const done = yield* get(this.done)
+        const done = yield* Store.get(this.done)
         yield* this.text.updateText(text)
         return 'todo updated'
     }
 
-    @command()
+    @Store.command()
     *toggleTodo() {
         yield* this.done.toggle()
         return 'todo toggled'
@@ -56,15 +58,15 @@ class TodoDomain<Root> extends Domain<Todo, Root> {
 
 let todoUid = 0
 
-class TodoListDomain<Root> extends Domain<Todo[], Root> {
-    @command()
+class TodoListDomain<Root> extends Store.Domain<Todo[], Root> {
+    @Store.command()
     *addTodo(text: string) {
         const newTodo = {
             id: todoUid++,
             text,
             done: false,
         }
-        yield* set(this, (todos) => [...todos, newTodo])
+        yield* Store.set(this, (todos) => [...todos, newTodo])
 
         return 'todo added'
     }
@@ -88,21 +90,21 @@ class TodoListDomain<Root> extends Domain<Todo[], Root> {
     })
 }
 
-class TodoAppDomain<Root> extends Domain<TodoApp, Root> {
+class TodoAppDomain<Root> extends Store.Domain<TodoApp, Root> {
     todos = new TodoListDomain(this.$.prop('todos'))
     input = new TextDomain(this.$.prop('input'));
 
-    @command()
+    @Store.command()
     *addTodo() {
-        const todoApp = yield* get(this)
+        const todoApp = yield* Store.get(this)
         yield* this.todos.addTodo(todoApp.input)
         yield* this.updateInput('')
         return 'Todo added'
     }
 
-    @command()
+    @Store.command()
     *updateInput(input: string) {
-        yield* Eff.await(Promise.resolve('test async'))
+        yield* Async.await(Promise.resolve('test async'))
         yield* this.input.updateText(input)
         return 'Input updated'
     }
@@ -111,10 +113,10 @@ class TodoAppDomain<Root> extends Domain<TodoApp, Root> {
 const todoApp$ = new TodoAppDomain(Optic.root<TodoApp>())
 
 describe('TodoAppDomain', () => {
-    let store: Store<TodoApp>
+    let store: Store.Store<TodoApp>
 
     beforeEach(() => {
-        store = new Store<TodoApp>({
+        store = new Store.Store<TodoApp>({
             state: {
                 todos: [],
                 filter: 'all',
@@ -294,7 +296,7 @@ describe('TodoAppDomain', () => {
 })
 
 describe('Custom Context in Store', () => {
-    class StoreWithCustomContext extends Store<number> {
+    class StoreWithCustomContext extends Store.Store<number> {
         enhancers = [PrettyPrinter(), CliPrettyLogger()]
         context = {
             a: 1,
@@ -311,11 +313,11 @@ describe('Custom Context in Store', () => {
     })
 
     it('should get context value', () => {
-        class A extends Eff.Ctx('a')<number> {}
+        class A extends Ctx.Ctx('a')<number> {}
 
         const result = store.runQuery(
             (function* () {
-                return yield* Eff.get(A)
+                return yield* Ctx.get(A)
             })(),
         )
 
@@ -326,10 +328,10 @@ describe('Custom Context in Store', () => {
     })
 
     it('should get context function result', () => {
-        class B extends Eff.Ctx('b')<(n: number) => number> {}
+        class B extends Ctx.Ctx('b')<(n: number) => number> {}
 
         const result = store.runQuery(function* () {
-            const b = yield* Eff.get(B)
+            const b = yield* Ctx.get(B)
             return b(1)
         })
 
