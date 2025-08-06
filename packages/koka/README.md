@@ -1,28 +1,22 @@
-# Koka - Lightweight TypeScript Effect Management Library Based on Algebraic Effects
+# Koka
 
-**Warning: This library is in early development and may undergo significant changes. Do not use in production environments.**
+A lightweight 3kB Effect-TS alternative library based on Algebraic Effects.
 
-Koka is a lightweight TypeScript effect management library based on algebraic effects, providing structured error handling, context management, and asynchronous operations with composability and type safety.
+[![npm version](https://badge.fury.io/js/koka.svg)](https://badge.fury.io/js/koka)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Bundle Size](https://img.shields.io/bundlephobia/minzip/koka)](https://bundlephobia.com/package/koka)
 
-## 📚 Documentation Navigation
+## Features
 
-[中文文档](./README.zh_CN.md)
+-   **Lightweight**: Only 3kB minified and gzipped
+-   **Type Safe**: Full TypeScript support with excellent type inference
+-   **Algebraic Effects**: Based on proven algebraic effects theory
+-   **Async Support**: Seamless integration with Promises and async/await
+-   **Error Handling**: Powerful error handling with type safety
+-   **Context Management**: Dependency injection made simple
+-   **Task Management**: Concurrent task execution with control
 
--   **[Documentation Home](./docs/README.md)** - Complete documentation navigation
--   **[Tutorials](./docs/tutorials.md)** - Learn Koka from scratch
--   **[How-to Guides](./docs/how-to-guides.md)** - Step-by-step solutions to specific problems
--   **[API Reference](./docs/reference.md)** - Complete API documentation
--   **[Concept Explanations](./docs/explanations.md)** - Deep understanding of Koka's design philosophy
-
-## 📋 Quick Navigation
-
--   [🚀 Quick Start](#-quick-start)
--   [✨ Core Features](#-core-features)
--   [🔄 Comparison with Effect-TS](#-comparison-with-effect-ts)
--   [📖 Documentation Structure](#-documentation-structure)
--   [🤝 Contributing](#-contributing)
-
-## 🚀 Quick Start
+## Quick Start
 
 ### Installation
 
@@ -37,97 +31,345 @@ pnpm add koka
 ### Basic Usage
 
 ```typescript
-import { Eff } from 'koka'
+import * as Koka from 'koka'
+import * as Err from 'koka/err'
+import * as Ctx from 'koka/ctx'
 
-// Error handling
-class ValidationError extends Eff.Err('ValidationError')<string> {}
+// Define your effects
+class UserNotFound extends Err.Err('UserNotFound')<string> {}
+class AuthToken extends Ctx.Ctx('AuthToken')<string> {}
 
+// Write effectful code
 function* getUser(id: string) {
-    if (!id) {
-        yield* Eff.throw(new ValidationError('ID is required'))
+    const token = yield* Ctx.get(AuthToken)
+
+    if (!token) {
+        yield* Err.throw(new UserNotFound('No auth token'))
     }
+
     return { id, name: 'John Doe' }
 }
 
-// Context management
-class Discount extends Eff.Ctx('Discount')<number> {}
+// Handle effects
+const program = Koka.try(getUser('123')).handle({
+    UserNotFound: (error) => ({ error }),
+    AuthToken: 'secret-token',
+})
 
-function* calculateTotal() {
-    const discount = yield* Eff.get(Discount)
-    return 100 * (1 - discount)
-}
-
-// Async operations
-async function* fetchData() {
-    const response = yield* Eff.await(fetch('/api/data'))
-    return response.json()
-}
-
-// Run effects
-const result = await Eff.run(
-    Eff.try(getUser('123')).handle({
-        ValidationError: (error) => ({ error }),
-    }),
-)
+const result = Koka.run(program)
+console.log(result) // { id: '123', name: 'John Doe' }
 ```
 
-## ✨ Core Features
+## Core Concepts
 
--   **Type Safe** - Full TypeScript support
--   **Lightweight** - Only ~3kB gzipped
--   **Composable** - Effects naturally compose
--   **Async Ready** - Seamless Promise integration
--   **Design First** - Support for predefined effect types
+### Error Effects
 
-## 🔄 Comparison with Effect-TS
+Handle errors with type safety:
 
-| Feature         | Koka | Effect-TS |
-| --------------- | ---- | --------- |
-| Error Effects   | ✅   | ✅        |
-| Context Effects | ✅   | ✅        |
-| Async Effects   | ✅   | ✅        |
-| Composability   | ✅   | ✅        |
-| Type Safety     | ✅   | ✅        |
-| Minimal API     | ✅   | ❌        |
-| Full Ecosystem  | ❌   | ✅        |
-| Learning Curve  | Low  | High      |
-| Package Size    | ~3kB | ~50kB     |
+```typescript
+import * as Err from 'koka/err'
 
-Koka is a lightweight alternative to Effect-TS, focusing on providing core effect management functionality without the complete ecosystem.
+class ValidationError extends Err.Err('ValidationError')<{ field: string; message: string }> {}
 
-## 📖 Documentation Structure
+function* validateUser(user: any) {
+    if (!user.name) {
+        yield* Err.throw(
+            new ValidationError({
+                field: 'name',
+                message: 'Name is required',
+            }),
+        )
+    }
+    return user
+}
 
-### Tutorials
+const program = Koka.try(validateUser({})).handle({
+    ValidationError: (error) => ({ error, status: 'error' }),
+})
 
--   [Getting Started](./docs/tutorials.md#getting-started) - Create your first Koka program
--   [Error Handling Basics](./docs/tutorials.md#error-handling-basics) - Learn how to handle error effects
--   [Context Management](./docs/tutorials.md#context-management) - Understand how to use context effects
--   [Async Programming](./docs/tutorials.md#async-programming) - Master async effect handling
+const result = Koka.run(program)
+```
 
-### How-to Guides
+### Context Effects
 
--   [Handle Specific Error Types](./docs/how-to-guides.md#handle-specific-error-types)
--   [Combine Multiple Effects](./docs/how-to-guides.md#combine-multiple-effects)
--   [Use Design-First Approach](./docs/how-to-guides.md#use-design-first-approach)
--   [Message Passing](./docs/how-to-guides.md#message-passing)
--   [Stream Processing](./docs/how-to-guides.md#stream-processing)
+Dependency injection made simple:
 
-### Reference
+```typescript
+import * as Ctx from 'koka/ctx'
 
--   [Eff API](./docs/reference.md#eff-api) - Complete Eff class API
--   [Effect Types](./docs/reference.md#effect-types) - Definitions of all effect types
--   [Utility Functions](./docs/reference.md#utility-functions) - Helper functions and types
+class Database extends Ctx.Ctx('Database')<{
+    query: (sql: string) => Promise<any>
+}> {}
 
-### Explanations
+function* getUser(id: string) {
+    const db = yield* Ctx.get(Database)
+    const user = yield* Async.await(db.query(`SELECT * FROM users WHERE id = '${id}'`))
+    return user
+}
 
--   [Algebraic Effects](./docs/explanations.md#algebraic-effects) - Concepts of algebraic effects
--   [Effect System Design](./docs/explanations.md#effect-system-design) - Koka's design philosophy
--   [Detailed Comparison with Effect-TS](./docs/explanations.md#detailed-comparison-with-effect-ts)
+const program = Koka.try(getUser('123')).handle({
+    Database: {
+        query: async (sql) => ({ id: '123', name: 'John Doe' }),
+    },
+})
 
-## 🤝 Contributing
+const result = await Koka.run(program)
+```
 
-PRs are welcome! Please ensure tests pass and new features include appropriate test coverage.
+### Async Operations
 
-## 📄 License
+Seamless async/await integration:
 
-MIT
+```typescript
+import * as Async from 'koka/async'
+
+function* fetchUser(id: string) {
+    const user = yield* Async.await(fetch(`/api/users/${id}`).then((res) => res.json()))
+    return user
+}
+
+const result = await Koka.run(fetchUser('123'))
+```
+
+### Task Management
+
+Concurrent operations with control:
+
+```typescript
+import * as Task from 'koka/task'
+
+function* getUserProfile(userId: string) {
+    const result = yield* Task.object({
+        user: () => fetchUser(userId),
+        posts: () => fetchPosts(userId),
+        comments: () => fetchComments(userId),
+    })
+
+    return result
+}
+
+const profile = await Koka.run(getUserProfile('123'))
+```
+
+## Comparison with Effect-TS
+
+| Aspect             | Koka             | Effect-TS       |
+| ------------------ | ---------------- | --------------- |
+| **Bundle Size**    | ~3kB             | ~50kB           |
+| **API Style**      | Object-oriented  | Functional      |
+| **Learning Curve** | Gentle           | Steep           |
+| **Type Safety**    | Excellent        | Excellent       |
+| **Performance**    | Minimal overhead | Higher overhead |
+
+### Migration from Effect-TS
+
+```typescript
+// Effect-TS
+const getUser = (id: string) =>
+    Effect.gen(function* (_) {
+        const userService = yield* _(UserService)
+        const user = yield* _(userService.getUser(id))
+        return user
+    })
+
+// Koka
+function* getUser(id: string) {
+    const userService = yield* Ctx.get(UserService)
+    const user = yield* Async.await(userService.getUser(id))
+    return user
+}
+```
+
+See our [migration guide](./docs/how-to/migrate-from-effect-ts.md) for detailed instructions.
+
+## API Reference
+
+### Core Functions
+
+-   `Koka.try()` - Create a program that can handle effects
+-   `Koka.run()` - Run a program
+-   `Koka.runSync()` - Run a program synchronously
+-   `Koka.runAsync()` - Run a program asynchronously
+
+### Effect Types
+
+-   `Err.Err()` - Error effects
+-   `Ctx.Ctx()` - Context effects
+-   `Opt.Opt()` - Optional effects
+
+### Task Functions
+
+-   `Task.all()` - Array-based parallel execution
+-   `Task.tuple()` - Tuple-based parallel execution
+-   `Task.object()` - Object-based parallel execution (recommended)
+-   `Task.race()` - Get first result
+-   `Task.concurrent()` - Controlled concurrency
+
+### Utility Functions
+
+-   `Async.await()` - Await values or promises
+-   `Result.run()` - Run with result handling
+-   `Result.wrap()` - Wrap generators in results
+-   `Result.unwrap()` - Unwrap result generators
+
+## Documentation
+
+Our documentation follows the [Diátaxis](https://diataxis.fr/) framework:
+
+-   **[Tutorials](./docs/tutorials/)** - Learning-oriented guides
+-   **[How-to Guides](./docs/how-to/)** - Task-oriented guides
+-   **[Reference](./docs/reference/)** - API documentation
+-   **[Explanations](./docs/explanations/)** - Concept explanations
+
+### Quick Links
+
+-   [Getting Started](./docs/tutorials/getting-started.md)
+-   [Core Concepts](./docs/tutorials/core-concepts.md)
+-   [API Reference](./docs/reference/api.md)
+-   [Effect-TS Comparison](./docs/explanations/effect-ts-comparison.md)
+-   [Migration Guide](./docs/how-to/migrate-from-effect-ts.md)
+
+## Examples
+
+### Error Handling
+
+```typescript
+import * as Koka from 'koka'
+import * as Err from 'koka/err'
+import * as Result from 'koka/result'
+
+class NetworkError extends Err.Err('NetworkError')<string> {}
+
+function* fetchData(url: string) {
+    try {
+        const response = yield* Async.await(fetch(url))
+        const data = yield* Async.await(response.json())
+        return data
+    } catch (error) {
+        yield* Err.throw(new NetworkError(error.message))
+    }
+}
+
+// Handle errors explicitly
+const result = Result.run(fetchData('https://api.example.com/data'))
+if (result.type === 'ok') {
+    console.log('Success:', result.value)
+} else {
+    console.log('Error:', result.error)
+}
+```
+
+### Context Management
+
+```typescript
+import * as Koka from 'koka'
+import * as Ctx from 'koka/ctx'
+import * as Opt from 'koka/opt'
+
+class Database extends Ctx.Ctx('Database')<{
+    query: (sql: string) => Promise<any>
+}> {}
+
+class Logger extends Opt.Opt('Logger')<(message: string) => void> {}
+
+function* getUser(id: string) {
+    const db = yield* Ctx.get(Database)
+    const logger = yield* Opt.get(Logger)
+
+    logger?.('Fetching user...')
+    const user = yield* Async.await(db.query(`SELECT * FROM users WHERE id = '${id}'`))
+    logger?.('User fetched successfully')
+
+    return user
+}
+
+const program = Koka.try(getUser('123')).handle({
+    Database: {
+        query: async (sql) => ({ id: '123', name: 'John Doe' }),
+    },
+    Logger: (message) => console.log(`[INFO] ${message}`),
+})
+
+const result = await Koka.run(program)
+```
+
+### Task Management
+
+```typescript
+import * as Koka from 'koka'
+import * as Task from 'koka/task'
+
+function* processUserData(userId: string) {
+    // Fetch data in parallel
+    const data = yield* Task.object({
+        user: () => fetchUser(userId),
+        posts: () => fetchPosts(userId),
+        comments: () => fetchComments(userId),
+    })
+
+    // Process data in parallel
+    const processed = yield* Task.object({
+        user: () => processUser(data.user),
+        posts: () => processPosts(data.posts),
+        comments: () => processComments(data.comments),
+    })
+
+    return processed
+}
+
+const result = await Koka.run(processUserData('123'))
+```
+
+## Requirements
+
+-   Node.js >= 22.18
+-   TypeScript >= 5.0
+
+## Browser Support
+
+Koka requires:
+
+-   ES2015+ (for generators)
+-   Promise support
+-   Symbol support
+
+For older browsers, consider using a polyfill or transpiler.
+
+## Contributing
+
+We welcome contributions! Please see our [Contributing Guide](../../CONTRIBUTING.md) for details.
+
+### Development
+
+```bash
+# Install dependencies
+pnpm install
+
+# Run tests
+pnpm test
+
+# Run tests with coverage
+pnpm test:coverage
+
+# Build the project
+pnpm build
+```
+
+## License
+
+MIT License - see [LICENSE](./LICENSE) for details.
+
+## Related Projects
+
+-   [Effect-TS](https://effect.website/) - Comprehensive algebraic effects library
+-   [Algebraic Effects Research](https://en.wikipedia.org/wiki/Algebraic_effect) - Theory behind algebraic effects
+
+## Support
+
+-   [GitHub Issues](https://github.com/koka-ts/koka/issues)
+-   [GitHub Discussions](https://github.com/koka-ts/koka/discussions)
+-   [Documentation](./docs/)
+
+---
+
+Made with ❤️ by the Koka team

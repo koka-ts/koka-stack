@@ -1,89 +1,162 @@
 # Koka Documentation
 
-Welcome to the Koka documentation! This documentation is organized according to the Diátaxis documentation framework to help you quickly find the information you need.
+Welcome to the Koka documentation! This documentation follows the [Diátaxis](https://diataxis.fr/) framework to provide you with the most effective learning experience.
 
-## 📚 Documentation Navigation
+## What is Koka?
 
-### 🎓 Tutorials
+Koka is a lightweight 3kB Effect-TS alternative library based on Algebraic Effects. It provides a powerful and ergonomic way to handle effects in TypeScript applications with minimal bundle size and maximum developer experience.
 
-**Learn how to use Koka**
+## Documentation Structure
 
--   **[Getting Started](./tutorials.md#getting-started)** - Create your first Koka program
--   **[Error Handling Basics](./tutorials.md#error-handling-basics)** - Learn how to handle error effects
--   **[Context Management](./tutorials.md#context-management)** - Understand how to use context effects
--   **[Async Programming](./tutorials.md#async-programming)** - Master async effect handling
--   **[Design-First Approach](./tutorials.md#design-first-approach)** - Learn predefined effect types
+Our documentation is organized into four distinct sections, each serving a different purpose:
 
-### 🔧 How-to Guides
+### 📚 [Tutorials](./tutorials/)
 
-**Step-by-step solutions to specific problems**
+**Learning-oriented guides** that help you get started with Koka.
 
--   **[Handle Specific Error Types](./how-to-guides.md#handle-specific-error-types)** - Define and use custom errors
--   **[Combine Multiple Effects](./how-to-guides.md#combine-multiple-effects)** - Execute and combine effects in parallel
--   **[Use Design-First Approach](./how-to-guides.md#use-design-first-approach)** - Organize effect definitions
--   **[Message Passing](./how-to-guides.md#message-passing)** - Implement communication between generators
--   **[Stream Processing](./how-to-guides.md#stream-processing)** - Handle streaming data
--   **[Error Recovery and Retry](./how-to-guides.md#error-recovery-and-retry)** - Implement retry mechanisms
--   **[Testing Effects](./how-to-guides.md#testing-effects)** - Write tests for effects
+-   [Getting Started](./tutorials/getting-started.md) - Your first steps with Koka
+-   [Core Concepts](./tutorials/core-concepts.md) - Understanding Algebraic Effects
+-   [Error Handling](./tutorials/error-handling.md) - Managing errors with effects
+-   [Context Management](./tutorials/context-management.md) - Working with context effects
+-   [Async Operations](./tutorials/async-operations.md) - Handling asynchronous code
+-   [Task Management](./tutorials/task-management.md) - Managing concurrent tasks
 
-### 📖 Reference
+### 🛠️ [How-to Guides](./how-to/)
 
-**Complete API documentation**
+**Task-oriented guides** that show you how to solve specific problems.
 
--   **[Eff API](./reference.md#eff-api)** - Complete Eff class API
--   **[Effect Types](./reference.md#effect-types)** - Definitions of all effect types
--   **[Result Types](./reference.md#result-types)** - Result types and utility functions
--   **[Utility Functions](./reference.md#utility-functions)** - Helper functions and types
--   **[Type Utilities](./reference.md#type-utilities)** - Advanced type definitions
+-   [Handle Multiple Effects](./how-to/handle-multiple-effects.md)
+-   [Create Custom Effects](./how-to/create-custom-effects.md)
+-   [Migrate from Effect-TS](./how-to/migrate-from-effect-ts.md)
+-   [Debug Effects](./how-to/debug-effects.md)
+-   [Test Effectful Code](./how-to/test-effectful-code.md)
+-   [Performance Optimization](./how-to/performance-optimization.md)
 
-### 💡 Explanations
+### 📖 [Reference](./reference/)
 
-**Deep understanding of Koka's design philosophy**
+**Information-oriented documentation** for quick lookups.
 
--   **[Algebraic Effects](./explanations.md#algebraic-effects)** - Concepts and principles of algebraic effects
--   **[Effect System Design](./explanations.md#effect-system-design)** - Koka's effect type system
--   **[Generators and Effects](./explanations.md#generators-and-effects)** - Why use generators
--   **[Type System Design](./explanations.md#type-system-design)** - Advanced type utilities
--   **[Detailed Comparison with Effect-TS](./explanations.md#detailed-comparison-with-effect-ts)** - In-depth comparison analysis
--   **[Best Practices](./explanations.md#best-practices)** - Effect design and code organization
+-   [API Reference](./reference/api.md) - Complete API documentation
+-   [Effect Types](./reference/effect-types.md) - All available effect types
+-   [Type Definitions](./reference/types.md) - TypeScript type definitions
+-   [Configuration](./reference/configuration.md) - Configuration options
 
-## 🚀 Quick Start
+### 💡 [Explanations](./explanations/)
 
-If you're a new user, we recommend reading in the following order:
+**Understanding-oriented content** that explains concepts and decisions.
 
-1. **[Tutorials](./tutorials.md)** - Learn Koka from scratch
-2. **[How-to Guides](./how-to-guides.md)** - Learn to solve specific problems
-3. **[Reference](./reference.md)** - Look up API details
-4. **[Explanations](./explanations.md)** - Deep understanding of design philosophy
+-   [Algebraic Effects Explained](./explanations/algebraic-effects.md)
+-   [Comparison with Effect-TS](./explanations/effect-ts-comparison.md)
+-   [Design Decisions](./explanations/design-decisions.md)
+-   [Performance Characteristics](./explanations/performance.md)
+-   [Best Practices](./explanations/best-practices.md)
 
-## 📋 Documentation Standards
+## Quick Start
 
-This documentation follows the [Diátaxis documentation framework](https://diataxis.fr/), which includes four types of documentation:
+```typescript
+import * as Koka from 'koka'
+import * as Err from 'koka/err'
+import * as Ctx from 'koka/ctx'
 
--   **Tutorials** - Learning-oriented, teaching you how to complete specific tasks
--   **How-to Guides** - Problem-oriented, solving specific problems
--   **Reference** - Information-oriented, providing complete API information
--   **Explanations** - Understanding-oriented, explaining concepts and design philosophy
+// Define your effects
+class UserNotFound extends Err.Err('UserNotFound')<string> {}
+class AuthToken extends Ctx.Ctx('AuthToken')<string> {}
 
-## 🤝 Contributing to Documentation
+// Write effectful code
+function* getUser(id: string) {
+    const token = yield* Ctx.get(AuthToken)
 
-We welcome community contributions to improve documentation:
+    if (!token) {
+        yield* Err.throw(new UserNotFound('No auth token'))
+    }
 
-1. **Report Issues** - Report documentation issues in GitHub Issues
-2. **Submit Improvements** - Submit documentation improvements via Pull Request
-3. **Share Experience** - Share experiences and best practices using Koka
+    return { id, name: 'John Doe' }
+}
 
-## 📞 Getting Help
+// Handle effects
+const program = Koka.try(getUser('123')).handle({
+    UserNotFound: (error) => ({ error }),
+    AuthToken: 'secret-token',
+})
 
-If you encounter problems while using Koka:
+const result = Koka.run(program)
+```
 
-1. **Check Documentation** - First check the relevant documentation
-2. **Search Issues** - Search for similar issues in GitHub Issues
-3. **Create Issue** - If you can't find an answer, create a new issue
-4. **Community Discussion** - Participate in GitHub Discussions
+## Key Features
 
-## 🔗 Related Links
+-   **Lightweight**: Only 3kB minified and gzipped
+-   **Type Safe**: Full TypeScript support with excellent type inference
+-   **Algebraic Effects**: Based on proven algebraic effects theory
+-   **Async Support**: Seamless integration with Promises and async/await
+-   **Error Handling**: Powerful error handling with type safety
+-   **Context Management**: Dependency injection made simple
+-   **Task Management**: Concurrent task execution with control
 
--   **[GitHub Repository](https://github.com/koka-lang/koka-stack)** - Source code and issues
--   **[npm Package](https://www.npmjs.com/package/koka)** - Installation and usage
--   **[Online Examples](https://github.com/koka-lang/koka-stack/tree/main/examples)** - Real-world usage examples
+## Installation
+
+```bash
+npm install koka
+# or
+yarn add koka
+# or
+pnpm add koka
+```
+
+## Requirements
+
+-   Node.js >= 22.18
+-   TypeScript >= 5.0
+
+## Documentation Navigation
+
+### 🎯 Choose Your Path
+
+**New to Algebraic Effects?**
+Start with [Getting Started](./tutorials/getting-started.md) and [Core Concepts](./tutorials/core-concepts.md)
+
+**Coming from Effect-TS?**
+Check out [Migration Guide](./how-to/migrate-from-effect-ts.md) and [Comparison](./explanations/effect-ts-comparison.md)
+
+**Need to Solve a Specific Problem?**
+Browse the [How-to Guides](./how-to/) section
+
+**Looking for API Details?**
+Go to [API Reference](./reference/api.md)
+
+**Want to Understand the Design?**
+Read [Design Decisions](./explanations/design-decisions.md) and [Best Practices](./explanations/best-practices.md)
+
+## Code Examples
+
+All code examples in this documentation follow the pattern used in the test files:
+
+```typescript
+// ✅ Correct import style (as used in tests)
+import * as Koka from 'koka'
+import * as Err from 'koka/err'
+import * as Ctx from 'koka/ctx'
+import * as Async from 'koka/async'
+import * as Task from 'koka/task'
+import * as Result from 'koka/result'
+import * as Opt from 'koka/opt'
+import * as Gen from 'koka/gen'
+
+// ❌ Not used in this documentation
+import { try, run } from 'koka'
+import { Err, Ctx } from 'koka'
+```
+
+## Contributing
+
+We welcome contributions! Please see our [Contributing Guide](../../CONTRIBUTING.md) for details.
+
+## License
+
+MIT License - see [LICENSE](../../LICENSE) for details.
+
+## External Resources
+
+-   [GitHub Repository](https://github.com/koka-ts/koka)
+-   [NPM Package](https://www.npmjs.com/package/koka)
+-   [Effect-TS Documentation](https://effect.website/) (for comparison)
+-   [Algebraic Effects Research](https://en.wikipedia.org/wiki/Algebraic_effect)
