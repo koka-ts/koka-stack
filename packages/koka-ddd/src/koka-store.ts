@@ -7,12 +7,12 @@ import * as Async from 'koka/async'
 import * as Optic from 'koka-optic'
 
 export class Domain<State, Root> {
-    $: Optic.Optic<State, Root>
+    [Optic.OPTICAL]: Optic.Optic<State, Root>
 
-    constructor(options: Optic.OpticOptions<State, Root>) {
-        this.$ = new Optic.Optic<State, Root>(options)
+    constructor(optic: Optic.Optic<State, Root>) {
+        this[Optic.OPTICAL] = optic
 
-        Object.defineProperty(this.$, 'getKey', {
+        Object.defineProperty(this[Optic.OPTICAL], 'getKey', {
             get: () => this.getKey,
         })
     }
@@ -72,7 +72,7 @@ export type DomainCommand<Return, Root, E extends Koka.AnyEff = never> = Generat
 export function* get<State, Root>(
     domainOrOptic: Domain<State, Root> | Optic.Optic<State, Root>,
 ): DomainQuery<State, Root> {
-    const optic = domainOrOptic instanceof Domain ? domainOrOptic.$ : domainOrOptic
+    const optic = domainOrOptic instanceof Domain ? Optic.from(domainOrOptic) : domainOrOptic
 
     const executionTree = yield* Opt.get(ExecutionTreeOpt)
 
@@ -91,7 +91,7 @@ export function* set<State, Root>(
     domainOrOptic: Domain<State, Root> | Optic.Optic<State, Root>,
     setStateInput: SetStateInput<State>,
 ): DomainCommand<void, Root> {
-    const optic = domainOrOptic instanceof Domain ? domainOrOptic.$ : domainOrOptic
+    const optic = domainOrOptic instanceof Domain ? Optic.from(domainOrOptic) : domainOrOptic
 
     const executionTree = yield* Opt.get(ExecutionTreeOpt)
 
@@ -252,42 +252,55 @@ export function command() {
     }
 }
 
-export type StoreContext = Record<string, unknown>
-
-type ToCtxEff<T extends StoreContext> = {
+export type ToCtxEff<T> = {
     [K in keyof T]: K extends string ? Ctx.Ctx<K, T[K]> : never
 }[keyof T]
 
-export type StoreEnhancer<State> = (store: Store<State>) => void
+export type StoreEnhancer<Root, Context extends StoreContext> = (store: Store<Root, Context>) => (() => void) | void
 
-export type StoreOptions<State> = {
-    state: State
-    enhancers?: StoreEnhancer<State>[]
+export type StoreOptions<Root, Context extends StoreContext> = {
+    state: Root
+    context: Context
+    enhancers?: StoreEnhancer<Root, Context>[]
 }
 
-export class Store<State> {
-    state: State
+export type AnyStore = Store<any, any>
 
-    context: StoreContext = {}
+export type InferStoreState<S> = S extends Store<infer State, any> ? State : never
 
-    enhancers: StoreEnhancer<State>[] = []
+export type InferStoreContext<S> = S extends Store<any, infer Context> ? Context : never
 
-    constructor(options: StoreOptions<State>) {
+export type StoreContext = Record<string, unknown>
+
+export class Store<Root, Context extends StoreContext> {
+    state: Root
+
+    context: Context
+
+    enhancers: StoreEnhancer<Root, Context>[] = []
+
+    constructor(options: StoreOptions<Root, Context>) {
         this.state = options.state
+        this.context = options.context
         this.enhancers = [...this.enhancers, ...(options.enhancers ?? [])]
 
         for (const enhancer of this.enhancers) {
-            enhancer(this)
+            const cleanup = enhancer(this)
+            if (cleanup) {
+                this.enhancerCleanup.push(cleanup)
+            }
         }
     }
 
-    getState = (): State => {
+    private enhancerCleanup: (() => void)[] = []
+
+    getState = (): Root => {
         return this.state
     }
 
     private dirty = false
 
-    setState = (state: State): void => {
+    setState = (state: Root): void => {
         if (state === this.state) {
             return
         }
@@ -306,9 +319,9 @@ export class Store<State> {
 
     pid = 0
 
-    private listeners: ((state: State) => unknown)[] = []
+    private listeners: ((state: Root) => unknown)[] = []
 
-    subscribe(listener: (state: State) => unknown): () => void {
+    subscribe(listener: (state: Root) => unknown): () => void {
         this.listeners.push(listener)
 
         return () => {
@@ -350,20 +363,58 @@ export class Store<State> {
         }
     }
 
-    get<T>(domainOrOptic: Optic.Optic<T, State> | Domain<T, State>): Result.Result<T, Optic.OpticErr> {
+    destroy(): void {
+        this.listeners = []
+        this.executionListeners = []
+
+        for (const cleanup of this.enhancerCleanup) {
+            cleanup()
+        }
+
+        this.enhancerCleanup = []
+    }
+
+    get<T>(domainOrOptic: Optic.Optic<T, Root> | Domain<T, Root>): Result.Result<T, Optic.OpticErr> {
         const result = this.runQuery(get(domainOrOptic))
         return result
     }
 
     set<T>(
-        domainOrOptic: Optic.Optic<T, State> | Domain<T, State>,
+        domainOrOptic: Optic.Optic<T, Root> | Domain<T, Root>,
         input: SetStateInput<T>,
     ): Result.Result<void, Optic.OpticErr> {
         const result = this.runCommand(set(domainOrOptic, input))
         return result
     }
 
-    runQuery<T, E extends QueryEff<State> | Err.AnyErr | Async.Async | ToCtxEff<this['context']>>(
+    subscribeQuery<T, E extends QueryEff<Root> | Err.AnyErr | Async.Async | ToCtxEff<this['context']>>(options: {
+        query: () => Generator<Exclude<E, SetRoot<any>>, T>
+        onResult?: (result: Result.Result<T, E>) => unknown
+        onErr?: (error: Koka.ExtractErr<E>) => unknown
+        onOk?: (result: T) => unknown
+    }): () => void {
+        const handleResult = (result: Result.Result<T, E>) => {
+            options.onResult?.(result)
+            if (result.type === 'ok') {
+                options.onOk?.(result.value)
+            } else {
+                options.onErr?.(result.error)
+            }
+        }
+        const unsubscribe = this.subscribe(() => {
+            const result = this.runQuery(options.query)
+
+            if (result instanceof Promise) {
+                result.then(handleResult as any)
+            } else {
+                handleResult(result as any)
+            }
+        })
+
+        return unsubscribe
+    }
+
+    runQuery<T, E extends QueryEff<Root> | Err.AnyErr | Async.Async | ToCtxEff<this['context']>>(
         input: MaybeFunction<Generator<Exclude<E, SetRoot<any>>, T>>,
     ): Async.Async extends E ? Async.MaybePromise<Result.Result<T, E>> : Result.Result<T, E> {
         const query = typeof input === 'function' ? input() : input
@@ -381,7 +432,7 @@ export class Store<State> {
                   }
                 : undefined
 
-        const withRoot = Koka.try(query as Generator<QueryEff<State>, T>).handle({
+        const withRoot = Koka.try(query as Generator<QueryEff<Root>, T>).handle({
             ...this.context,
             [GetRoot.field]: this.getState,
             [ExecutionTreeOpt.field]: executionTree,
@@ -404,7 +455,7 @@ export class Store<State> {
         return handleResult(result) as any
     }
 
-    runCommand<T, E extends CommandEff<State> | Err.AnyErr | Async.Async | ToCtxEff<this['context']>>(
+    runCommand<T, E extends CommandEff<Root> | Err.AnyErr | Async.Async | ToCtxEff<this['context']>>(
         input: MaybeFunction<Generator<E, T>>,
     ): Async.Async extends E ? Async.MaybePromise<Result.Result<T, E>> : Result.Result<T, E> {
         const command = typeof input === 'function' ? input() : input
@@ -424,7 +475,7 @@ export class Store<State> {
                   }
                 : undefined
 
-        const withRoot = Koka.try(command as Generator<RootAccessor<State> | CommandEff<State>, any>).handle({
+        const withRoot = Koka.try(command as Generator<RootAccessor<Root> | CommandEff<Root>, any>).handle({
             ...this.context,
             [SetRoot.field]: this.setState,
             [GetRoot.field]: this.getState,

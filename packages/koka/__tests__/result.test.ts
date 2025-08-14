@@ -81,9 +81,9 @@ describe('Result.run', () => {
             return value
         }
 
-        const result = await Result.run(program(42))
+        const result: Async.MaybePromise<Result.Ok<number> | Err.AnyErr> = Result.run(program(42))
 
-        expect(result).toEqual({
+        expect(await result).toEqual({
             type: 'ok',
             value: 42,
         })
@@ -97,12 +97,93 @@ describe('Result.run', () => {
             return 'should not reach here'
         }
 
-        const result = Result.run(program)
+        const result: Result.Result<string, Err.AnyErr> = Result.run(program)
 
         expect(result).toEqual({
             type: 'err',
             name: 'TestError',
             error: 'error message',
+        })
+    })
+})
+
+describe('Result.runSync', () => {
+    it('should run generator and return Result', () => {
+        function* program() {
+            return 42
+        }
+
+        const result: Result.Ok<number> = Result.runSync(program)
+        expect(result).toEqual({
+            type: 'ok',
+            value: 42,
+        })
+    })
+
+    it('should throw error if generator is async', () => {
+        function* asyncProgram() {
+            yield* Async.await(Promise.resolve(42))
+        }
+
+        expect(() => Result.runSync(asyncProgram)).toThrow()
+    })
+
+    it('should handle error in generator', () => {
+        class TestError extends Err.Err('TestError')<string> {}
+
+        function* program() {
+            yield* Err.throw(new TestError('error message'))
+        }
+
+        expect(Result.runSync(program)).toEqual({
+            type: 'err',
+            name: 'TestError',
+            error: 'error message',
+        })
+    })
+})
+
+describe('Result.runAsync', () => {
+    it('should run generator and return Result', async () => {
+        function* program() {
+            return 42
+        }
+
+        const result = await Result.runAsync(program)
+
+        expect(result).toEqual({
+            type: 'ok',
+            value: 42,
+        })
+    })
+
+    it('should handle error in generator', async () => {
+        class TestError extends Err.Err('TestError')<string> {}
+
+        function* program() {
+            yield* Err.throw(new TestError('error message'))
+        }
+
+        const result = await Result.runAsync(program)
+
+        expect(result).toEqual({
+            type: 'err',
+            name: 'TestError',
+            error: 'error message',
+        })
+    })
+
+    it('should handle async effect', async () => {
+        function* asyncProgram() {
+            const value = yield* Async.await(Promise.resolve(42))
+            return value * 2
+        }
+
+        const result = await Result.runAsync(asyncProgram)
+
+        expect(result).toEqual({
+            type: 'ok',
+            value: 84,
         })
     })
 })

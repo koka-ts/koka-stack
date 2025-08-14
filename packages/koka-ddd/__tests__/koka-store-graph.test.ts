@@ -127,7 +127,7 @@ const orderStorage = new OrderStorageDomain()
 const productStorage = new ProductStorageDomain()
 
 describe('Graph Domain Operations', () => {
-    let store: Store.Store<RootState>
+    let store: Store.Store<RootState, {}>
 
     beforeEach(() => {
         const initialState: RootState = {
@@ -154,7 +154,7 @@ describe('Graph Domain Operations', () => {
                 },
             },
         }
-        store = new Store.Store<RootState>({ state: initialState })
+        store = new Store.Store<RootState, {}>({ state: initialState, context: {} })
     })
 
     describe('User Operations', () => {

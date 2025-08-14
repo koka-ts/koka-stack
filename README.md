@@ -51,11 +51,11 @@ const result = Koka.run(program)
 
 **Documentation:** [📖 Full Documentation](./packages/koka/docs/)
 
-### [@koka/optic](./packages/koka-optic/)
+### [koka-optic](./packages/koka-optic/)
 
 Optics library for immutable data manipulation.
 
-### [@koka/store](./packages/koka-store/)
+### [koka-store](./packages/koka-ddd/)
 
 State management library with algebraic effects.
 

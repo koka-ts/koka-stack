@@ -15,7 +15,7 @@ export type OpticOptions<State, Root> = {
     set: Setter<State, Root>
 }
 
-type ArrayItem<T> = T extends (infer U)[] | readonly (infer U)[] ? U : never
+export type ArrayItem<T> = T extends (infer U)[] | readonly (infer U)[] ? U : never
 
 export type GetKey<T> = (item: ArrayItem<T>) => string | number
 
@@ -65,7 +65,12 @@ export type LeafOpticProxy<State extends number | string | boolean> = {
     [OpticProxySymbol]?: State
 }
 
-export type OpticProxy<State> = State extends object | unknown[]
+export type OpticProxy<State> = State extends unknown[]
+    ? {
+          [index: number]: OpticProxy<State[number]>
+          length: LeafOpticProxy<number>
+      }
+    : State extends object
     ? {
           [K in keyof State]: OpticProxy<State[K]>
       }
@@ -217,6 +222,28 @@ export function set<State, Root>(
             return state
         })(root)
     }
+}
+
+export const OPTICAL = Symbol.for('koka-optic')
+
+export type OpticSymbol = typeof OPTICAL
+
+export type Optical<State, Root> =
+    | Optic<State, Root>
+    | {
+          [OPTICAL]: Optic<State, Root>
+      }
+
+export function isOptical<State, Root>(value: unknown): value is Optical<State, Root> {
+    return typeof value === 'object' && value !== null && OPTICAL in value
+}
+
+export function from<State, Root>(optical: Optical<State, Root>): Optic<State, Root> {
+    if (optical instanceof Optic) {
+        return optical
+    }
+
+    return optical[OPTICAL]
 }
 
 export class Optic<State, Root> {

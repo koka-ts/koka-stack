@@ -127,6 +127,12 @@ export function runAsync<Return>(actor: Actor<Async | AnyOpt, Return>): Promise<
     return Promise.resolve(run(actor))
 }
 
+export function runUnSafe<Yield extends AnyEff, Return>(
+    input: Actor<Yield, Return>,
+): Async extends Yield ? MaybePromise<Return> : Return {
+    return run(input as any) as any
+}
+
 export type ExtractErr<T> = T extends AnyErr ? T : never
 
 export type ExcludeErr<T> = T extends AnyErr ? never : T

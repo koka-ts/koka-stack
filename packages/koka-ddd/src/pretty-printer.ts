@@ -1,4 +1,4 @@
-import { ExecutionTree, Store } from './koka-store.ts'
+import { ExecutionTree, Store } from './koka-ddd.ts'
 
 export const PrettyPrinter = () => {
     return <State>(store: Store<State>) => {
@@ -25,7 +25,7 @@ export const prettyPrintExecutionTree = (tree: ExecutionTree) => {
             treeLines.push(`${spaces}Return: ${JSON.stringify(node.return)}`)
         }
 
-        if (node.states.length > 0) {
+        if (node.type === 'query' && node.states.length > 0) {
             treeLines.push(`${spaces}States:`)
             for (const state of node.states) {
                 treeLines.push(`${spaces}  State: ${JSON.stringify(state)}`)

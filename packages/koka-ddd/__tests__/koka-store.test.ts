@@ -39,8 +39,8 @@ class BoolDomain<Root> extends Store.Domain<boolean, Root> {
 }
 
 class TodoDomain<Root> extends Store.Domain<Todo, Root> {
-    text = new TextDomain(this.$.prop('text'))
-    done = new BoolDomain(this.$.prop('done'));
+    text = new TextDomain(Optic.from(this).prop('text'))
+    done = new BoolDomain(Optic.from(this).prop('done'));
 
     @Store.command()
     *updateTodoText(text: string) {
@@ -72,15 +72,15 @@ class TodoListDomain<Root> extends Store.Domain<Todo[], Root> {
     }
 
     todo(id: number) {
-        return new TodoDomain(this.$.find((todo) => todo.id === id))
+        return new TodoDomain(Optic.from(this).find((todo) => todo.id === id))
     }
 
     getKey = (todo: Todo) => {
         return todo.id
     }
 
-    completedTodoList = this.$.filter((todo) => todo.done)
-    activeTodoList = this.$.filter((todo) => !todo.done)
+    completedTodoList = Optic.from(this).filter((todo) => todo.done)
+    activeTodoList = Optic.from(this).filter((todo) => !todo.done)
     activeTodoTextList = this.activeTodoList.map((todo$) => todo$.prop('text'))
     completedTodoTextList = this.completedTodoList.map((todo$) => todo$.prop('text'))
 
@@ -91,8 +91,8 @@ class TodoListDomain<Root> extends Store.Domain<Todo[], Root> {
 }
 
 class TodoAppDomain<Root> extends Store.Domain<TodoApp, Root> {
-    todos = new TodoListDomain(this.$.prop('todos'))
-    input = new TextDomain(this.$.prop('input'));
+    todos = new TodoListDomain(Optic.from(this).prop('todos'))
+    input = new TextDomain(Optic.from(this).prop('input'));
 
     @Store.command()
     *addTodo() {
@@ -113,16 +113,17 @@ class TodoAppDomain<Root> extends Store.Domain<TodoApp, Root> {
 const todoApp$ = new TodoAppDomain(Optic.root<TodoApp>())
 
 describe('TodoAppDomain', () => {
-    let store: Store.Store<TodoApp>
+    let store: Store.Store<TodoApp, {}>
 
     beforeEach(() => {
-        store = new Store.Store<TodoApp>({
+        store = new Store.Store<TodoApp, {}>({
             state: {
                 todos: [],
                 filter: 'all',
                 input: '',
             },
-            enhancers: [PrettyPrinter(), CliPrettyLogger()],
+            context: {},
+            // enhancers: [PrettyPrinter(), CliPrettyLogger()],
         })
     })
 
@@ -296,12 +297,13 @@ describe('TodoAppDomain', () => {
 })
 
 describe('Custom Context in Store', () => {
-    class StoreWithCustomContext extends Store.Store<number> {
+    type CustomContext = {
+        a: number
+        b: (n: number) => number
+    }
+
+    class StoreWithCustomContext extends Store.Store<number, CustomContext> {
         enhancers = [PrettyPrinter(), CliPrettyLogger()]
-        context = {
-            a: 1,
-            b: (n: number) => n + 1,
-        }
     }
 
     let store: StoreWithCustomContext
@@ -309,6 +311,10 @@ describe('Custom Context in Store', () => {
     beforeEach(() => {
         store = new StoreWithCustomContext({
             state: 0,
+            context: {
+                a: 1,
+                b: (n) => n + 1,
+            },
         })
     })
 

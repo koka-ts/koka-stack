@@ -1,4 +1,4 @@
-import { ExecutionTree, Store } from './koka-store.ts'
+import { ExecutionTree, Store } from './koka-ddd.ts'
 import chalk from 'chalk'
 
 type LoggerOptions = {
@@ -53,7 +53,7 @@ const formatExecutionTree = (tree: ExecutionTree, options: LoggerOptions): strin
         lines.push(formatLine(`  return: ${JSON.stringify(tree.return)}`, chalk.yellow))
     }
 
-    if (options.showStates && tree.states.length > 0) {
+    if (options.showStates && tree.type === 'query' && tree.states.length > 0) {
         lines.push(formatLine('  states:', chalk.gray))
         for (const state of tree.states) {
             lines.push(formatLine(`    ${JSON.stringify(state)}`, chalk.gray))

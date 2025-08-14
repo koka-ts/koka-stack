@@ -350,3 +350,110 @@ describe('design first approach', () => {
         expect(logs).toEqual(['User ID: 12345', 'User ID is missing, throwing UserInvalidErr'])
     })
 })
+
+describe('Koka.runUnSafe', () => {
+    it('should handle sync effects with explicit type annotation', () => {
+        class TestOpt extends Opt.Opt('TestOpt')<string> {}
+
+        function* test(): Generator<TestOpt, string> {
+            const value = yield* Opt.get(TestOpt)
+            return value ?? 'default'
+        }
+
+        const result: string = Koka.runUnSafe(test())
+        expect(result).toBe('default')
+    })
+
+    it('should handle async effects with explicit type annotation', async () => {
+        function* test(): Generator<Async.Async, number> {
+            const value = yield* Async.await(Promise.resolve(42))
+            return value * 2
+        }
+
+        const result: number | Promise<number> = Koka.runUnSafe(test())
+        const resolved = await result
+        expect(resolved).toBe(84)
+    })
+
+    it('should handle error effects with explicit type annotation', () => {
+        class TestError extends Err.Err('TestError')<string> {}
+
+        function* test(): Generator<TestError, string> {
+            yield* Err.throw(new TestError('error message'))
+            return 'should not reach here'
+        }
+
+        expect(() => {
+            Koka.runUnSafe(test())
+        }).toThrow()
+    })
+
+    it('should handle context effects with explicit type annotation', () => {
+        class TestCtx extends Ctx.Ctx('TestCtx')<number> {}
+
+        function* test(): Generator<TestCtx, number> {
+            const value = yield* Ctx.get(TestCtx)
+            return value * 2
+        }
+
+        expect(() => {
+            Koka.runUnSafe(test())
+        }).toThrow()
+    })
+
+    it('should handle option effects with explicit type annotation', () => {
+        class TestOpt extends Opt.Opt('TestOpt')<string> {}
+
+        function* test(): Generator<TestOpt, string> {
+            const value = yield* Opt.get(TestOpt)
+            return value ?? 'default'
+        }
+
+        const result: string = Koka.runUnSafe(test())
+        expect(result).toBe('default')
+    })
+
+    it('should handle async function input with explicit type annotation', async () => {
+        function* test(): Generator<Async.Async, number> {
+            const value = yield* Async.await(Promise.resolve(42))
+            return value * 2
+        }
+
+        const result: number | Promise<number> = Koka.runUnSafe(() => test())
+        const resolved = await result
+        expect(resolved).toBe(84)
+    })
+
+    it('should handle nested generators with explicit type annotation', async () => {
+        function* inner(): Generator<Async.Async, number> {
+            return yield* Async.await(Promise.resolve(21))
+        }
+
+        function* outer(): Generator<Async.Async, number> {
+            const value = yield* inner()
+            return value * 2
+        }
+
+        const result: number | Promise<number> = Koka.runUnSafe(outer())
+        const resolved = await result
+        expect(resolved).toBe(42)
+    })
+
+    it('should handle error propagation in async effects with explicit type annotation', async () => {
+        function* test(): Generator<Async.Async, string> {
+            try {
+                yield* Async.await(Promise.reject(new Error('Async error')))
+                return 'should not reach here'
+            } catch (err) {
+                if (err instanceof Error) {
+                    return `Caught: ${err.message}`
+                }
+                throw err
+            }
+        }
+
+        const result: string | Promise<string> = Koka.runUnSafe(test())
+        const resolved = await result
+        expect(resolved).toBe('Caught: Async error')
+    })
+})
