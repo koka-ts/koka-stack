@@ -1,5 +1,6 @@
 import { createContext, useContext, useSyncExternalStore, type ReactNode } from 'react'
 import * as Domain from 'koka-domain'
+import * as Err from 'koka/err'
 import * as Result from 'koka/result'
 import * as Optic from 'koka-optic'
 
@@ -60,17 +61,30 @@ export function useDomainState<State, Root>(domain: Domain.Domain<State, Root>):
     return result.value
 }
 
-export type DomainStateSelector<State, Target> = (state: State) => Target
+export function useDomainQueryResult<Return, Yield extends Err.AnyErr = Err.AnyErr>(
+    query: Domain.Query<Return, Yield>,
+): Result.Result<Return, Yield> {
+    const subscribe = (onStoreChange: () => void) => {
+        return Domain.subscribeQueryResult(query, onStoreChange)
+    }
 
-export function useDomainSelector<State, Root, Target>(
-    domain: Domain.Domain<State, Root>,
-    selector: DomainStateSelector<State, Target>,
-): Target {
-    const result = useDomainResult(domain)
+    const getState = () => {
+        return Domain.getQueryResult(query)
+    }
+
+    const result = useSyncExternalStore(subscribe, getState, getState)
+
+    return result
+}
+
+export function useDomainQuery<Return, Yield extends Err.AnyErr = Err.AnyErr>(
+    query: Domain.Query<Return, Yield>,
+): Return {
+    const result = useDomainQueryResult(query)
 
     if (result.type === 'err') {
         throw result.error
     }
 
-    return selector(result.value)
+    return result.value
 }

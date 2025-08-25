@@ -8,21 +8,6 @@ import { shallowEqual } from './shallowEqual'
 
 export { shallowEqual }
 
-const withResolvers: <T>() => PromiseWithResolvers<T> =
-    Promise.withResolvers?.bind(Promise) ??
-    (<T>() => {
-        let resolve: (value: T) => void
-        let reject: (reason?: any) => void
-
-        const promise = new Promise<T>((res, rej) => {
-            resolve = res
-            reject = rej
-        })
-
-        // @ts-ignore as expected
-        return { promise, resolve, reject }
-    })
-
 export function shallowEqualResult<T>(a: Result.Result<T, any>, b: Result.Result<T, any>): boolean {
     if (a === b) {
         return true
@@ -266,10 +251,6 @@ export class Domain<State, Root = unknown> {
     }
 }
 
-const DEFAULT_STATE = Symbol('DEFAULT_STATE')
-
-type DEFAULT_STATE = typeof DEFAULT_STATE
-
 export type ExecutionTree = CommandExecutionTree | QueryExecutionTree
 
 export type StateChange = {
@@ -316,12 +297,12 @@ type KokaClassMethodDecoratorContext<
     static: false
 }
 
-type Query<Yield extends Err.AnyErr, Return> = {
+export type Query<Return, Yield extends Err.AnyErr = Err.AnyErr> = {
     (): Generator<Yield | QueryOpt, Return, unknown>
     store?: AnyStore
 }
 
-type AnyQuery = Query<any, any>
+export type AnyQuery = Query<any>
 
 type QueryStorage = {
     domainDeps: Map<AnyDomain, Result.Result<any, Optic.OpticErr>>
@@ -342,7 +323,7 @@ const checkQueryStorageDeps = (queryStorage: QueryStorage) => {
     }
 
     for (const [query, result] of queryStorage.queryDeps) {
-        const currentResult = Result.run(query())
+        const currentResult = getQueryResult(query)
 
         if (!shallowEqualResult(currentResult, result)) {
             return false
@@ -357,10 +338,10 @@ class QueryStorageOpt extends Opt.Opt('koka-domain/query-storage-opt')<QueryStor
 const queryStorages = new WeakMap<Query<any, any>, QueryStorage>()
 
 export function query() {
-    return function <This, Args extends any[], Return, Yield extends Err.AnyErr>(
+    return function <This, Args extends any[], Return, Yield extends Err.AnyErr = Err.AnyErr>(
         target: (this: This, ...args: Args) => Generator<Yield | QueryOpt, Return>,
         context: KokaClassMethodDecoratorContext<This, typeof target>,
-    ): Query<Yield, Return> {
+    ): Query<Return, Yield> {
         const methodName = context.name
 
         context.addInitializer(function () {
@@ -471,11 +452,39 @@ export function query() {
     }
 }
 
-export function subscribeQueryResult<Yield extends Err.AnyErr, Return>(
-    query: Query<Yield, Return>,
+const queryResultWeakMap = new WeakMap<Query<any, any>, Result.Result<any, any>>()
+
+export function getQueryResult<Return, Yield extends Err.AnyErr = Err.AnyErr>(
+    query: Query<Return, Yield>,
+): Result.Result<Return, Err.ExtractErr<Yield>> {
+    const result = Result.run(query())
+
+    const previousResult = queryResultWeakMap.get(query)
+
+    if (previousResult && shallowEqualResult(result, previousResult)) {
+        return previousResult
+    }
+
+    queryResultWeakMap.set(query, result)
+
+    return result
+}
+
+export function getQueryState<Return, Yield extends Err.AnyErr = Err.AnyErr>(query: Query<Return, Yield>): Return {
+    const result = getQueryResult(query)
+
+    if (result.type === 'err') {
+        throw new Error(`Query ${query.name} returned an error: ${JSON.stringify(result.error)}`)
+    }
+
+    return result.value
+}
+
+export function subscribeQueryResult<Return, Yield extends Err.AnyErr = Err.AnyErr>(
+    query: Query<Return, Yield>,
     listener: (result: Result.Result<Return, Err.ExtractErr<Yield>>) => unknown,
 ): () => void {
-    let previousResult: Result.Result<Return, Err.ExtractErr<Yield>> = Result.run(query())
+    let previousResult: Result.Result<Return, Err.ExtractErr<Yield>> = getQueryResult(query)
 
     const store = query.store
 
@@ -484,7 +493,7 @@ export function subscribeQueryResult<Yield extends Err.AnyErr, Return>(
     }
 
     return store.subscribe(() => {
-        const result = Result.run(query())
+        const result = getQueryResult(query)
 
         if (previousResult && shallowEqualResult(result, previousResult)) {
             return
@@ -495,8 +504,8 @@ export function subscribeQueryResult<Yield extends Err.AnyErr, Return>(
     })
 }
 
-export function subscribeQueryState<Yield extends Err.AnyErr, Return>(
-    query: Query<Yield, Return>,
+export function subscribeQueryState<Return, Yield extends Err.AnyErr = Err.AnyErr>(
+    query: Query<Return, Yield>,
     listener: (state: Return) => unknown,
 ): () => void {
     return subscribeQueryResult(query, (result) => {

@@ -1,26 +1,18 @@
 import * as Koka from 'koka'
+import * as Domain from 'koka-domain'
 import * as Result from 'koka/result'
-import { useDomainState } from 'koka-react'
+import { useDomainState, useDomainQuery } from 'koka-react'
 import './App.css'
-import { type TodoFilter, TodoListDomain, TodoFilterDomain, TodoAppDomain, TodoDomain } from './domain'
+import { type TodoFilter, type Todo, TodoListDomain, TodoFilterDomain, TodoAppDomain, TodoDomain } from './domain'
 
 type TodoItemProps = {
     todo$: TodoDomain
-    filter$: TodoFilterDomain
     onRemove?: (id: number) => void
 }
 
 function TodoItem(props: TodoItemProps) {
     const todo$ = props.todo$
     const todo = useDomainState(todo$)
-    const filter = useDomainState(props.filter$)
-
-    if (filter === 'done' && !todo.done) {
-        return null
-    }
-    if (filter === 'undone' && todo.done) {
-        return null
-    }
 
     const handleToggle = () => {
         Koka.runThrow(todo$.toggleTodo())
@@ -201,15 +193,14 @@ function TodoListHeader(props: TodoListHeaderProps) {
 }
 
 type TodoListItemsProps = {
+    getFilteredTodoIds: Domain.Query<number[]>
     todoList$: TodoListDomain
-    filter$: TodoFilterDomain
 }
 
 function TodoListItems(props: TodoListItemsProps) {
     const todoList$ = props.todoList$
-    const filter$ = props.filter$
 
-    const todoIds = useDomainState(todoList$.map((todo) => todo.prop('id')))
+    const filteredTodoIds = useDomainQuery(props.getFilteredTodoIds)
 
     const handleRemove = (id: number) => {
         Koka.runThrow(todoList$.removeTodo(id))
@@ -217,8 +208,8 @@ function TodoListItems(props: TodoListItemsProps) {
 
     return (
         <ul className="divide-y divide-gray-100">
-            {todoIds.map((id) => (
-                <TodoItem key={id} todo$={todoList$.todo(id)} filter$={filter$} onRemove={handleRemove} />
+            {filteredTodoIds.map((id) => (
+                <TodoItem key={id} todo$={todoList$.todo(id)} onRemove={handleRemove} />
             ))}
         </ul>
     )
@@ -264,8 +255,8 @@ function EmptyTodoList() {
 }
 
 type TodoListProps = {
+    getTodoIds: Domain.Query<number[]>
     todoList$: TodoListDomain
-    filter$: TodoFilterDomain
 }
 
 function TodoList(props: TodoListProps) {
@@ -280,7 +271,7 @@ function TodoList(props: TodoListProps) {
     return (
         <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden min-h-48">
             <TodoListHeader todoList$={todoList$} />
-            <TodoListItems todoList$={todoList$} filter$={props.filter$} />
+            <TodoListItems todoList$={todoList$} getFilteredTodoIds={props.getTodoIds} />
             <TodoListFooter todoList$={todoList$} />
         </div>
     )
@@ -302,7 +293,7 @@ function App(props: AppProps) {
             <TodoInput todoApp$={todoApp$} />
             <TodoFilter filter$={todoApp$.filter$} />
             <TodoStats todoList$={todoApp$.todos$} />
-            <TodoList todoList$={todoApp$.todos$} filter$={todoApp$.filter$} />
+            <TodoList todoList$={todoApp$.todos$} getTodoIds={todoApp$.getFilteredTodoIds} />
         </div>
     )
 }

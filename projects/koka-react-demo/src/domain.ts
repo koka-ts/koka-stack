@@ -99,9 +99,45 @@ export class TodoListDomain extends Domain<Todo[]> {
     completedTodoTextList$ = this.completedTodoList$.map((todo$) => todo$.prop('text'));
 
     @query()
-    *completedTodoList() {
+    *getCompletedTodoList() {
         const completedTodoList = yield* get(this.completedTodoList$)
         return completedTodoList
+    }
+
+    @query()
+    *getActiveTodoList() {
+        const activeTodoList = yield* get(this.activeTodoList$)
+        return activeTodoList
+    }
+
+    @query()
+    *getActiveTodoTextList() {
+        const activeTodoTextList = yield* get(this.activeTodoTextList$)
+        return activeTodoTextList
+    }
+
+    @query()
+    *getCompletedTodoTextList() {
+        const completedTodoTextList = yield* get(this.completedTodoTextList$)
+        return completedTodoTextList
+    }
+
+    @query()
+    *getTodoCount() {
+        const todoList = yield* get(this)
+        return todoList.length
+    }
+
+    @query()
+    *getCompletedTodoCount() {
+        const completedTodoList = yield* get(this.completedTodoList$)
+        return completedTodoList.length
+    }
+
+    @query()
+    *getActiveTodoCount() {
+        const activeTodoList = yield* get(this.activeTodoList$)
+        return activeTodoList.length
     }
 }
 
@@ -146,5 +182,31 @@ export class TodoAppDomain extends Domain<TodoApp> {
         yield* Async.await(Promise.resolve('test async'))
         yield* this.input$.updateText(input)
         return 'Input updated'
+    }
+
+    @query()
+    *getFilteredTodoList() {
+        const todoList = yield* get(this.todos$)
+        const filter = yield* get(this.filter$)
+
+        if (filter === 'all') {
+            return todoList
+        }
+
+        if (filter === 'done') {
+            return todoList.filter((todo) => todo.done)
+        }
+
+        if (filter === 'undone') {
+            return todoList.filter((todo) => !todo.done)
+        }
+
+        return todoList
+    }
+
+    @query()
+    *getFilteredTodoIds() {
+        const todoList = yield* this.getFilteredTodoList()
+        return todoList.map((todo) => todo.id)
     }
 }
