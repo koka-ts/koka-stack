@@ -23,7 +23,7 @@
     "dependencies": {
         "koka": "^1.0.0",
         "koka-optic": "^1.0.0",
-        "koka-ddd": "^1.0.0",
+        "koka-domain": "^1.0.0",
         "react": "^18.0.0"
     },
     "devDependencies": {

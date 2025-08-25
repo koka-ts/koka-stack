@@ -3,7 +3,7 @@ import * as Async from 'koka/async'
 import * as Koka from 'koka'
 import * as Result from 'koka/result'
 import * as Err from 'koka/err'
-import * as Store from '../src/koka-ddd.ts'
+import { Domain, Store, get, set } from '../src/koka-domain.ts'
 
 type Todo = {
     id: number
@@ -17,30 +17,30 @@ type TodoApp = {
     input: string
 }
 
-class TextDomain<Root> extends Store.Domain<string, Root> {
+class TextDomain<Root> extends Domain<string, Root> {
     *updateText(text: string) {
-        yield* this.set(text)
+        yield* set(this, text)
         return 'text updated'
     }
     *clearText() {
-        yield* this.set('')
+        yield* set(this, '')
         return 'text cleared'
     }
 }
 
-class BoolDomain<Root> extends Store.Domain<boolean, Root> {
+class BoolDomain<Root> extends Domain<boolean, Root> {
     *toggle() {
-        yield* this.set((value) => !value)
+        yield* set(this, (value) => !value)
         return 'bool toggled'
     }
 }
 
-class TodoDomain<Root> extends Store.Domain<Todo, Root> {
+class TodoDomain<Root> extends Domain<Todo, Root> {
     text$ = new TextDomain(this.prop('text'))
     done$ = new BoolDomain(this.prop('done'));
 
     *updateTodoText(text: string) {
-        const done = yield* this.done$.get()
+        const done = yield* get(this.done$)
         yield* this.text$.updateText(text)
         return 'todo updated'
     }
@@ -53,14 +53,14 @@ class TodoDomain<Root> extends Store.Domain<Todo, Root> {
 
 let todoUid = 0
 
-class TodoListDomain<Root> extends Store.Domain<Todo[], Root> {
+class TodoListDomain<Root> extends Domain<Todo[], Root> {
     *addTodo(text: string) {
         const newTodo = {
             id: todoUid++,
             text,
             done: false,
         }
-        yield* this.set((todos) => [...todos, newTodo])
+        yield* set(this, (todos) => [...todos, newTodo])
 
         return 'todo added'
     }
@@ -81,12 +81,12 @@ class TodoListDomain<Root> extends Store.Domain<Todo[], Root> {
 
 class TodoInputErr extends Err.Err('TodoInputErr')<string> {}
 
-class TodoAppDomain<Root> extends Store.Domain<TodoApp, Root> {
+class TodoAppDomain<Root> extends Domain<TodoApp, Root> {
     todos$ = new TodoListDomain(this.prop('todos'))
     input$ = new TextDomain(this.prop('input'));
 
     *addTodo() {
-        const todoApp = yield* this.get()
+        const todoApp = yield* get(this)
 
         if (todoApp.input === '') {
             throw yield* Err.throw(new TodoInputErr('Input is empty'))
@@ -105,7 +105,7 @@ class TodoAppDomain<Root> extends Store.Domain<TodoApp, Root> {
 }
 
 describe('TodoAppStore', () => {
-    let store: Store.Store<TodoApp>
+    let store: Store<TodoApp>
 
     beforeEach(() => {
         const state: TodoApp = {
@@ -114,7 +114,7 @@ describe('TodoAppStore', () => {
             input: '',
         }
 
-        store = new Store.Store({
+        store = new Store({
             state,
         })
     })
@@ -144,7 +144,7 @@ describe('TodoAppStore', () => {
             value: 'Todo added',
         })
 
-        const todos: Result.Result<Todo[], Optic.OpticErr> = Result.run(todoAppDomain.todos$.get())
+        const todos: Result.Result<Todo[], Optic.OpticErr> = Result.run(get(todoAppDomain.todos$))
 
         expect(todos).toEqual({
             type: 'ok',

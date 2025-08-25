@@ -127,7 +127,7 @@ importers:
         specifier: ^5.8.0
         version: 5.8.3
 
-  packages/koka-ddd:
+  packages/koka-domain:
     dependencies:
       chalk:
         specifier: ^4.1.2
@@ -209,9 +209,9 @@ importers:
       koka:
         specifier: ^1.0.0
         version: link:../koka
-      koka-ddd:
+      koka-domain:
         specifier: ^1.0.0
-        version: link:../koka-ddd
+        version: link:../koka-domain
       koka-optic:
         specifier: ^1.0.0
         version: link:../koka-optic
@@ -246,9 +246,9 @@ importers:
       koka:
         specifier: workspace:*
         version: link:../../packages/koka
-      koka-ddd:
+      koka-domain:
         specifier: workspace:*
-        version: link:../../packages/koka-ddd
+        version: link:../../packages/koka-domain
       koka-optic:
         specifier: workspace:*
         version: link:../../packages/koka-optic

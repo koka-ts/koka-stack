@@ -1,4 +1,4 @@
-import { ExecutionTree, Store } from './koka-ddd.ts'
+import { ExecutionTree, Store } from './koka-domain.ts'
 
 type LoggerOptions = {
     colors?: boolean

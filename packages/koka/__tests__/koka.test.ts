@@ -360,7 +360,7 @@ describe('Koka.runUnSafe', () => {
             return value ?? 'default'
         }
 
-        const result: string = Koka.runUnSafe(test())
+        const result: string = Koka.runThrow(test())
         expect(result).toBe('default')
     })
 
@@ -370,7 +370,7 @@ describe('Koka.runUnSafe', () => {
             return value * 2
         }
 
-        const result: number | Promise<number> = Koka.runUnSafe(test())
+        const result: number | Promise<number> = Koka.runThrow(test())
         const resolved = await result
         expect(resolved).toBe(84)
     })
@@ -384,7 +384,7 @@ describe('Koka.runUnSafe', () => {
         }
 
         expect(() => {
-            Koka.runUnSafe(test())
+            Koka.runThrow(test())
         }).toThrow()
     })
 
@@ -397,7 +397,7 @@ describe('Koka.runUnSafe', () => {
         }
 
         expect(() => {
-            Koka.runUnSafe(test())
+            Koka.runThrow(test())
         }).toThrow()
     })
 
@@ -409,7 +409,7 @@ describe('Koka.runUnSafe', () => {
             return value ?? 'default'
         }
 
-        const result: string = Koka.runUnSafe(test())
+        const result: string = Koka.runThrow(test())
         expect(result).toBe('default')
     })
 
@@ -419,7 +419,7 @@ describe('Koka.runUnSafe', () => {
             return value * 2
         }
 
-        const result: number | Promise<number> = Koka.runUnSafe(() => test())
+        const result: number | Promise<number> = Koka.runThrow(() => test())
         const resolved = await result
         expect(resolved).toBe(84)
     })
@@ -434,7 +434,7 @@ describe('Koka.runUnSafe', () => {
             return value * 2
         }
 
-        const result: number | Promise<number> = Koka.runUnSafe(outer())
+        const result: number | Promise<number> = Koka.runThrow(outer())
         const resolved = await result
         expect(resolved).toBe(42)
     })
@@ -452,7 +452,7 @@ describe('Koka.runUnSafe', () => {
             }
         }
 
-        const result: string | Promise<string> = Koka.runUnSafe(test())
+        const result: string | Promise<string> = Koka.runThrow(test())
         const resolved = await result
         expect(resolved).toBe('Caught: Async error')
     })

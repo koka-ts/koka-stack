@@ -1,26 +1,37 @@
 import * as Koka from 'koka'
 import * as Result from 'koka/result'
-import { useDomainSelector, useDomainState } from 'koka-react'
+import { useDomainState } from 'koka-react'
 import './App.css'
 import { type TodoFilter, TodoListDomain, TodoFilterDomain, TodoAppDomain, TodoDomain } from './domain'
 
-// Components
-
-type TodoItemProps<Root> = {
-    todo$: TodoDomain<Root>
+type TodoItemProps = {
+    todo$: TodoDomain
+    filter$: TodoFilterDomain
     onRemove?: (id: number) => void
 }
 
-function TodoItem<Root>(props: TodoItemProps<Root>) {
+function TodoItem(props: TodoItemProps) {
     const todo$ = props.todo$
     const todo = useDomainState(todo$)
+    const filter = useDomainState(props.filter$)
+
+    if (filter === 'done' && !todo.done) {
+        return null
+    }
+    if (filter === 'undone' && todo.done) {
+        return null
+    }
 
     const handleToggle = () => {
-        Koka.runUnSafe(todo$.toggleTodo())
+        Koka.runThrow(todo$.toggleTodo())
     }
 
     const handleRemove = () => {
         props.onRemove?.(todo.id)
+    }
+
+    const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        Koka.runThrow(todo$.updateTodoText(e.target.value))
     }
 
     return (
@@ -35,13 +46,13 @@ function TodoItem<Root>(props: TodoItemProps<Root>) {
                 onChange={handleToggle}
                 className="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
             />
-            <span
-                className={`flex-1 text-left text-gray-800 transition-all duration-200 ${
-                    todo.done ? 'line-through text-gray-500' : ''
-                }`}
-            >
-                {todo.text}
-            </span>
+            <input
+                type="text"
+                value={todo.text}
+                onChange={handleTextChange}
+                className="flex-1 text-left text-gray-800 transition-all duration-200"
+            />
+
             <button
                 onClick={handleRemove}
                 className="w-8 h-8 !bg-red-500 !hover:bg-red-600 text-white rounded-full flex items-center justify-center text-lg font-bold transition-colors duration-200 opacity-0 group-hover:opacity-100 focus:opacity-100"
@@ -52,11 +63,11 @@ function TodoItem<Root>(props: TodoItemProps<Root>) {
     )
 }
 
-type TodoInputProps<Root> = {
-    todoApp$: TodoAppDomain<Root>
+type TodoInputProps = {
+    todoApp$: TodoAppDomain
 }
 
-function TodoInput<Root>(props: TodoInputProps<Root>) {
+function TodoInput(props: TodoInputProps) {
     const todoApp$ = props.todoApp$
     const input = useDomainState(todoApp$.input$)
 
@@ -73,7 +84,7 @@ function TodoInput<Root>(props: TodoInputProps<Root>) {
     }
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        Koka.runUnSafe(todoApp$.updateInput(e.target.value))
+        Koka.runThrow(todoApp$.updateInput(e.target.value))
     }
 
     return (
@@ -95,16 +106,16 @@ function TodoInput<Root>(props: TodoInputProps<Root>) {
     )
 }
 
-type TodoFilterProps<Root> = {
-    filter$: TodoFilterDomain<Root>
+type TodoFilterProps = {
+    filter$: TodoFilterDomain
 }
 
-function TodoFilter<Root>(props: TodoFilterProps<Root>) {
+function TodoFilter(props: TodoFilterProps) {
     const filter$ = props.filter$
     const currentFilter = useDomainState(filter$)
 
     const handleFilterChange = (filter: TodoFilter) => {
-        Koka.runUnSafe(filter$.setFilter(filter))
+        Koka.runThrow(filter$.setFilter(filter))
     }
 
     const filterButtons = [
@@ -132,17 +143,15 @@ function TodoFilter<Root>(props: TodoFilterProps<Root>) {
     )
 }
 
-type TodoStatsProps<Root> = {
-    todoList$: TodoListDomain<Root>
+type TodoStatsProps = {
+    todoList$: TodoListDomain
 }
 
-function TodoStats<Root>(props: TodoStatsProps<Root>) {
+function TodoStats(props: TodoStatsProps) {
     const todoList$ = props.todoList$
-    const activeTodoList = useDomainState(todoList$.activeTodoList$)
-    const completedTodoList = useDomainState(todoList$.completedTodoList$)
+    const activeCount = useDomainState(todoList$.activeTodoList$.prop('length'))
+    const completedCount = useDomainState(todoList$.completedTodoList$.prop('length'))
 
-    const activeCount = activeTodoList.length
-    const completedCount = completedTodoList.length
     const totalCount = activeCount + completedCount
 
     return (
@@ -163,93 +172,125 @@ function TodoStats<Root>(props: TodoStatsProps<Root>) {
     )
 }
 
-export type TodoListProps<Root> = {
-    todoList$: TodoListDomain<Root>
-    filter$: TodoFilterDomain<Root>
+type TodoListHeaderProps = {
+    todoList$: TodoListDomain
 }
 
-function TodoList<Root>(props: TodoListProps<Root>) {
-    const todoList$ = props.todoList$
-    const filter$ = props.filter$
-
-    const filter = useDomainState(filter$)
-    const todos = useDomainState(todoList$)
-    const allCompleted = useDomainSelector(todoList$, (todos) => todos.length > 0 && todos.every((todo) => todo.done))
-    const hasCompleted = useDomainSelector(todoList$, (todos) => todos.some((todo) => todo.done))
-
-    const filteredTodos = useDomainSelector(todoList$, (todos) => {
-        switch (filter) {
-            case 'all':
-                return todos
-            case 'done':
-                return todos.filter((todo) => todo.done)
-            case 'undone':
-                return todos.filter((todo) => !todo.done)
-        }
-    })
+function TodoListHeader(props: TodoListHeaderProps) {
+    const todoDoneList$ = props.todoList$.map((todo) => todo.prop('done'))
+    const todoDoneList = useDomainState(todoDoneList$)
+    const allCompleted = todoDoneList.length > 0 && todoDoneList.every((done) => done)
 
     const handleToggleAll = () => {
-        Koka.runUnSafe(todoList$.toggleAll())
-    }
-
-    const handleClearCompleted = () => {
-        Koka.runUnSafe(todoList$.clearCompleted())
-    }
-
-    const handleRemove = (id: number) => {
-        Koka.runUnSafe(todoList$.removeTodo(id))
-    }
-
-    if (todos.length === 0) {
-        return (
-            <div className="text-center py-12 min-h-48 flex flex-col justify-center">
-                <div className="text-gray-400 text-6xl mb-4">📝</div>
-                <p className="text-gray-500 text-lg">no todos, add one!</p>
-            </div>
-        )
+        Koka.runThrow(props.todoList$.toggleAll())
     }
 
     return (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden min-h-48">
-            {todos.length > 0 && (
-                <div className="flex items-center gap-3 p-4 bg-gray-50 border-b border-gray-100">
-                    <input
-                        type="checkbox"
-                        checked={allCompleted}
-                        onChange={handleToggleAll}
-                        className="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
-                    />
-                    <span className="text-sm text-gray-600 cursor-pointer select-none">
-                        {allCompleted ? 'unselect all' : 'select all'}
-                    </span>
-                </div>
-            )}
-
-            <ul className="divide-y divide-gray-100">
-                {filteredTodos.map((todo) => (
-                    <TodoItem key={todo.id} todo$={todoList$.todo(todo.id)} onRemove={handleRemove} />
-                ))}
-            </ul>
-
-            {hasCompleted && (
-                <div className="p-4 bg-gray-50 border-t border-gray-100 text-center">
-                    <button
-                        onClick={handleClearCompleted}
-                        className="px-4 py-2 !bg-blue-600 !hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-                    >
-                        clear done
-                    </button>
-                </div>
-            )}
+        <div className="flex items-center gap-3 p-4 bg-gray-50 border-b border-gray-100">
+            <input
+                type="checkbox"
+                checked={allCompleted}
+                onChange={handleToggleAll}
+                className="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
+            />
+            <span className="text-sm text-gray-600 cursor-pointer select-none">
+                {allCompleted ? 'unselect all' : 'select all'}
+            </span>
         </div>
     )
 }
 
-type AppProps<Root> = {
-    todoApp$: TodoAppDomain<Root>
+type TodoListItemsProps = {
+    todoList$: TodoListDomain
+    filter$: TodoFilterDomain
 }
 
-function App<Root>(props: AppProps<Root>) {
+function TodoListItems(props: TodoListItemsProps) {
+    const todoList$ = props.todoList$
+    const filter$ = props.filter$
+
+    const todoIds = useDomainState(todoList$.map((todo) => todo.prop('id')))
+
+    const handleRemove = (id: number) => {
+        Koka.runThrow(todoList$.removeTodo(id))
+    }
+
+    return (
+        <ul className="divide-y divide-gray-100">
+            {todoIds.map((id) => (
+                <TodoItem key={id} todo$={todoList$.todo(id)} filter$={filter$} onRemove={handleRemove} />
+            ))}
+        </ul>
+    )
+}
+
+type TodoListFooterProps = {
+    todoList$: TodoListDomain
+}
+
+function TodoListFooter(props: TodoListFooterProps) {
+    const todoList$ = props.todoList$
+    const todoDoneList$ = todoList$.map((todo) => todo.prop('done'))
+    const todoDoneList = useDomainState(todoDoneList$)
+    const hasCompleted = todoDoneList.length > 0 && todoDoneList.some((done) => done)
+
+    const handleClearCompleted = () => {
+        Koka.runThrow(todoList$.clearCompleted())
+    }
+
+    if (!hasCompleted) {
+        return null
+    }
+
+    return (
+        <div className="p-4 bg-gray-50 border-t border-gray-100 text-center">
+            <button
+                onClick={handleClearCompleted}
+                className="px-4 py-2 !bg-blue-600 !hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+            >
+                clear done
+            </button>
+        </div>
+    )
+}
+
+function EmptyTodoList() {
+    return (
+        <div className="text-center py-12 min-h-48 flex flex-col justify-center">
+            <div className="text-gray-400 text-6xl mb-4">📝</div>
+            <p className="text-gray-500 text-lg">no todos, add one!</p>
+        </div>
+    )
+}
+
+type TodoListProps = {
+    todoList$: TodoListDomain
+    filter$: TodoFilterDomain
+}
+
+function TodoList(props: TodoListProps) {
+    const todoList$ = props.todoList$
+
+    const todoCount = useDomainState(todoList$.prop('length'))
+
+    if (todoCount === 0) {
+        return <EmptyTodoList />
+    }
+
+    return (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden min-h-48">
+            <TodoListHeader todoList$={todoList$} />
+            <TodoListItems todoList$={todoList$} filter$={props.filter$} />
+            <TodoListFooter todoList$={todoList$} />
+        </div>
+    )
+}
+
+type AppProps = {
+    todoApp$: TodoAppDomain
+}
+
+function App(props: AppProps) {
     const todoApp$ = props.todoApp$
 
     return (

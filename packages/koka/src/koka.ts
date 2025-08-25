@@ -1,6 +1,6 @@
 import type { Async, MaybePromise } from './async.ts'
 import type { Ctx } from './ctx.ts'
-import type { AnyErr, Err } from './err.ts'
+import type { Err } from './err.ts'
 import * as Gen from './gen.ts'
 import type { AnyOpt, Opt } from './opt.ts'
 
@@ -127,15 +127,11 @@ export function runAsync<Return>(actor: Actor<Async | AnyOpt, Return>): Promise<
     return Promise.resolve(run(actor))
 }
 
-export function runUnSafe<Yield extends AnyEff, Return>(
+export function runThrow<Yield extends AnyEff, Return>(
     input: Actor<Yield, Return>,
 ): Async extends Yield ? MaybePromise<Return> : Return {
     return run(input as any) as any
 }
-
-export type ExtractErr<T> = T extends AnyErr ? T : never
-
-export type ExcludeErr<T> = T extends AnyErr ? never : T
 
 export type ExtractEffFromObject<Gens extends object> = {
     [K in keyof Gens]: Gens[K] extends Actor<infer E, any> ? E : never

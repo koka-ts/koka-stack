@@ -1,7 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import * as DDD from 'koka-ddd'
-import { PrettyLogger } from 'koka-ddd/pretty-browser-logger'
+import * as Domain from 'koka-domain'
+import { PrettyLogger } from 'koka-domain/pretty-browser-logger'
 import { useDomainState } from 'koka-react'
 import { type TodoApp, TodoAppDomain } from './domain'
 import './index.css'
@@ -12,7 +12,7 @@ type AppState = {
 }
 
 type MainProps = {
-    domain: DDD.Domain<AppState, AppState>
+    domain: Domain.Domain<AppState, AppState>
 }
 
 function Main(props: MainProps) {
@@ -41,7 +41,7 @@ const initialState: AppState = {
     todoAppList: [
         {
             todos: [
-                { id: 101, text: 'Learn koka-ddd framework', done: true },
+                { id: 101, text: 'Learn koka-domain framework', done: true },
                 { id: 102, text: 'Build React todo app', done: true },
                 { id: 103, text: 'Write comprehensive documentation', done: false },
                 { id: 104, text: 'Add unit tests', done: false },
@@ -101,7 +101,7 @@ const initialState: AppState = {
     ],
 }
 
-const store = new DDD.Store<AppState>({
+const store = new Domain.Store<AppState>({
     state: initialState,
     enhancers: [PrettyLogger()],
 })

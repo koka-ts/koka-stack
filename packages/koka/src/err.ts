@@ -6,6 +6,10 @@ export type Err<Name extends string, T> = {
 
 export type AnyErr = Err<string, any>
 
+export type ExtractErr<T> = T extends AnyErr ? T : never
+
+export type ExcludeErr<T> = T extends AnyErr ? never : T
+
 export function Err<const Name extends string>(name: Name) {
     return class Eff<E = void> {
         static field: Name = name

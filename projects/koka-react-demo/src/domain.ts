@@ -1,6 +1,27 @@
-import * as DDD from 'koka-ddd'
+import { Domain, command, get, query, set } from 'koka-domain'
 import * as Async from 'koka/async'
 import * as Err from 'koka/err'
+
+export class TextDomain extends Domain<string> {
+    @command()
+    *updateText(text: string) {
+        yield* set(this, text)
+        return 'text updated'
+    }
+    @command()
+    *clearText() {
+        yield* set(this, '')
+        return 'text cleared'
+    }
+}
+
+export class BoolDomain extends Domain<boolean> {
+    @command()
+    *toggle() {
+        yield* set(this, (value) => !value)
+        return 'bool toggled'
+    }
+}
 
 export type Todo = {
     id: number
@@ -8,46 +29,17 @@ export type Todo = {
     done: boolean
 }
 
-export type TodoFilter = 'all' | 'done' | 'undone'
-
-export type TodoApp = {
-    todos: Todo[]
-    filter: TodoFilter
-    input: string
-}
-
-export class TextDomain<Root> extends DDD.Domain<string, Root> {
-    @DDD.command()
-    *updateText(text: string) {
-        yield* this.set(text)
-        return 'text updated'
-    }
-    @DDD.command()
-    *clearText() {
-        yield* this.set('')
-        return 'text cleared'
-    }
-}
-
-export class BoolDomain<Root> extends DDD.Domain<boolean, Root> {
-    @DDD.command()
-    *toggle() {
-        yield* this.set((value) => !value)
-        return 'bool toggled'
-    }
-}
-
-export class TodoDomain<Root> extends DDD.Domain<Todo, Root> {
+export class TodoDomain extends Domain<Todo> {
     text$ = new TextDomain(this.prop('text'))
     done$ = new BoolDomain(this.prop('done'));
 
-    @DDD.command()
+    @command()
     *updateTodoText(text: string) {
         yield* this.text$.updateText(text)
         return 'todo updated'
     }
 
-    @DDD.command()
+    @command()
     *toggleTodo() {
         yield* this.done$.toggle()
         return 'todo toggled'
@@ -56,36 +48,40 @@ export class TodoDomain<Root> extends DDD.Domain<Todo, Root> {
 
 let todoUid = 100
 
-export class TodoListDomain<Root> extends DDD.Domain<Todo[], Root> {
-    @DDD.command()
+export class TodoListDomain extends Domain<Todo[]> {
+    @command()
     *addTodo(text: string) {
         const newTodo = {
             id: todoUid++,
             text,
             done: false,
         }
-        yield* this.set((todos) => [...todos, newTodo])
+        yield* set(this, (todos) => [...todos, newTodo])
 
         return 'todo added'
     }
 
-    @DDD.command()
+    @command()
     *toggleAll() {
-        const todos = yield* this.get()
+        const todos = yield* get(this)
         const allDone = todos.every((todo) => todo.done)
-        yield* this.set((todos) => todos.map((todo) => ({ ...todo, done: !allDone })))
+
+        yield* set(this, (todos) => {
+            return todos.map((todo) => ({ ...todo, done: !allDone }))
+        })
+
         return 'all todos toggled'
     }
 
-    @DDD.command()
+    @command()
     *clearCompleted() {
-        yield* this.set((todos) => todos.filter((todo) => !todo.done))
+        yield* set(this, (todos) => todos.filter((todo) => !todo.done))
         return 'completed todos cleared'
     }
 
-    @DDD.command()
+    @command()
     *removeTodo(id: number) {
-        yield* this.set((todos) => todos.filter((todo) => todo.id !== id))
+        yield* set(this, (todos) => todos.filter((todo) => todo.id !== id))
         return 'todo removed'
     }
 
@@ -100,27 +96,41 @@ export class TodoListDomain<Root> extends DDD.Domain<Todo[], Root> {
     completedTodoList$ = this.filter((todo) => todo.done)
     activeTodoList$ = this.filter((todo) => !todo.done)
     activeTodoTextList$ = this.activeTodoList$.map((todo$) => todo$.prop('text'))
-    completedTodoTextList$ = this.completedTodoList$.map((todo$) => todo$.prop('text'))
+    completedTodoTextList$ = this.completedTodoList$.map((todo$) => todo$.prop('text'));
+
+    @query()
+    *completedTodoList() {
+        const completedTodoList = yield* get(this.completedTodoList$)
+        return completedTodoList
+    }
 }
 
-export class TodoFilterDomain<Root> extends DDD.Domain<TodoFilter, Root> {
-    @DDD.command()
+export type TodoFilter = 'all' | 'done' | 'undone'
+
+export class TodoFilterDomain extends Domain<TodoFilter> {
+    @command()
     *setFilter(filter: TodoFilter) {
-        yield* this.set(filter)
+        yield* set(this, filter)
         return 'filter set'
     }
 }
 
 export class TodoInputErr extends Err.Err('TodoInputErr')<string> {}
 
-export class TodoAppDomain<Root> extends DDD.Domain<TodoApp, Root> {
+export type TodoApp = {
+    todos: Todo[]
+    filter: TodoFilter
+    input: string
+}
+
+export class TodoAppDomain extends Domain<TodoApp> {
     todos$ = new TodoListDomain(this.prop('todos'))
     filter$ = new TodoFilterDomain(this.prop('filter'))
     input$ = new TextDomain(this.prop('input'));
 
-    @DDD.command()
+    @command()
     *addTodo() {
-        const todoApp = yield* this.get()
+        const todoApp = yield* get(this)
 
         if (todoApp.input === '') {
             throw yield* Err.throw(new TodoInputErr('Input is empty'))
@@ -131,7 +141,7 @@ export class TodoAppDomain<Root> extends DDD.Domain<TodoApp, Root> {
         return 'Todo added'
     }
 
-    @DDD.command()
+    @command()
     *updateInput(input: string) {
         yield* Async.await(Promise.resolve('test async'))
         yield* this.input$.updateText(input)

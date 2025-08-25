@@ -1,6 +1,6 @@
 import * as Err from 'koka/err'
-import * as Optic from 'koka-optic'
-import * as Store from '../src/koka-store.ts'
+import * as Result from 'koka/result'
+import { Domain, Store, get, set } from '../src/koka-domain.ts'
 
 type UserEntity = {
     id: string
@@ -27,30 +27,28 @@ type RootState = {
     products: Record<string, ProductEntity>
 }
 
-class UserStorageDomain<Root extends RootState> extends Store.Domain<Root['users'], Root> {
-    constructor() {
-        super(Optic.root<Root>().prop('users'))
-    }
+class DomainErr extends Err.Err('DomainErr')<string> {}
+
+class UserStorageDomain<Root extends RootState> extends Domain<Root['users'], Root> {
     *getUser(id: string) {
-        const users = yield* Store.get(this)
+        const users = yield* get(this)
         if (id in users) {
             return users[id]
         }
-        class DomainErr extends Err.Err('DomainErr')<string> {}
+
         throw yield* Err.throw(new DomainErr(`User ${id} not found`))
     }
     *addUser(user: UserEntity) {
-        const users = yield* Store.get(this)
+        const users = yield* get(this)
         if (user.id in users) {
-            class DomainErr extends Err.Err('DomainErr')<string> {}
             throw yield* Err.throw(new DomainErr(`User ${user.id} exists`))
         }
-        yield* Store.set(this, { ...users, [user.id]: user })
+        yield* set(this, { ...users, [user.id]: user })
     }
     *addOrder(userId: string, orderId: string) {
         const user = yield* this.getUser(userId)
-        yield* Store.set(this, {
-            ...(yield* Store.get(this)),
+        yield* set(this, {
+            ...(yield* get(this)),
             [userId]: {
                 ...user,
                 orderIds: [...user.orderIds, orderId],
@@ -59,30 +57,25 @@ class UserStorageDomain<Root extends RootState> extends Store.Domain<Root['users
     }
 }
 
-class OrderStorageDomain<Root extends RootState> extends Store.Domain<Root['orders'], Root> {
-    constructor() {
-        super(Optic.root<Root>().prop('orders'))
-    }
+class OrderStorageDomain<Root extends RootState> extends Domain<Root['orders'], Root> {
     *getOrder(id: string) {
-        const orders = yield* Store.get(this)
+        const orders = yield* get(this)
         if (id in orders) {
             return orders[id]
         }
-        class DomainErr extends Err.Err('DomainErr')<string> {}
         throw yield* Err.throw(new DomainErr(`Order ${id} not found`))
     }
     *addOrder(order: OrderEntity) {
-        const orders = yield* Store.get(this)
+        const orders = yield* get(this)
         if (order.id in orders) {
-            class DomainErr extends Err.Err('DomainErr')<string> {}
             throw yield* Err.throw(new DomainErr(`Order ${order.id} exists`))
         }
-        yield* Store.set(this, { ...orders, [order.id]: order })
+        yield* set(this, { ...orders, [order.id]: order })
     }
     *addProduct(orderId: string, productId: string) {
         const order = yield* this.getOrder(orderId)
-        yield* Store.set(this, {
-            ...(yield* Store.get(this)),
+        yield* set(this, {
+            ...(yield* get(this)),
             [orderId]: {
                 ...order,
                 productIds: [...order.productIds, productId],
@@ -91,43 +84,38 @@ class OrderStorageDomain<Root extends RootState> extends Store.Domain<Root['orde
     }
 }
 
-class ProductStorageDomain<Root extends RootState> extends Store.Domain<Root['products'], Root> {
-    constructor() {
-        super(Optic.root<Root>().prop('products'))
-    }
+class ProductStorageDomain<Root extends RootState> extends Domain<Root['products'], Root> {
     *getProduct(id: string) {
-        const products = yield* Store.get(this)
+        const products = yield* get(this)
         if (id in products) {
             return products[id]
         }
-        class DomainErr extends Err.Err('DomainErr')<string> {}
         throw yield* Err.throw(new DomainErr(`Product ${id} not found`))
     }
     *addProduct(product: ProductEntity) {
-        const products = yield* Store.get(this)
+        const products = yield* get(this)
         if (product.id in products) {
-            class DomainErr extends Err.Err('DomainErr')<string> {}
             throw yield* Err.throw(new DomainErr(`Product ${product.id} exists`))
         }
-        yield* Store.set(this, { ...products, [product.id]: product })
+        yield* set(this, { ...products, [product.id]: product })
     }
     *getCollectors(productId: string) {
         const product = yield* this.getProduct(productId)
         const users = [] as UserEntity[]
         for (const collectorId of product.collectorIds) {
-            const user = yield* new UserStorageDomain().getUser(collectorId)
+            const user = yield* new UserStorageDomain(this.store.domain.prop('users')).getUser(collectorId)
             users.push(user)
         }
         return users
     }
 }
 
-const userStorage = new UserStorageDomain()
-const orderStorage = new OrderStorageDomain()
-const productStorage = new ProductStorageDomain()
-
 describe('Graph Domain Operations', () => {
-    let store: Store.Store<RootState, {}>
+    let store: Store<RootState>
+
+    let userStorage: UserStorageDomain<RootState>
+    let orderStorage: OrderStorageDomain<RootState>
+    let productStorage: ProductStorageDomain<RootState>
 
     beforeEach(() => {
         const initialState: RootState = {
@@ -154,12 +142,16 @@ describe('Graph Domain Operations', () => {
                 },
             },
         }
-        store = new Store.Store<RootState, {}>({ state: initialState, context: {} })
+        store = new Store<RootState>({ state: initialState })
+
+        userStorage = new UserStorageDomain(store.domain.prop('users'))
+        orderStorage = new OrderStorageDomain(store.domain.prop('orders'))
+        productStorage = new ProductStorageDomain(store.domain.prop('products'))
     })
 
     describe('User Operations', () => {
         it('should get user', () => {
-            const result = store.runCommand(userStorage.getUser('user1'))
+            const result = Result.run(userStorage.getUser('user1'))
             if (result.type === 'err') throw new Error('Expected user but got error')
             expect(result.value.name).toBe('John Doe')
         })
@@ -170,9 +162,9 @@ describe('Graph Domain Operations', () => {
                 name: 'Jane Doe',
                 orderIds: [],
             }
-            store.runCommand(userStorage.addUser(newUser))
+            Result.run(userStorage.addUser(newUser))
 
-            const result = store.runCommand(userStorage.getUser('user2'))
+            const result = Result.run(userStorage.getUser('user2'))
             if (result.type === 'err') throw new Error('Expected user but got error')
             expect(result.value.name).toBe('Jane Doe')
         })
@@ -180,13 +172,13 @@ describe('Graph Domain Operations', () => {
 
     describe('Order Operations', () => {
         it('should get order', () => {
-            const result = store.runCommand(orderStorage.getOrder('order1'))
+            const result = Result.run(orderStorage.getOrder('order1'))
             if (result.type === 'err') throw new Error('Expected order but got error')
             expect(result.value.userId).toBe('user1')
         })
 
         it('should add product to order', () => {
-            store.runCommand(
+            Result.run(
                 productStorage.addProduct({
                     id: 'product2',
                     name: 'MacBook',
@@ -195,9 +187,9 @@ describe('Graph Domain Operations', () => {
                 }),
             )
 
-            store.runCommand(orderStorage.addProduct('order1', 'product2'))
+            Result.run(orderStorage.addProduct('order1', 'product2'))
 
-            const result = store.runCommand(orderStorage.getOrder('order1'))
+            const result = Result.run(orderStorage.getOrder('order1'))
             if (result.type === 'err') throw new Error('Expected order but got error')
             expect(result.value.productIds).toEqual(['product1', 'product2'])
         })
@@ -205,13 +197,13 @@ describe('Graph Domain Operations', () => {
 
     describe('Product Operations', () => {
         it('should get product', () => {
-            const result = store.runCommand(productStorage.getProduct('product1'))
+            const result = Result.run(productStorage.getProduct('product1'))
             if (result.type === 'err') throw new Error('Expected product but got error')
             expect(result.value.name).toBe('iPhone')
         })
 
         it('should get collectors', () => {
-            const result = store.runCommand(productStorage.getCollectors('product1'))
+            const result = Result.run(productStorage.getCollectors('product1'))
             if (result.type === 'err') throw new Error('Expected collectors but got error')
             expect(result.value.length).toBe(1)
             expect(result.value[0].name).toBe('John Doe')
@@ -220,7 +212,7 @@ describe('Graph Domain Operations', () => {
 
     describe('Graph Relationships', () => {
         it('should maintain user-order relationship', () => {
-            store.runCommand(
+            Result.run(
                 orderStorage.addOrder({
                     id: 'order2',
                     userId: 'user1',
@@ -228,9 +220,9 @@ describe('Graph Domain Operations', () => {
                 }),
             )
 
-            store.runCommand(userStorage.addOrder('user1', 'order2'))
+            Result.run(userStorage.addOrder('user1', 'order2'))
 
-            const userResult = store.runCommand(userStorage.getUser('user1'))
+            const userResult = Result.run(userStorage.getUser('user1'))
             if (userResult.type === 'err') throw new Error('Expected user but got error')
             expect(userResult.value.orderIds).toEqual(['order1', 'order2'])
         })

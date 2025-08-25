@@ -62,18 +62,23 @@ const OpticProxySymbol = Symbol.for('koka-optic-proxy')
 type OpticProxySymbol = typeof OpticProxySymbol
 
 export type LeafOpticProxy<State extends number | string | boolean> = {
-    [OpticProxySymbol]?: State
+    [OpticProxySymbol]: State
+}
+
+export type ArrayOpticProxy<State extends unknown[]> = {
+    [index: number]: OpticProxy<State[number]>
+    length: LeafOpticProxy<number>
+    [OpticProxySymbol]: State
+}
+
+export type ObjectOpticProxy<State extends object> = {
+    [K in keyof State | OpticProxySymbol]: K extends OpticProxySymbol ? State : OpticProxy<State[K & keyof State]>
 }
 
 export type OpticProxy<State> = State extends unknown[]
-    ? {
-          [index: number]: OpticProxy<State[number]>
-          length: LeafOpticProxy<number>
-      }
+    ? ArrayOpticProxy<State>
     : State extends object
-    ? {
-          [K in keyof State]: OpticProxy<State[K]>
-      }
+    ? ObjectOpticProxy<State>
     : State extends number | string | boolean
     ? LeafOpticProxy<State>
     : never

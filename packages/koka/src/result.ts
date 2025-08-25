@@ -34,7 +34,7 @@ export type InferOkValue<T> = T extends Ok<infer U> ? U : never
 
 export function* wrap<Yield extends Koka.AnyEff, Return>(
     gen: Generator<Yield, Return>,
-): Generator<Koka.ExcludeErr<Yield>, Ok<Return> | Koka.ExtractErr<Yield>> {
+): Generator<Err.ExcludeErr<Yield>, Ok<Return> | Err.ExtractErr<Yield>> {
     try {
         let result = gen.next()
 
@@ -42,7 +42,7 @@ export function* wrap<Yield extends Koka.AnyEff, Return>(
             const effect = result.value
 
             if (effect.type === 'err') {
-                return effect as Koka.ExtractErr<Yield>
+                return effect as Err.ExtractErr<Yield>
             } else {
                 result = gen.next(yield effect as any)
             }
@@ -63,25 +63,25 @@ export function* wrap<Yield extends Koka.AnyEff, Return>(
  */
 export function* unwrap<Yield, Return extends AnyOk | Err.AnyErr>(
     gen: Generator<Yield, Return>,
-): Generator<Yield | Koka.ExtractErr<Return>, InferOkValue<Return>> {
+): Generator<Yield | Err.ExtractErr<Return>, InferOkValue<Return>> {
     const result = yield* gen
 
     if (result.type === 'ok') {
         return result.value
     } else {
-        throw yield result as Koka.ExtractErr<Return>
+        throw yield result as Err.ExtractErr<Return>
     }
 }
 
 export function run<Yield extends Err.AnyErr | Opt.AnyOpt, Return>(
     input: Koka.Actor<Yield, Return>,
-): Ok<Return> | Koka.ExtractErr<Yield>
+): Ok<Return> | Err.ExtractErr<Yield>
 export function run<Yield extends Err.AnyErr | Opt.AnyOpt, Return>(
     input: Koka.Actor<Async.Async | Opt.AnyOpt | Yield, Return>,
-): Async.MaybePromise<Ok<Return> | Koka.ExtractErr<Yield>>
+): Async.MaybePromise<Ok<Return> | Err.ExtractErr<Yield>>
 export function run<Yield extends Err.AnyErr, Return>(
     input: Koka.Actor<Async.Async | Opt.AnyOpt | Yield, Return>,
-): Async.MaybePromise<Ok<Return> | Koka.ExtractErr<Yield>> {
+): Async.MaybePromise<Ok<Return> | Err.ExtractErr<Yield>> {
     const gen = typeof input === 'function' ? input() : input
 
     return Koka.run(wrap(gen as any) as any)
@@ -89,14 +89,14 @@ export function run<Yield extends Err.AnyErr, Return>(
 
 export function runSync<Yield, Return>(
     input: Koka.Actor<Opt.AnyOpt | Yield, Return>,
-): Ok<Return> | Koka.ExtractErr<Yield> {
+): Ok<Return> | Err.ExtractErr<Yield> {
     const gen = typeof input === 'function' ? input() : input
     return Koka.runSync(wrap(gen as any) as any)
 }
 
 export function runAsync<Yield, Return>(
     input: Koka.Actor<Async.Async | Opt.AnyOpt | Yield, Return>,
-): Promise<Ok<Return> | Koka.ExtractErr<Yield>> {
+): Promise<Ok<Return> | Err.ExtractErr<Yield>> {
     const gen = typeof input === 'function' ? input() : input
     return Koka.runAsync(wrap(gen as any) as any)
 }

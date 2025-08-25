@@ -55,7 +55,7 @@ const result = Koka.run(program)
 
 Optics library for immutable data manipulation.
 
-### [koka-store](./packages/koka-ddd/)
+### [koka-store](./packages/koka-domain/)
 
 State management library with algebraic effects.
 
