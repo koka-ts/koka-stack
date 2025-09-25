@@ -1,9 +1,10 @@
-import * as Koka from 'koka'
-import * as Optic from 'koka-optic'
+import * as DDD from 'koka'
+import * as Accessor from 'koka-accessor'
 import * as Opt from 'koka/opt'
 import * as Result from 'koka/result'
 import * as Err from 'koka/err'
 import * as Async from 'koka/async'
+import * as Task from 'koka/task'
 import { shallowEqual } from './shallowEqual'
 
 export { shallowEqual }
@@ -16,54 +17,56 @@ export function shallowEqualResult<T>(a: Result.Result<T, any>, b: Result.Result
     if (a.type === 'ok' && b.type === 'ok') {
         return shallowEqual(a.value, b.value)
     }
+
     if (a.type === 'err' && b.type === 'err') {
         return shallowEqual(a.error, b.error)
     }
+
     return false
 }
 
-export type StoreEnhancer<State> = (store: Store<State>) => (() => void) | void
+export type StorePlugin<Root> = (store: Store<Root>) => (() => void) | void
 
-export type StoreOptions<State> = {
-    state: State
-    enhancers?: StoreEnhancer<State>[]
+export type StoreOptions<Root> = {
+    state: Root
+    plugins?: StorePlugin<Root>[]
 }
 
 export type AnyStore = Store<any>
 
 export type InferStoreState<S> = S extends Store<infer State> ? State : never
 
-export class Store<State> {
-    state: State
-    domain: Domain<State, State>
+export class Store<Root> {
+    state: Root
+    domain: Domain<Root, Root, this>
 
-    enhancers: StoreEnhancer<State>[] = []
-    private enhancerCleanup: (() => void)[] = []
+    plugins: StorePlugin<Root>[] = []
+    private pluginCleanup: (() => void)[] = []
 
-    constructor(options: StoreOptions<State>) {
+    constructor(options: StoreOptions<Root>) {
         this.state = options.state
-        this.domain = new Domain({
+        this.domain = new Domain<Root, Root, this>({
             store: this,
-            optic: Optic.root<State>(),
+            accessor: Accessor.root<Root>(),
         })
 
-        this.enhancers = [...this.enhancers, ...(options.enhancers ?? [])]
+        this.plugins = [...this.plugins, ...(options.plugins ?? [])]
 
-        for (const enhancer of this.enhancers) {
-            const cleanup = enhancer(this)
+        for (const plugin of this.plugins) {
+            const cleanup = plugin(this)
             if (cleanup) {
-                this.enhancerCleanup.push(cleanup)
+                this.pluginCleanup.push(cleanup)
             }
         }
     }
 
-    getState = (): State => {
+    getState = (): Root => {
         return this.state
     }
 
     private dirty = false
     version = 0
-    setState = (state: State): void => {
+    setState = (state: Root): void => {
         if (shallowEqual(state, this.state)) {
             return
         }
@@ -84,9 +87,9 @@ export class Store<State> {
 
     promise = Promise.resolve()
 
-    private listeners: ((state: State) => unknown)[] = []
+    private listeners: ((state: Root) => unknown)[] = []
 
-    subscribe(listener: (state: State) => unknown): () => void {
+    subscribe(listener: (state: Root) => unknown): () => void {
         this.listeners.push(listener)
 
         return () => {
@@ -111,11 +114,11 @@ export class Store<State> {
     destroy(): void {
         this.listeners = []
 
-        for (const enhancer of this.enhancerCleanup) {
-            enhancer()
+        for (const cleanup of this.pluginCleanup) {
+            cleanup()
         }
 
-        this.enhancerCleanup = []
+        this.pluginCleanup = []
     }
 
     private executionListeners: ((tree: ExecutionTree) => unknown)[] = []
@@ -138,120 +141,259 @@ export class Store<State> {
     }
 }
 
-export type SetStateInput<S> = S | Optic.Updater<S> | ((state: S) => S)
+export type CommandEff = Accessor.AccessorErr | Async.Async | QueryOpt | CommandTracerOpt | EventTracerOpt
 
-export type DomainOptions<State, Root = unknown> = {
-    store: Store<Root>
-    optic: Optic.Optic<State, Root>
+export type EventInput<E extends AnyEvent, D extends AnyDomain> = {
+    domain: D
+    event: E
 }
 
-export type AnyDomain = Domain<any, any>
+export interface Event<Name extends string, T> {
+    type: 'event'
+    name: Name
+    payload: T
+}
 
-export class Domain<State, Root = unknown> {
-    store: Store<Root>
-    optic: Optic.Optic<State, Root>
-    constructor(options: DomainOptions<State, Root>) {
-        const optic = new Optic.Optic(options.optic)
+export type AnyEvent = Event<string, any>
 
-        Object.defineProperty(optic, 'getKey', {
+export function Event<const Name extends string>(name: Name) {
+    return class Eff<T = void> implements Event<Name, T> {
+        static field: Name = name
+        type = 'event' as const
+        name = name
+        payload: T
+        constructor(payload: T) {
+            this.payload = payload
+        }
+    }
+}
+
+type EventCtor<Name extends string, T> = new (...args: any[]) => Event<Name, T>
+
+type AnyEventCtor = EventCtor<string, any>
+
+export type EventValue<E extends AnyEvent> = E['payload']
+
+export type EventHandler<E extends AnyEvent> = (event: E) => Generator<CommandEff, unknown>
+
+const eventHandlersStorages = new WeakMap<
+    AnyDomain,
+    Map<new (...args: any[]) => AnyEvent, Array<EventHandler<AnyEvent>>>
+>()
+
+export function event<ES extends AnyEventCtor[]>(...Events: ES) {
+    return function <This extends AnyDomain, Return, E extends DDD.AnyEff>(
+        target: (this: This, event: InstanceType<ES[number]>) => Generator<E, Return>,
+        context: KokaClassMethodDecoratorContext<This, typeof target>,
+    ): typeof target {
+        context.addInitializer(function () {
+            if (!(this instanceof Domain)) {
+                throw new Error('Event must be used on a Domain class')
+            }
+
+            let eventHandlersStorage = eventHandlersStorages.get(this)
+
+            if (!eventHandlersStorage) {
+                eventHandlersStorage = new Map()
+                eventHandlersStorages.set(this, eventHandlersStorage)
+            }
+
+            for (const Event of Events) {
+                let eventHandlers = eventHandlersStorage.get(Event)
+
+                if (!eventHandlers) {
+                    eventHandlers = []
+                    eventHandlersStorage.set(Event, eventHandlers)
+                }
+
+                const eventHandler = target.bind(this) as unknown as EventHandler<AnyEvent>
+                eventHandlers.push(eventHandler)
+            }
+        })
+
+        return target
+    }
+}
+
+export function* emit<D extends AnyDomain, E extends AnyEvent>(domain: D, event: E): Generator<CommandEff, void> {
+    const eventHandlers = eventHandlersStorages.get(domain)
+
+    if (eventHandlers) {
+        const eventHandlerList = eventHandlers.get(event.constructor as AnyEventCtor)
+        if (eventHandlerList) {
+            const parent = yield* Opt.get(CommandTracerOpt)
+
+            const eventTree: EventExecutionTree = {
+                type: 'event',
+                async: true,
+                domainName: domain.constructor.name,
+                name: event.constructor.name,
+                payload: event.payload,
+                commands: [],
+            }
+
+            parent?.events.push(eventTree)
+
+            const effector = Task.all(eventHandlerList.map((eventHandler) => eventHandler(event)))
+
+            const result = Result.run(
+                DDD.try(effector).handle({
+                    [EventTracerOpt.field]: eventTree,
+                }),
+            ) as Result.Result<unknown, Err.AnyErr>
+
+            if (result.type === 'err') {
+                throw yield* Err.throw(result) as any
+            }
+
+            return
+        }
+    }
+
+    if (domain.parent) {
+        yield* emit(domain.parent, event)
+    }
+}
+
+export type SetStateInput<S> = S | Accessor.Updater<S> | ((state: S) => S)
+
+export type PureDomain<State, Root = any, Enhancer extends {} = {}> = {
+    store: Store<Root> & Enhancer
+    accessor: Accessor.Accessor<State, Root>
+    parent?: Domain<any, Root, Enhancer>
+}
+
+export type AnyDomain = PureDomain<any, any>
+
+export type InferDomainEnhancer<D extends AnyDomain> = D extends PureDomain<any, any, infer Enhancer> ? Enhancer : never
+
+export type InferDomainState<D extends AnyDomain> = D extends PureDomain<infer State, any, any> ? State : never
+
+export type InferDomainRoot<D extends AnyDomain> = D extends PureDomain<any, infer Root, any> ? Root : never
+
+export class Domain<State, Root = any, Enhancer extends {} = {}> implements PureDomain<State, Root, Enhancer> {
+    store: Store<Root> & Enhancer
+    accessor: Accessor.Accessor<State, Root>
+    parent?: Domain<any, Root, Enhancer>
+    constructor(options: PureDomain<State, Root, Enhancer>) {
+        const accessor = new Accessor.Accessor(options.accessor)
+
+        Object.defineProperty(accessor, 'getKey', {
             get: () => {
                 return this.getKey
             },
         })
 
         this.store = options.store
-        this.optic = optic
+        this.accessor = accessor
+        this.parent = options.parent
     }
 
-    getKey?: Optic.GetKey<State>
+    getKey?: Accessor.GetKey<State>
 
-    transform<Target>(selector: Optic.Transformer<Target, State>): Domain<Target, Root> {
+    transform<Target>(selector: Accessor.Transformer<Target, State>): Domain<Target, Root, Enhancer> {
         return new Domain({
             store: this.store,
-            optic: this.optic.transform(selector),
+            accessor: this.accessor.transform(selector),
+            parent: this.parent,
         })
     }
 
-    prop<Key extends keyof State & string>(key: Key): Domain<State[Key], Root> {
+    prop<Key extends keyof State & string>(key: Key): Domain<State[Key], Root, Enhancer> {
         return new Domain({
             store: this.store,
-            optic: this.optic.prop(key),
+            accessor: this.accessor.prop(key),
+            parent: this.parent,
         })
     }
 
-    index<Index extends keyof State & number>(index: Index): Domain<State[Index], Root> {
+    index<Index extends keyof State & number>(index: Index): Domain<State[Index], Root, Enhancer> {
         return new Domain({
             store: this.store,
-            optic: this.optic.index(index),
+            accessor: this.accessor.index(index),
+            parent: this.parent,
         })
     }
 
-    find<Target extends Optic.ArrayItem<State>>(
+    find<Target extends Accessor.ArrayItem<State>>(
         predicate:
-            | ((item: Optic.ArrayItem<State>, index: number) => boolean)
-            | ((item: Optic.ArrayItem<State>, index: number) => item is Target),
-    ): Domain<Target, Root> {
+            | ((item: Accessor.ArrayItem<State>, index: number) => boolean)
+            | ((item: Accessor.ArrayItem<State>, index: number) => item is Target),
+    ): Domain<Target, Root, Enhancer> {
         return new Domain({
             store: this.store,
-            optic: this.optic.find(predicate),
+            accessor: this.accessor.find(predicate),
+            parent: this.parent,
         })
     }
 
-    match<Matched extends State>(predicate: (state: State) => state is Matched): Domain<Matched, Root> {
+    match<Matched extends State>(predicate: (state: State) => state is Matched): Domain<Matched, Root, Enhancer> {
         return new Domain({
             store: this.store,
-            optic: this.optic.match(predicate),
+            accessor: this.accessor.match(predicate),
+            parent: this.parent,
         })
     }
 
-    refine(predicate: (state: State) => boolean): Domain<State, Root> {
+    refine(predicate: (state: State) => boolean): Domain<State, Root, Enhancer> {
         return new Domain({
             store: this.store,
-            optic: this.optic.refine(predicate),
+            accessor: this.accessor.refine(predicate),
+            parent: this.parent,
         })
     }
 
-    as<Refined>(): Domain<Refined, Root> {
+    as<Refined>(): Domain<Refined, Root, Enhancer> {
         return new Domain({
             store: this.store,
-            optic: this.optic.as<Refined>(),
+            accessor: this.accessor.as<Refined>(),
+            parent: this.parent,
         })
     }
 
     map<Target>(
         mapper:
-            | Optic.Transformer<Target, Optic.ArrayItem<State>>
-            | Optic.Optic<Target, Optic.ArrayItem<State>>
+            | Accessor.Transformer<Target, Accessor.ArrayItem<State>>
+            | Accessor.Accessor<Target, Accessor.ArrayItem<State>>
             | ((
-                  state: Optic.Optic<Optic.ArrayItem<State>, Optic.ArrayItem<State>>,
-              ) => Optic.Optic<Target, Optic.ArrayItem<State>>),
-    ): Domain<Target[], Root> {
+                  state: Accessor.Accessor<Accessor.ArrayItem<State>, Accessor.ArrayItem<State>>,
+              ) => Accessor.Accessor<Target, Accessor.ArrayItem<State>>),
+    ): Domain<Target[], Root, Enhancer> {
         return new Domain({
             store: this.store,
-            optic: this.optic.map(mapper),
+            accessor: this.accessor.map(mapper),
+            parent: this.parent,
         })
     }
 
-    filter<Target extends Optic.ArrayItem<State>>(
+    filter<Target extends Accessor.ArrayItem<State>>(
         predicate:
-            | ((item: Optic.ArrayItem<State>, index: number) => boolean)
-            | ((item: Optic.ArrayItem<State>, index: number) => item is Target),
-    ): Domain<Target[], Root> {
+            | ((item: Accessor.ArrayItem<State>, index: number) => boolean)
+            | ((item: Accessor.ArrayItem<State>, index: number) => item is Target),
+    ): Domain<Target[], Root, Enhancer> {
         return new Domain({
             store: this.store,
-            optic: this.optic.filter(predicate),
+            accessor: this.accessor.filter(predicate),
+            parent: this.parent,
         })
     }
 
-    select<Selected>(selector: (proxy: Optic.OpticProxy<State>) => Optic.OpticProxy<Selected>): Domain<Selected, Root> {
+    select<Selected>(
+        selector: (proxy: Accessor.AccessorProxy<State>) => Accessor.AccessorProxy<Selected>,
+    ): Domain<Selected, Root, Enhancer> {
         return new Domain({
             store: this.store,
-            optic: this.optic.select(selector),
+            accessor: this.accessor.proxy(selector),
+            parent: this.parent,
         })
     }
 }
 
-export type ExecutionTree = CommandExecutionTree | QueryExecutionTree
+export type StoreCtor<S extends AnyStore = AnyStore> =
+    | (abstract new <Root>(options: StoreOptions<Root>) => S)
+    | (new <Root>(options: StoreOptions<Root>) => S)
+
+export type ExecutionTree = CommandExecutionTree | QueryExecutionTree | EventExecutionTree
 
 export type StateChange = {
     previous: unknown
@@ -260,28 +402,41 @@ export type StateChange = {
 
 export type CommandExecutionTree = {
     type: 'command'
+    domainName: string
     name: string
     async: boolean
     args: unknown[]
-    return: unknown
+    result?: Result.Result<unknown, Err.AnyErr>
     states: unknown[]
     changes: StateChange[]
     commands: CommandExecutionTree[]
     queries: QueryExecutionTree[]
+    events: EventExecutionTree[]
 }
 
 export type QueryExecutionTree = {
     type: 'query'
+    domainName: string
     async: boolean
     name: string
     args: unknown[]
-    return: unknown
+    result?: Result.Result<unknown, Err.AnyErr>
     states: unknown[]
     queries: QueryExecutionTree[]
 }
 
-export class CommandTracerOpt extends Opt.Opt('koka-domain/command-tracer-opt')<CommandExecutionTree> {}
-export class QueryTracerOpt extends Opt.Opt('koka-domain/query-tracer-opt')<QueryExecutionTree> {}
+export type EventExecutionTree = {
+    type: 'event'
+    async: true
+    domainName: string
+    name: string
+    payload: unknown
+    commands: CommandExecutionTree[]
+}
+
+export class CommandTracerOpt extends Opt.Opt('koka-ddd/command-tracer-opt')<CommandExecutionTree> {}
+export class QueryTracerOpt extends Opt.Opt('koka-ddd/query-tracer-opt')<QueryExecutionTree> {}
+export class EventTracerOpt extends Opt.Opt('koka-ddd/event-tracer-opt')<EventExecutionTree> {}
 
 type KokaClassMethodDecoratorContext<
     This = unknown,
@@ -298,14 +453,14 @@ type KokaClassMethodDecoratorContext<
 }
 
 export type Query<Return, Yield extends Err.AnyErr = Err.AnyErr> = {
-    (): Generator<Yield | QueryOpt, Return, unknown>
+    (): Generator<Yield | QueryOpt, Return>
     store?: AnyStore
 }
 
 export type AnyQuery = Query<any>
 
 type QueryStorage = {
-    domainDeps: Map<AnyDomain, Result.Result<any, Optic.OpticErr>>
+    domainDeps: Map<AnyDomain, Result.Result<any, Accessor.AccessorErr>>
     queryDeps: Map<AnyQuery, Result.Result<any, Err.AnyErr>>
     current?: {
         version: number
@@ -333,15 +488,15 @@ const checkQueryStorageDeps = (queryStorage: QueryStorage) => {
     return true
 }
 
-class QueryStorageOpt extends Opt.Opt('koka-domain/query-storage-opt')<QueryStorage> {}
+class QueryStorageOpt extends Opt.Opt('koka-ddd/query-storage-opt')<QueryStorage> {}
 
 const queryStorages = new WeakMap<Query<any, any>, QueryStorage>()
 
 export function query() {
-    return function <This, Args extends any[], Return, Yield extends Err.AnyErr = Err.AnyErr>(
+    return function <This extends AnyDomain, Args extends any[], Return, Yield extends DDD.AnyEff>(
         target: (this: This, ...args: Args) => Generator<Yield | QueryOpt, Return>,
         context: KokaClassMethodDecoratorContext<This, typeof target>,
-    ): Query<Return, Yield> {
+    ): typeof target {
         const methodName = context.name
 
         context.addInitializer(function () {
@@ -352,17 +507,18 @@ export function query() {
             this[methodName].store = this.store
         })
 
-        function* replacementMethod(this: AnyDomain, ...args: Args): Generator<Yield | QueryOpt, Return> {
+        function* replacementMethod(this: This, ...args: Args): Generator<Yield | QueryOpt, Return> {
+            const domainName = (this as any).constructor?.name ?? 'UnknownDomain'
             const parentQueryTree: QueryExecutionTree | undefined = yield* Opt.get(QueryTracerOpt)
 
-            const name = `${(this as any).constructor?.name ?? 'UnknownDomain'}.${methodName}`
+            const name = methodName
             const queryExecutionTree: QueryExecutionTree | undefined = parentQueryTree
                 ? {
                       type: 'query',
+                      domainName,
                       async: false,
-                      name,
+                      name: name,
                       args: args,
-                      return: undefined,
                       states: [],
                       queries: [],
                   }
@@ -372,22 +528,22 @@ export function query() {
                 parentQueryTree.queries.push(queryExecutionTree)
             }
 
-            const handledQueryEff = Koka.try(target.call(this as This, ...args)).handle({
+            const handledQueryEff = DDD.try(target.call(this as This, ...args)).handle({
                 [QueryTracerOpt.field]: queryExecutionTree,
             } as any)
 
             const result: Result.Result<any, Err.AnyErr> = yield* Result.wrap(handledQueryEff)
 
-            if (result.type === 'err') {
-                throw yield* Err.throw(result) as any
-            }
-
             if (queryExecutionTree) {
-                queryExecutionTree.return = result.value
+                queryExecutionTree.result = result
             }
 
             if (!parentQueryTree && queryExecutionTree) {
                 this.store.publishExecution(queryExecutionTree)
+            }
+
+            if (result.type === 'err') {
+                throw yield* Err.throw(result) as any
             }
 
             return result.value as Return
@@ -430,7 +586,7 @@ export function query() {
                 queryStorages.set(queryMethod, queryStorage)
             }
 
-            const withQueryStorage = Koka.try(replacementMethod.call(this, ...args)).handle({
+            const withQueryStorage = DDD.try(replacementMethod.call(this, ...args)).handle({
                 [QueryStorageOpt.field]: queryStorage,
             } as any)
 
@@ -516,76 +672,84 @@ export function subscribeQueryState<Return, Yield extends Err.AnyErr = Err.AnyEr
         listener(result.value)
     })
 }
+
 export function command() {
-    return function <This, Args extends any[], Return, E extends Koka.AnyEff>(
+    return function <This extends AnyDomain, Args extends any[], Return, E extends DDD.AnyEff>(
         target: (this: This, ...args: Args) => Generator<E, Return>,
         context: KokaClassMethodDecoratorContext<This, typeof target>,
     ): typeof target {
         const methodName = context.name
 
-        context.addInitializer(function () {
-            // @ts-ignore
-            this[methodName] = this[methodName].bind(this)
-        })
-
-        function* replacementMethod(
-            this: This,
-            ...args: Args
-        ): Generator<E | CommandTracerOpt | QueryTracerOpt, Return, unknown> {
+        function* replacementMethod(this: This, ...args: Args): Generator<E | CommandEff, Return> {
             if (!(this instanceof Domain)) {
                 throw new Error('Command must be used on a Domain class')
             }
 
-            const parent: CommandExecutionTree | undefined = yield* Opt.get(CommandTracerOpt)
+            const domainName = (this as any).constructor?.name ?? 'UnknownDomain'
+            const parent = yield* Opt.get(CommandTracerOpt)
 
-            const name = `${(this as any).constructor?.name ?? 'UnknownDomain'}.${methodName}`
+            const eventTree = yield* Opt.get(EventTracerOpt)
+
+            const name = methodName
             const commandTree: CommandExecutionTree = {
                 type: 'command',
+                domainName,
                 async: false,
-                name,
+                name: name,
                 args: args,
-                return: undefined,
                 states: [],
                 changes: [],
                 commands: [],
                 queries: [],
+                events: [],
             }
 
             const queryTree: QueryExecutionTree = {
                 type: 'query',
+                domainName,
                 async: false,
-                name,
+                name: name,
                 args: args,
-                return: undefined,
                 states: [],
                 queries: [],
             }
 
-            parent?.commands.push(commandTree)
+            if (parent) {
+                parent.commands.push(commandTree)
+            } else if (eventTree) {
+                eventTree.commands.push(commandTree)
+            }
 
-            const gen = Koka.try(target.call(this, ...args)).handle({
+            const gen = DDD.try(Result.wrap(target.call(this, ...args))).handle({
                 [CommandTracerOpt.field]: commandTree,
                 [QueryTracerOpt.field]: queryTree,
             } as any)
 
-            let result = gen.next()
+            let iteratorResult = gen.next()
 
-            while (!result.done) {
-                const effect = result.value
+            while (!iteratorResult.done) {
+                const effect = iteratorResult.value
 
                 if (effect.type === 'async') {
                     commandTree.async = true
-                    result = gen.next(yield effect as any)
+                    iteratorResult = gen.next(yield effect as any)
                 } else {
-                    result = gen.next(yield effect as any)
+                    iteratorResult = gen.next(yield effect as any)
                 }
             }
 
-            commandTree.queries = queryTree.queries
-            commandTree.return = result.value
+            const result = iteratorResult.value as Result.Result<unknown, Err.AnyErr>
 
-            if (!parent) {
+            commandTree.queries = queryTree.queries
+            commandTree.states = queryTree.states
+            commandTree.result = result
+
+            if (!parent && !eventTree) {
                 this.store.publishExecution(commandTree)
+            }
+
+            if (result.type === 'err') {
+                throw yield* Err.throw(result) as any
             }
 
             return result.value as Return
@@ -597,11 +761,13 @@ export function command() {
 
 export type QueryOpt = QueryStorageOpt | QueryTracerOpt
 
-function* getDomainState<State, Root>(domain: Domain<State, Root>): Generator<Optic.OpticErr | QueryOpt, State> {
+function* getDomainState<State, Root>(
+    domain: PureDomain<State, Root>,
+): Generator<Accessor.AccessorErr | QueryOpt, State> {
     const queryTree = yield* Opt.get(QueryTracerOpt)
 
     const rootState = domain.store.getState()
-    const state = yield* Optic.get(rootState, domain.optic)
+    const state = yield* Accessor.get(rootState, domain.accessor)
 
     if (queryTree) {
         queryTree.states.push(state)
@@ -612,12 +778,12 @@ function* getDomainState<State, Root>(domain: Domain<State, Root>): Generator<Op
 
 type DomainStorage = {
     version: number
-    result: Result.Result<any, Optic.OpticErr>
+    result: Result.Result<any, Accessor.AccessorErr>
 }
 
-const domainStorages = new WeakMap<Domain<any, any>, DomainStorage>()
+const domainStorages = new WeakMap<PureDomain<any, any>, DomainStorage>()
 
-export function* get<State, Root>(domain: Domain<State, Root>): Generator<Optic.OpticErr | QueryOpt, State> {
+export function* get<State, Root>(domain: PureDomain<State, Root>): Generator<Accessor.AccessorErr | QueryOpt, State> {
     const domainStorage = domainStorages.get(domain)
     const parentQueryStorage = yield* Opt.get(QueryStorageOpt)
 
@@ -652,14 +818,14 @@ export function* get<State, Root>(domain: Domain<State, Root>): Generator<Optic.
 }
 
 export function* set<State, Root>(
-    domain: Domain<State, Root>,
+    domain: PureDomain<State, Root>,
     setStateInput: SetStateInput<State>,
-): Generator<Optic.OpticErr | CommandTracerOpt, Root> {
+): Generator<Accessor.AccessorErr | CommandTracerOpt, Root> {
     const commandTree = yield* Opt.get(CommandTracerOpt)
 
     const rootState = domain.store.getState()
 
-    const newRootState = yield* Optic.set(rootState, domain.optic, function* (state) {
+    const newRootState = yield* Accessor.set(rootState, domain.accessor, function* (state) {
         if (typeof setStateInput !== 'function') {
             if (shallowEqual(state, setStateInput)) {
                 return state
@@ -674,9 +840,9 @@ export function* set<State, Root>(
             return setStateInput
         }
 
-        const result = (setStateInput as Optic.Updater<State> | ((state: State) => State))(state)
+        const result = (setStateInput as Accessor.Updater<State> | ((state: State) => State))(state)
 
-        const nextState = yield* Optic.getOpticValue(result)
+        const nextState = yield* Accessor.getValue(result)
 
         if (shallowEqual(nextState, state)) {
             return state
@@ -697,9 +863,9 @@ export function* set<State, Root>(
     return newRootState
 }
 
-const previousResultWeakMap = new WeakMap<Domain<any, any>, Result.Result<any, any>>()
+const previousResultWeakMap = new WeakMap<PureDomain<any, any>, Result.Result<any, any>>()
 
-export function getState<State, Root>(domain: Domain<State, Root>): Result.Result<State, Optic.OpticErr> {
+export function getState<State, Root>(domain: PureDomain<State, Root>): Result.Result<State, Accessor.AccessorErr> {
     const result = Result.run(get(domain))
 
     const previousResult = previousResultWeakMap.get(domain)
@@ -716,17 +882,17 @@ export function getState<State, Root>(domain: Domain<State, Root>): Result.Resul
 }
 
 export function setState<State, Root>(
-    domain: Domain<State, Root>,
+    domain: PureDomain<State, Root>,
     setStateInput: SetStateInput<State>,
-): Result.Result<Root, Optic.OpticErr> {
+): Result.Result<Root, Accessor.AccessorErr> {
     return Result.run(set(domain, setStateInput))
 }
 
 export function subscribeDomainResult<State, Root>(
-    domain: Domain<State, Root>,
-    listener: (result: Result.Result<State, Optic.OpticErr>) => unknown,
+    domain: PureDomain<State, Root>,
+    listener: (result: Result.Result<State, Accessor.AccessorErr>) => unknown,
 ): () => void {
-    let previousResult: Result.Result<State, Optic.OpticErr> | undefined
+    let previousResult: Result.Result<State, Accessor.AccessorErr> | undefined
 
     return domain.store.subscribe(() => {
         const result = getState(domain)
@@ -742,7 +908,7 @@ export function subscribeDomainResult<State, Root>(
 }
 
 export function subscribeDomainState<State, Root>(
-    domain: Domain<State, Root>,
+    domain: PureDomain<State, Root>,
     listener: (state: State) => unknown,
 ): () => void {
     return subscribeDomainResult(domain, (result) => {

@@ -11,9 +11,9 @@
     },
     "dependencies": {
         "koka": "workspace:*",
-        "koka-optic": "workspace:*",
+        "koka-accessor": "workspace:*",
         "koka-react": "workspace:*",
-        "koka-domain": "workspace:*",
+        "koka-ddd": "workspace:*",
         "react": "^19.1.0",
         "react-dom": "^19.1.0"
     },

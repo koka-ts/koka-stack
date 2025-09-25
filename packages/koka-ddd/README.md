@@ -1,4 +1,4 @@
-# koka-store - Domain Modeling with Effects
+# koka-ddd - Domain Modeling with Effects
 
 **Warning: This library is in early development and may change significantly. Do not use in production yet.**
 
@@ -8,16 +8,16 @@ Koka DDD provides a domain modeling framework built on Koka's algebraic effects 
 -   **Store Pattern**: Centralized state management
 -   **Command/Query Separation**: Clear distinction between writes and reads
 -   **Effect Integration**: Seamless Koka effects usage
--   **Optics Support**: Composable data access patterns
+-   **Accessors Support**: Composable data access patterns
 
 ## Installation
 
 ```bash
-npm install koka-store
+npm install koka-ddd
 # or
-yarn add koka-store
+yarn add koka-ddd
 # or
-pnpm add koka-store
+pnpm add koka-ddd
 ```
 
 ## Core Concepts
@@ -27,7 +27,7 @@ pnpm add koka-store
 Define your domain using the `Domain` base class:
 
 ```typescript
-import { Domain } from 'koka-store'
+import { Domain } from 'koka-ddd'
 
 class TodoDomain extends Domain<Todo> {
   text = new TextDomain(this.$prop('text'))
@@ -44,7 +44,7 @@ class TodoDomain extends Domain<Todo> {
 Manage application state with the `Store` class:
 
 ```typescript
-import { Store } from 'koka-store'
+import { Store } from 'koka-ddd'
 
 const store = new Store({
     state: {
@@ -67,7 +67,7 @@ store.runCommand(todoDomain.addTodo('New task'))
 ## Complete Todo App Example
 
 ```typescript
-import { Domain, Store } from 'koka-store'
+import { Domain, Store } from 'koka-ddd'
 
 // Define domains
 class TodoDomain extends Domain<Todo> {

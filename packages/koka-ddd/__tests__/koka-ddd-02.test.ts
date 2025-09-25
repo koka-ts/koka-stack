@@ -1,6 +1,6 @@
 import * as Err from 'koka/err'
 import * as Result from 'koka/result'
-import { Domain, Store, get, set } from '../src/koka-domain.ts'
+import { Domain, Store, get, set } from '../src/koka-ddd.ts'
 
 type UserEntity = {
     id: string

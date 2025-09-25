@@ -40,13 +40,13 @@
 
 ### Patch Changes
 
--   improve koka, add optic.proxy to koka-optic
+-   improve koka, add accessor.proxy to koka-accessor
 
 ## 1.0.2
 
 ### Patch Changes
 
--   add Optic.get/Optic.set, fix Eff.try().cach()
+-   add Accessor.get/Accessor.set, fix Eff.try().cach()
 
 ## 1.0.1
 

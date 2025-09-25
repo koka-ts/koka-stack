@@ -1,9 +1,16 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import * as Domain from 'koka-domain'
-import { PrettyLogger } from 'koka-domain/pretty-browser-logger'
+import * as DDD from 'koka-ddd'
+import { PrettyLogger } from 'koka-ddd/pretty-browser-logger'
 import { useDomainState } from 'koka-react'
-import { type TodoApp, TodoAppDomain } from './domain'
+import {
+    type TodoApp,
+    TodoAppDomain,
+    type CoreDomain,
+    type TodoStorage,
+    type Todo,
+    type TextLoggerEnhancer,
+} from './domain'
 import './index.css'
 import App from './App.tsx'
 
@@ -12,7 +19,7 @@ type AppState = {
 }
 
 type MainProps = {
-    domain: Domain.Domain<AppState, AppState>
+    domain: CoreDomain<AppState, AppState>
 }
 
 function Main(props: MainProps) {
@@ -41,7 +48,7 @@ const initialState: AppState = {
     todoAppList: [
         {
             todos: [
-                { id: 101, text: 'Learn koka-domain framework', done: true },
+                { id: 101, text: 'Learn koka-ddd framework', done: true },
                 { id: 102, text: 'Build React todo app', done: true },
                 { id: 103, text: 'Write comprehensive documentation', done: false },
                 { id: 104, text: 'Add unit tests', done: false },
@@ -101,9 +108,42 @@ const initialState: AppState = {
     ],
 }
 
-const store = new Domain.Store<AppState>({
+export type UseTodoStorageOptions = {
+    todoStorageKey: string
+}
+
+export function useTodoStorage(options: UseTodoStorageOptions): TodoStorage {
+    return {
+        async saveTodoList(todoList: Todo[]): Promise<void> {
+            localStorage.setItem(options.todoStorageKey, JSON.stringify(todoList))
+        },
+        async loadTodoList(): Promise<Todo[]> {
+            return JSON.parse(localStorage.getItem(options.todoStorageKey) || '[]')
+        },
+    }
+}
+
+export const logText: TextLoggerEnhancer['logText'] = (text) => {
+    console.log('[logText]', text)
+}
+
+export interface StoreWithTodoStorageOptions<Root> extends DDD.StoreOptions<Root> {
+    todoStorageKey?: string
+}
+
+export class StoreWithTodoStorage<Root> extends DDD.Store<Root> {
+    todoStorage: TodoStorage
+    constructor(options: StoreWithTodoStorageOptions<Root>) {
+        super(options)
+        this.todoStorage = useTodoStorage({
+            todoStorageKey: options.todoStorageKey ?? 'todoList',
+        })
+    }
+    logText = logText
+}
+const store = new StoreWithTodoStorage<AppState>({
     state: initialState,
-    enhancers: [PrettyLogger()],
+    plugins: [PrettyLogger()],
 })
 
 createRoot(document.getElementById('root')!).render(

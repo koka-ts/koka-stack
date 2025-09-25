@@ -1,13 +1,12 @@
 import * as Koka from 'koka'
-import * as Domain from 'koka-domain'
+import * as DDD from 'koka-ddd'
 import * as Result from 'koka/result'
 import { useDomainState, useDomainQuery } from 'koka-react'
 import './App.css'
-import { type TodoFilter, type Todo, TodoListDomain, TodoFilterDomain, TodoAppDomain, TodoDomain } from './domain'
+import { type TodoFilter, TodoListDomain, TodoFilterDomain, TodoAppDomain, TodoDomain } from './domain'
 
 type TodoItemProps = {
     todo$: TodoDomain
-    onRemove?: (id: number) => void
 }
 
 function TodoItem(props: TodoItemProps) {
@@ -19,7 +18,7 @@ function TodoItem(props: TodoItemProps) {
     }
 
     const handleRemove = () => {
-        props.onRemove?.(todo.id)
+        Koka.runThrow(todo$.removeTodo())
     }
 
     const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -66,13 +65,13 @@ function TodoInput(props: TodoInputProps) {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
 
-        const program = Koka.try(todoApp$.addTodo()).handle({
+        const effector = Koka.try(todoApp$.addTodo()).handle({
             TodoInputErr: (message) => {
                 alert(message)
             },
         })
 
-        await Result.runAsync(program)
+        await Result.runAsync(effector)
     }
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -193,7 +192,7 @@ function TodoListHeader(props: TodoListHeaderProps) {
 }
 
 type TodoListItemsProps = {
-    getFilteredTodoIds: Domain.Query<number[]>
+    getFilteredTodoIds: DDD.Query<number[]>
     todoList$: TodoListDomain
 }
 
@@ -202,14 +201,10 @@ function TodoListItems(props: TodoListItemsProps) {
 
     const filteredTodoIds = useDomainQuery(props.getFilteredTodoIds)
 
-    const handleRemove = (id: number) => {
-        Koka.runThrow(todoList$.removeTodo(id))
-    }
-
     return (
         <ul className="divide-y divide-gray-100">
             {filteredTodoIds.map((id) => (
-                <TodoItem key={id} todo$={todoList$.todo(id)} onRemove={handleRemove} />
+                <TodoItem key={id} todo$={todoList$.todo(id)} />
             ))}
         </ul>
     )
@@ -255,7 +250,7 @@ function EmptyTodoList() {
 }
 
 type TodoListProps = {
-    getTodoIds: Domain.Query<number[]>
+    getTodoIds: DDD.Query<number[]>
     todoList$: TodoListDomain
 }
 

@@ -30,9 +30,9 @@ type ExtractErrorHandlerReturn<Handlers, Eff> = Eff extends Err<infer Name, infe
         : never
     : never
 
-export type Actor<Yield, Return> = Generator<Yield, Return> | (() => Generator<Yield, Return>)
+export type Effector<Yield, Return> = Generator<Yield, Return> | (() => Generator<Yield, Return>)
 
-function tryEffect<Yield extends AnyEff, Return>(input: Actor<Yield, Return>) {
+function tryEffect<Yield extends AnyEff, Return>(input: Effector<Yield, Return>) {
     return {
         *handle<Handlers extends Partial<EffectHandlers<Yield>>>(
             handlers: Handlers,
@@ -82,9 +82,9 @@ function tryEffect<Yield extends AnyEff, Return>(input: Actor<Yield, Return>) {
 
 export { tryEffect as try }
 
-export function run<Return>(input: Actor<AnyOpt, Return>): Return
-export function run<Return>(input: Actor<Async | AnyOpt, Return>): MaybePromise<Return>
-export function run<Return>(input: Actor<Async | AnyOpt, Return>): MaybePromise<Return> {
+export function run<Return>(input: Effector<AnyOpt, Return>): Return
+export function run<Return>(input: Effector<Async | AnyOpt, Return>): MaybePromise<Return>
+export function run<Return>(input: Effector<Async | AnyOpt, Return>): MaybePromise<Return> {
     const gen = typeof input === 'function' ? input() : input
 
     const process = (result: IteratorResult<Async | AnyOpt, Return>): MaybePromise<Return> => {
@@ -113,7 +113,7 @@ export function run<Return>(input: Actor<Async | AnyOpt, Return>): MaybePromise<
     return process(gen.next())
 }
 
-export function runSync<Return>(actor: Actor<AnyOpt, Return>): Return {
+export function runSync<Return>(actor: Effector<AnyOpt, Return>): Return {
     const result = run(actor)
 
     if (result instanceof Promise) {
@@ -123,24 +123,24 @@ export function runSync<Return>(actor: Actor<AnyOpt, Return>): Return {
     return result
 }
 
-export function runAsync<Return>(actor: Actor<Async | AnyOpt, Return>): Promise<Return> {
+export function runAsync<Return>(actor: Effector<Async | AnyOpt, Return>): Promise<Return> {
     return Promise.resolve(run(actor))
 }
 
 export function runThrow<Yield extends AnyEff, Return>(
-    input: Actor<Yield, Return>,
+    input: Effector<Yield, Return>,
 ): Async extends Yield ? MaybePromise<Return> : Return {
     return run(input as any) as any
 }
 
 export type ExtractEffFromObject<Gens extends object> = {
-    [K in keyof Gens]: Gens[K] extends Actor<infer E, any> ? E : never
+    [K in keyof Gens]: Gens[K] extends Effector<infer E, any> ? E : never
 }[keyof Gens]
 
 export type ExtractEffFromTuple<Gens> = Gens extends []
     ? never
     : Gens extends [infer Head, ...infer Tail]
-    ? Head extends Actor<infer Yield, any>
+    ? Head extends Effector<infer Yield, any>
         ? Yield | ExtractEffFromTuple<Tail>
         : never
     : never
@@ -154,13 +154,13 @@ export type ExtractEff<Gens> = Gens extends unknown[]
 export type ExtractReturnFromTuple<Gens> = Gens extends []
     ? []
     : Gens extends [infer Head, ...infer Tail]
-    ? Head extends Actor<any, infer R>
+    ? Head extends Effector<any, infer R>
         ? [R, ...ExtractReturnFromTuple<Tail>]
         : [Head, ...ExtractReturnFromTuple<Tail>]
     : never
 
 export type ExtractReturnFromObject<Gens extends object> = {
-    [K in keyof Gens]: Gens[K] extends Actor<any, infer R> ? R : Gens[K]
+    [K in keyof Gens]: Gens[K] extends Effector<any, infer R> ? R : Gens[K]
 }
 
 export type ExtractReturn<Gens> = Gens extends unknown[]

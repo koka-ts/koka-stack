@@ -2,15 +2,15 @@ import * as Err from 'koka/err'
 import * as Gen from 'koka/gen'
 import * as Result from 'koka/result'
 
-export class OpticErr extends Err.Err('koka-optic/optic-err')<string> {}
+export class AccessorErr extends Err.Err('koka-accessor/accessor-err')<string> {}
 
-export type Getter<State, Root> = (root: Root) => Generator<OpticErr, State, unknown>
+export type Getter<State, Root> = (root: Root) => Generator<AccessorErr, State>
 
-export type Updater<State> = (state: State) => Generator<OpticErr, State, unknown>
+export type Updater<State> = (state: State) => Generator<AccessorErr, State>
 
 export type Setter<State, Root> = (updater: Updater<State>) => Updater<Root>
 
-export type OpticOptions<State, Root> = {
+export type AccessorOptions<State, Root> = {
     get: Getter<State, Root>
     set: Setter<State, Root>
 }
@@ -19,9 +19,9 @@ export type ArrayItem<T> = T extends (infer U)[] | readonly (infer U)[] ? U : ne
 
 export type GetKey<T> = (item: ArrayItem<T>) => string | number
 
-export type MaybeOpticEff<T> = T | Generator<OpticErr, T, unknown>
+export type MaybeAccessorEff<T> = T | Generator<AccessorErr, T>
 
-export function* getOpticValue<T>(value: MaybeOpticEff<T>): Generator<OpticErr, T, unknown> {
+export function* getValue<T>(value: MaybeAccessorEff<T>): Generator<AccessorErr, T> {
     if (Gen.isGen(value)) {
         return yield* value
     } else {
@@ -30,100 +30,98 @@ export function* getOpticValue<T>(value: MaybeOpticEff<T>): Generator<OpticErr, 
 }
 
 export type Transformer<Target, State> = {
-    get: (state: State) => MaybeOpticEff<Target>
-    set: (target: Target, state: State) => MaybeOpticEff<State>
+    get: (state: State) => MaybeAccessorEff<Target>
+    set: (target: Target, state: State) => MaybeAccessorEff<State>
 }
 
-export type InferOpticState<T> = T extends Optic<infer State, any> ? State : never
+export type InferAccessorState<T> = T extends Accessor<infer State, any> ? State : never
 
-export type InferOpticRoot<T> = T extends Optic<any, infer Root> ? Root : never
+export type InferAccessorRoot<T> = T extends Accessor<any, infer Root> ? Root : never
 
-export type AnyOptic = Optic<any, any>
+export type AnyAccessor = Accessor<any, any>
 
-export type NestedArray<T> = Array<T | NestedArray<T>>
+const accessorWeakMap = new WeakMap<object | unknown[], WeakMap<AnyAccessor, unknown>>()
 
-export type NestedReadonlyArray<T> = ReadonlyArray<T | NestedReadonlyArray<T>>
+const setAccessorCache = (object: object | unknown[], accessor: AnyAccessor, value: unknown) => {
+    let accessorMap = accessorWeakMap.get(object)
 
-const opticWeakMap = new WeakMap<object | unknown[], WeakMap<AnyOptic, unknown>>()
-
-const setOpticCache = (object: object | unknown[], optic: AnyOptic, value: unknown) => {
-    let opticMap = opticWeakMap.get(object)
-
-    if (!opticMap) {
-        opticMap = new WeakMap()
-        opticWeakMap.set(object, opticMap)
+    if (!accessorMap) {
+        accessorMap = new WeakMap()
+        accessorWeakMap.set(object, accessorMap)
     }
 
-    opticMap.set(optic, value)
+    accessorMap.set(accessor, value)
 }
 
-const OpticProxySymbol = Symbol.for('koka-optic-proxy')
+const AccessorProxySymbol = Symbol.for('koka-accessor-proxy')
 
-type OpticProxySymbol = typeof OpticProxySymbol
+type AccessorProxySymbol = typeof AccessorProxySymbol
 
-export type LeafOpticProxy<State extends number | string | boolean> = {
-    [OpticProxySymbol]: State
+export type LeafAccessorProxy<State extends number | string | boolean> = {
+    [AccessorProxySymbol]: State
 }
 
-export type ArrayOpticProxy<State extends unknown[]> = {
-    [index: number]: OpticProxy<State[number]>
-    length: LeafOpticProxy<number>
-    [OpticProxySymbol]: State
+export type ArrayAccessorProxy<State extends unknown[]> = {
+    [index: number]: AccessorProxy<State[number]>
+    length: LeafAccessorProxy<number>
+    [AccessorProxySymbol]: State
 }
 
-export type ObjectOpticProxy<State extends object> = {
-    [K in keyof State | OpticProxySymbol]: K extends OpticProxySymbol ? State : OpticProxy<State[K & keyof State]>
+export type ObjectAccessorProxy<State extends object> = {
+    [K in keyof State | AccessorProxySymbol]: K extends AccessorProxySymbol
+        ? State
+        : AccessorProxy<State[K & keyof State]>
 }
 
-export type OpticProxy<State> = State extends unknown[]
-    ? ArrayOpticProxy<State>
+export type AccessorProxy<State> = State extends unknown[]
+    ? ArrayAccessorProxy<State>
     : State extends object
-    ? ObjectOpticProxy<State>
+    ? ObjectAccessorProxy<State>
     : State extends number | string | boolean
-    ? LeafOpticProxy<State>
+    ? LeafAccessorProxy<State>
     : never
 
-type OpticProxyPath = (string | number)[]
+type AccessorProxyPath = (string | number)[]
 
-const opticProxyPathWeakMap = new WeakMap<object, OpticProxyPath>()
+const accessorProxyPathWeakMap = new WeakMap<object, AccessorProxyPath>()
 
-const getOpticProxyPath = (proxy: object): OpticProxyPath => {
-    const path = opticProxyPathWeakMap.get(proxy)
+const getAccessorProxyPath = (proxy: object): AccessorProxyPath => {
+    const path = accessorProxyPathWeakMap.get(proxy)
 
     if (!path) {
-        throw new Error('[koka-optic] Optic proxy path not found')
+        throw new Error('[koka-accessor] Accessor proxy path not found')
     }
 
     return path
 }
 
-function createOpticProxy<State>(path: OpticProxyPath = []): OpticProxy<State> {
-    const proxy: OpticProxy<State> = new Proxy(
+function createAccessorProxy<State>(path: AccessorProxyPath = []): AccessorProxy<State> {
+    const proxy: AccessorProxy<State> = new Proxy(
         {},
         {
             get(_target, prop) {
                 if (typeof prop === 'symbol') {
-                    throw new Error('[koka-optic] Optic proxy does not support symbols')
+                    throw new Error('[koka-accessor] Accessor proxy does not support symbols')
                 }
 
                 const index = Number(prop)
 
                 if (!Number.isNaN(index)) {
-                    return createOpticProxy<State>([...path, index])
+                    return createAccessorProxy<State>([...path, index])
                 }
 
-                return createOpticProxy<State>([...path, prop])
+                return createAccessorProxy<State>([...path, prop])
             },
         },
-    ) as OpticProxy<State>
+    ) as AccessorProxy<State>
 
-    opticProxyPathWeakMap.set(proxy, path)
+    accessorProxyPathWeakMap.set(proxy, path)
 
     return proxy
 }
 
-export function root<Root>(): Optic<Root, Root> {
-    return new Optic({
+export function root<Root>(): Accessor<Root, Root> {
+    return new Accessor({
         *get(root) {
             return root
         },
@@ -137,17 +135,17 @@ export function root<Root>(): Optic<Root, Root> {
     })
 }
 
-export function object<T extends Record<string, AnyOptic>>(
-    optics: T,
-): Optic<{ [K in keyof T]: InferOpticState<T[K]> }, InferOpticRoot<T[keyof T]>> {
-    return root<InferOpticRoot<T[keyof T]>>()
+export function object<T extends Record<string, AnyAccessor>>(
+    accessors: T,
+): Accessor<{ [K in keyof T]: InferAccessorState<T[K]> }, InferAccessorRoot<T[keyof T]>> {
+    return root<InferAccessorRoot<T[keyof T]>>()
         .transform({
             *get(root) {
-                const object = {} as { [K in keyof T]: InferOpticState<T[K]> }
+                const object = {} as { [K in keyof T]: InferAccessorState<T[K]> }
 
-                for (const key in optics) {
+                for (const key in accessors) {
                     // @ts-ignore
-                    object[key] = yield* optics[key].get(root)
+                    object[key] = yield* accessors[key].get(root)
                 }
 
                 return {
@@ -165,7 +163,7 @@ export function object<T extends Record<string, AnyOptic>>(
                     }
 
                     // @ts-ignore expected
-                    root = yield* optics[key].set(function* () {
+                    root = yield* accessors[key].set(function* () {
                         return newValue as any
                     })(root)
                 }
@@ -176,10 +174,10 @@ export function object<T extends Record<string, AnyOptic>>(
         .prop('newObject')
 }
 
-export function optional<State, Root>(optic: Optic<State, Root>): Optic<State | undefined, Root> {
+export function optional<State, Root>(accessor: Accessor<State, Root>): Accessor<State | undefined, Root> {
     return root<Root>().transform<State | undefined>({
         *get(root) {
-            const result = yield* Result.wrap(optic.get(root))
+            const result = yield* Result.wrap(accessor.get(root))
 
             if (result.type === 'ok') {
                 return result.value
@@ -192,7 +190,7 @@ export function optional<State, Root>(optic: Optic<State, Root>): Optic<State | 
 
             const newState = state as State
 
-            const newRoot = yield* optic.set(function* () {
+            const newRoot = yield* accessor.set(function* () {
                 return newState
             })(root)
 
@@ -201,18 +199,18 @@ export function optional<State, Root>(optic: Optic<State, Root>): Optic<State | 
     })
 }
 
-export function get<State, Root>(root: Root, optic: Optic<State, Root>): Generator<OpticErr, State> {
-    return optic.get(root)
+export function get<State, Root>(root: Root, accessor: Accessor<State, Root>): Generator<AccessorErr, State> {
+    return accessor.get(root)
 }
 
 export function set<State, Root>(
     root: Root,
-    optic: Optic<State, Root>,
+    accessor: Accessor<State, Root>,
     stateOrUpdater: State | ((state: State) => State) | Updater<State>,
-): Generator<OpticErr, Root> {
+): Generator<AccessorErr, Root> {
     if (typeof stateOrUpdater === 'function') {
         const updater = stateOrUpdater as ((state: State) => State) | Updater<State>
-        return optic.set(function* (state) {
+        return accessor.set(function* (state) {
             const newState = updater(state)
 
             if (Gen.isGen(newState)) {
@@ -223,39 +221,17 @@ export function set<State, Root>(
         })(root)
     } else {
         const state = stateOrUpdater as State
-        return optic.set(function* () {
+        return accessor.set(function* () {
             return state
         })(root)
     }
 }
 
-export const OPTICAL = Symbol.for('koka-optic')
-
-export type OpticSymbol = typeof OPTICAL
-
-export type Optical<State, Root> =
-    | Optic<State, Root>
-    | {
-          [OPTICAL]: Optic<State, Root>
-      }
-
-export function isOptical<State, Root>(value: unknown): value is Optical<State, Root> {
-    return typeof value === 'object' && value !== null && OPTICAL in value
-}
-
-export function from<State, Root>(optical: Optical<State, Root>): Optic<State, Root> {
-    if (optical instanceof Optic) {
-        return optical
-    }
-
-    return optical[OPTICAL]
-}
-
-export class Optic<State, Root> {
+export class Accessor<State, Root> {
     get: Getter<State, Root>
     set: Setter<State, Root>
 
-    constructor(options: OpticOptions<State, Root>) {
+    constructor(options: AccessorOptions<State, Root>) {
         this.get = options.get
         this.set = options.set
     }
@@ -264,43 +240,43 @@ export class Optic<State, Root> {
         return undefined
     }
 
-    transform<Target>(selector: Transformer<Target, State>): Optic<Target, Root> {
+    transform<Target>(selector: Transformer<Target, State>): Accessor<Target, Root> {
         const { get, set } = this
 
-        const optic: Optic<Target, Root> = new Optic({
+        const accessor: Accessor<Target, Root> = new Accessor({
             *get(root) {
                 const isObjectRoot = typeof root === 'object' && root !== null
 
-                let opticMap = isObjectRoot ? opticWeakMap.get(root) : null
+                let accessorMap = isObjectRoot ? accessorWeakMap.get(root) : null
 
-                if (opticMap?.has(optic)) {
-                    return opticMap.get(optic)! as Target
+                if (accessorMap?.has(accessor)) {
+                    return accessorMap.get(accessor)! as Target
                 }
 
                 const state = yield* get(root)
 
                 const isObjectState = typeof state === 'object' && state !== null
 
-                opticMap = isObjectState ? opticWeakMap.get(state) : null
+                accessorMap = isObjectState ? accessorWeakMap.get(state) : null
 
-                if (opticMap?.has(optic)) {
-                    const target = opticMap.get(optic)! as Target
+                if (accessorMap?.has(accessor)) {
+                    const target = accessorMap.get(accessor)! as Target
 
                     if (isObjectRoot) {
-                        setOpticCache(root, optic, target)
+                        setAccessorCache(root, accessor, target)
                     }
 
                     return target
                 }
 
-                const target = yield* getOpticValue(selector.get(state))
+                const target = yield* getValue(selector.get(state))
 
                 if (isObjectState) {
-                    setOpticCache(state, optic, target)
+                    setAccessorCache(state, accessor, target)
                 }
 
                 if (isObjectRoot) {
-                    setOpticCache(root, optic, target)
+                    setAccessorCache(root, accessor, target)
                 }
 
                 return target
@@ -311,25 +287,25 @@ export class Optic<State, Root> {
 
                     const isObjectState = typeof state === 'object' && state !== null
 
-                    const opticMap = isObjectState ? opticWeakMap.get(state) : null
+                    const accessorMap = isObjectState ? accessorWeakMap.get(state) : null
 
-                    if (opticMap?.has(optic)) {
-                        target = opticMap.get(optic)! as Target
+                    if (accessorMap?.has(accessor)) {
+                        target = accessorMap.get(accessor)! as Target
                     } else {
-                        target = yield* getOpticValue(selector.get(state))
+                        target = yield* getValue(selector.get(state))
 
                         if (isObjectState) {
-                            setOpticCache(state, optic, target)
+                            setAccessorCache(state, accessor, target)
                         }
                     }
 
                     const newTarget = yield* updater(target)
-                    const newState = yield* getOpticValue(selector.set(newTarget, state))
+                    const newState = yield* getValue(selector.set(newTarget, state))
 
                     const isObjectNewState = typeof newState === 'object' && newState !== null
 
                     if (isObjectNewState) {
-                        setOpticCache(newState, optic, newTarget)
+                        setAccessorCache(newState, accessor, newTarget)
                     }
 
                     return newState
@@ -341,10 +317,10 @@ export class Optic<State, Root> {
             },
         })
 
-        return optic
+        return accessor
     }
 
-    prop<Key extends keyof State & string>(key: Key): Optic<State[Key], Root> {
+    prop<Key extends keyof State & string>(key: Key): Accessor<State[Key], Root> {
         return this.transform({
             get(state) {
                 return state[key]
@@ -358,16 +334,18 @@ export class Optic<State, Root> {
         })
     }
 
-    index<Index extends keyof State & number>(index: Index): Optic<State[Index], Root> {
+    index<Index extends keyof State & number>(index: Index): Accessor<State[Index], Root> {
         return this.transform({
             *get(state) {
                 if (!Array.isArray(state)) {
-                    throw yield* Err.throw(new OpticErr(`[koka-optic] Index ${index} is not applied for an array`))
+                    throw yield* Err.throw(
+                        new AccessorErr(`[koka-accessor] Index ${index} is not applied for an array`),
+                    )
                 }
 
                 if (index < 0 || index >= state.length) {
                     throw yield* Err.throw(
-                        new OpticErr(`[koka-optic] Index ${index} is out of bounds: ${state.length}`),
+                        new AccessorErr(`[koka-accessor] Index ${index} is out of bounds: ${state.length}`),
                     )
                 }
 
@@ -386,7 +364,7 @@ export class Optic<State, Root> {
         predicate:
             | ((item: ArrayItem<State>, index: number) => boolean)
             | ((item: ArrayItem<State>, index: number) => item is Target),
-    ): Optic<Target, Root> {
+    ): Accessor<Target, Root> {
         type TargetInfo = {
             target: Target
             index: number
@@ -395,13 +373,15 @@ export class Optic<State, Root> {
         return this.transform<TargetInfo>({
             *get(list) {
                 if (!Array.isArray(list)) {
-                    throw yield* Err.throw(new OpticErr(`[koka-optic] Find ${predicate} is not applied for an array`))
+                    throw yield* Err.throw(
+                        new AccessorErr(`[koka-accessor] Find ${predicate} is not applied for an array`),
+                    )
                 }
 
                 const index = list.findIndex(predicate)
 
                 if (index === -1) {
-                    throw yield* Err.throw(new OpticErr(`[koka-optic] Item not found`))
+                    throw yield* Err.throw(new AccessorErr(`[koka-accessor] Item not found`))
                 }
 
                 const target = list[index]
@@ -420,11 +400,11 @@ export class Optic<State, Root> {
         }).prop('target')
     }
 
-    match<Matched extends State>(predicate: (state: State) => state is Matched): Optic<Matched, Root> {
+    match<Matched extends State>(predicate: (state: State) => state is Matched): Accessor<Matched, Root> {
         return this.transform({
             *get(state) {
                 if (!predicate(state)) {
-                    throw yield* Err.throw(new OpticErr(`[koka-optic] State does not match by ${predicate}`))
+                    throw yield* Err.throw(new AccessorErr(`[koka-accessor] State does not match by ${predicate}`))
                 }
 
                 return state
@@ -435,11 +415,11 @@ export class Optic<State, Root> {
         })
     }
 
-    refine(predicate: (state: State) => boolean): Optic<State, Root> {
+    refine(predicate: (state: State) => boolean): Accessor<State, Root> {
         return this.transform({
             *get(state) {
                 if (!predicate(state)) {
-                    throw yield* Err.throw(new OpticErr(`[koka-optic] State does not match by ${predicate}`))
+                    throw yield* Err.throw(new AccessorErr(`[koka-accessor] State does not match by ${predicate}`))
                 }
 
                 return state
@@ -450,23 +430,23 @@ export class Optic<State, Root> {
         })
     }
 
-    as<Refined>(): Optic<Refined, Root> {
-        return this as unknown as Optic<Refined, Root>
+    as<Refined>(): Accessor<Refined, Root> {
+        return this as unknown as Accessor<Refined, Root>
     }
 
     map<Target>(
         mapper:
             | Transformer<Target, ArrayItem<State>>
-            | Optic<Target, ArrayItem<State>>
-            | ((state: Optic<ArrayItem<State>, ArrayItem<State>>) => Optic<Target, ArrayItem<State>>),
-    ): Optic<Target[], Root> {
+            | Accessor<Target, ArrayItem<State>>
+            | ((state: Accessor<ArrayItem<State>, ArrayItem<State>>) => Accessor<Target, ArrayItem<State>>),
+    ): Accessor<Target[], Root> {
         const from = root<ArrayItem<State>>()
 
-        let mapper$: Optic<Target, ArrayItem<State>>
+        let mapper$: Accessor<Target, ArrayItem<State>>
 
         if (typeof mapper === 'function') {
             mapper$ = mapper(from)
-        } else if (mapper instanceof Optic) {
+        } else if (mapper instanceof Accessor) {
             mapper$ = mapper
         } else {
             mapper$ = from.transform(mapper)
@@ -493,7 +473,9 @@ export class Optic<State, Root> {
 
                 if (list.length !== targetList.length) {
                     throw yield* Err.throw(
-                        new OpticErr(`[koka-optic] List length mismatch: ${list.length} !== ${targetList.length}`),
+                        new AccessorErr(
+                            `[koka-accessor] List length mismatch: ${list.length} !== ${targetList.length}`,
+                        ),
                     )
                 }
 
@@ -520,7 +502,7 @@ export class Optic<State, Root> {
         predicate:
             | ((item: ArrayItem<State>, index: number) => boolean)
             | ((item: ArrayItem<State>, index: number) => item is Target),
-    ): Optic<Target[], Root> {
+    ): Accessor<Target[], Root> {
         const { getKey } = this
 
         type Index = number
@@ -540,7 +522,9 @@ export class Optic<State, Root> {
         return this.transform<FilteredInfo>({
             *get(list) {
                 if (!Array.isArray(list)) {
-                    throw yield* Err.throw(new OpticErr(`[koka-optic] Filter ${predicate} is not applied for an array`))
+                    throw yield* Err.throw(
+                        new AccessorErr(`[koka-accessor] Filter ${predicate} is not applied for an array`),
+                    )
                 }
 
                 let indexRecord: IndexRecord | undefined
@@ -557,7 +541,7 @@ export class Optic<State, Root> {
                         }
 
                         if (key in indexRecord) {
-                            throw new Error(`[koka-optic] Key ${key} is not unique`)
+                            throw new Error(`[koka-accessor] Key ${key} is not unique`)
                         }
 
                         indexRecord[key] = index
@@ -613,21 +597,21 @@ export class Optic<State, Root> {
         }).prop('filtered')
     }
 
-    select<Selected>(selector: (proxy: OpticProxy<State>) => OpticProxy<Selected>): Optic<Selected, Root> {
-        const proxy = createOpticProxy<State>()
+    proxy<Selected>(selector: (proxy: AccessorProxy<State>) => AccessorProxy<Selected>): Accessor<Selected, Root> {
+        const proxy = createAccessorProxy<State>()
         const selected = selector(proxy)
-        const path = getOpticProxyPath(selected)
+        const path = getAccessorProxyPath(selected)
 
-        let optic: Optic<any, Root> = this
+        let accessor: Accessor<any, Root> = this
 
         for (const key of path) {
             if (typeof key === 'number') {
-                optic = optic.index(key)
+                accessor = accessor.index(key)
             } else {
-                optic = optic.prop(key)
+                accessor = accessor.prop(key)
             }
         }
 
-        return optic
+        return accessor
     }
 }

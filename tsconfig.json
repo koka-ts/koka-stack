@@ -16,6 +16,7 @@
         "sourceMap": true,
         "esModuleInterop": true,
         "stripInternal": true,
+        "experimentalDecorators": false,
         "lib": ["ESNext", "DOM"]
     },
     "include": ["./packages", "./projects", "sync-repo.ts"]

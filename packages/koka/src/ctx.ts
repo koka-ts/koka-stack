@@ -9,7 +9,7 @@ export type Ctx<Name extends string, T> = {
 export type AnyCtx = Ctx<string, any>
 
 export function Ctx<const Name extends string>(name: Name) {
-    return class Eff<T> {
+    return class Eff<T> implements Ctx<Name, T> {
         static field: Name = name
         type = 'ctx' as const
         name = name

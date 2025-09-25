@@ -19,8 +19,6 @@ module.exports = {
     moduleNameMapper: {
         '^koka$': 'koka/src/koka.ts',
         '^koka/(.*)$': 'koka/src/$1.ts',
-        '^koka-optic$': 'koka-optic/src/koka-optic.ts',
-        '^koka-optic/(.*)$': 'koka-optic/src/$1.ts',
     },
     testPathIgnorePatterns: ['/node_modules/', '/examples/'],
     globals: {
@@ -29,7 +27,7 @@ module.exports = {
         },
     },
     displayName: {
-        name: 'koka-optic',
+        name: 'koka-accessor',
         color: 'blue',
     },
     collectCoverageFrom: ['src/**/*.{ts,tsx}'],

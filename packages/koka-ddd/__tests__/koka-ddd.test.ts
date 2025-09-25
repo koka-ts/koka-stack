@@ -1,22 +1,25 @@
 import * as Async from 'koka/async'
 import * as Result from 'koka/result'
-import * as Optic from 'koka-optic'
 import {
     Domain,
     Store,
-    get,
-    set,
-    query,
+    Event,
+    event,
     command,
+    get,
     getState,
+    emit,
+    query,
+    set,
     setState,
-    subscribeDomainState,
-    subscribeQueryState,
-    subscribeDomainResult,
-    subscribeQueryResult,
-    shallowEqual,
     shallowEqualResult,
-} from '../src/koka-domain.ts'
+    subscribeDomainResult,
+    subscribeDomainState,
+    subscribeQueryResult,
+    subscribeQueryState,
+    CommandExecutionTree,
+} from '../src/koka-ddd.ts'
+import { PrettyLogger } from '../src/pretty-cli-logger.ts'
 
 type Todo = {
     id: number
@@ -51,6 +54,8 @@ class BoolDomain<Root> extends Domain<boolean, Root> {
     }
 }
 
+class RemoveTodoEvent extends Event('RemoveTodo')<{ todoId: number }> {}
+
 class TodoDomain<Root> extends Domain<Todo, Root> {
     text$ = new TextDomain(this.prop('text'))
     done$ = new BoolDomain(this.prop('done'));
@@ -67,11 +72,31 @@ class TodoDomain<Root> extends Domain<Todo, Root> {
         yield* this.done$.toggle()
         return 'todo toggled'
     }
+
+    @command()
+    *removeTodo() {
+        const todo = yield* get(this)
+        yield* emit(this, new RemoveTodoEvent({ todoId: todo.id }))
+        return 'todo removed'
+    }
 }
 
 let todoUid = 0
 
+const test = event(RemoveTodoEvent)
+
 class TodoListDomain<Root> extends Domain<Todo[], Root> {
+    @command()
+    *removeTodo(id: number) {
+        yield* set(this, (todos) => todos.filter((todo) => todo.id !== id))
+        return 'todo removed'
+    }
+
+    @event(RemoveTodoEvent)
+    *handleRemoveTodo(event: RemoveTodoEvent) {
+        yield* this.removeTodo(event.payload.todoId)
+    }
+
     @command()
     *addTodo(text: string) {
         const newTodo = {
@@ -437,15 +462,16 @@ describe('Store', () => {
 
         const executionTree = {
             type: 'command' as const,
+            domainName: 'test',
             name: 'test',
             async: false,
             args: [],
-            return: undefined,
             states: [],
             changes: [],
             commands: [],
             queries: [],
-        }
+            events: [],
+        } satisfies CommandExecutionTree
 
         store.publishExecution(executionTree)
 
@@ -463,7 +489,7 @@ describe('Store', () => {
                 filter: 'all',
                 input: '',
             },
-            enhancers: [enhancer],
+            plugins: [enhancer],
         })
 
         expect(enhancer).toHaveBeenCalledWith(store)
@@ -478,7 +504,7 @@ describe('Store', () => {
                 filter: 'all',
                 input: '',
             },
-            enhancers: [enhancer],
+            plugins: [enhancer],
         })
 
         // Cleanup should be stored but not called yet
@@ -963,5 +989,40 @@ describe('Subscription mechanisms', () => {
 
         expect(listener).toHaveBeenCalledWith(expect.objectContaining(Result.ok('done')))
         unsubscribe()
+    })
+})
+
+describe('Event functionality', () => {
+    let store: Store<TodoApp>
+    let todoApp$: TodoAppDomain<TodoApp>
+
+    beforeEach(() => {
+        todoUid = 4
+        store = new Store<TodoApp>({
+            state: {
+                todos: [
+                    { id: 1, text: 'todo 1', done: false },
+                    { id: 2, text: 'todo 2', done: true },
+                    { id: 3, text: 'todo 3', done: false },
+                ],
+                filter: 'all',
+                input: '',
+            },
+            plugins: [PrettyLogger()],
+        })
+        todoApp$ = new TodoAppDomain(store.domain)
+    })
+
+    it('should trigger event handler', async () => {
+        Result.run(todoApp$.todos$.todo(1).removeTodo())
+
+        await store.promise
+
+        const state = store.getState()
+
+        expect(state.todos).toEqual([
+            { id: 2, text: 'todo 2', done: true },
+            { id: 3, text: 'todo 3', done: false },
+        ])
     })
 })

@@ -1,14 +1,14 @@
-# koka-optic - Get/Set Immutable Data Made Easy
+# koka-accessor - Get/Set Immutable Data Made Easy
 
 **Warning: This library is in early development and may change significantly. Do not use in production yet.**
 
-koka-optic makes working with immutable data structures effortless, providing a simple and type-safe way to:
+koka-accessor makes working with immutable data structures effortless, providing a simple and type-safe way to:
 
 -   **Get** deeply nested values
 -   **Set** values without mutating original data
 -   **Transform** complex data structures with ease
 
-Built on composable optics with full TypeScript type safety and seamless Koka effects integration.
+Built on composable accessors with full TypeScript type safety and seamless Koka effects integration.
 
 ## Motivation
 
@@ -27,17 +27,17 @@ const newState = {
 }
 ```
 
-koka-optic simplifies this to:
+koka-accessor simplifies this to:
 
 ```typescript
-const nameOptic = Optic.root<User>().prop('user').prop('profile').prop('name')
+const nameAccessor = Accessor.root<User>().prop('user').prop('profile').prop('name')
 
-const updateName = Optic.set(state, nameOptic, 'New Name')
+const updateName = Accessor.set(state, nameAccessor, 'New Name')
 
 const result = Eff.runResult(updateName) // { user: { profile: { name: 'New Name' } } }
 ```
 
-### Why koka-optic?
+### Why koka-accessor?
 
 -   🚀 **Simpler immutable updates** - No more spread operator hell
 -   🔍 **Type-safe access** - Catch errors at compile time
@@ -56,18 +56,18 @@ const result = Eff.runResult(updateName) // { user: { profile: { name: 'New Name
 ## Installation
 
 ```bash
-npm install koka koka-optic
+npm install koka koka-accessor
 # or
-yarn add koka koka-optic
+yarn add koka koka-accessor
 # or
-pnpm add koka koka-optic
+pnpm add koka koka-accessor
 ```
 
 ## Getting Started
 
 ### Core Concepts
 
-An **Optic** is a bidirectional path into your data structure that lets you:
+An **Accessor** is a bidirectional path into your data structure that lets you:
 
 1. **Get** values (like a getter)
 2. **Set** values (like a setter)
@@ -77,16 +77,16 @@ All while preserving immutability and type safety.
 
 ```typescript
 import { Eff } from 'koka'
-import { Optic } from 'koka-optic'
+import { Accessor } from 'koka-accessor'
 
-// Create root optic
-const root = Optic.root<number>()
+// Create root accessor
+const root = Accessor.root<number>()
 
-// Create object property optic
-const nameOptic = Optic.root<{ name: string }>().prop('name')
+// Create object property accessor
+const nameAccessor = Accessor.root<{ name: string }>().prop('name')
 
-// Create array index optic
-const firstItemOptic = Optic.root<number[]>().index(0)
+// Create array index accessor
+const firstItemAccessor = Accessor.root<number[]>().index(0)
 ```
 
 ## Basic Usage
@@ -94,12 +94,12 @@ const firstItemOptic = Optic.root<number[]>().index(0)
 ### Getting Values
 
 ```typescript
-const valueResult = Eff.runResult(Optic.get({ name: 'Alice' }, nameOptic))
+const valueResult = Eff.runResult(Accessor.get({ name: 'Alice' }, nameAccessor))
 if (valueResult.type === 'ok') {
     const value = valueResult.value // 'Alice'
 }
 
-const firstResult = Eff.runResult(Optic.get([1, 2, 3], firstItemOptic))
+const firstResult = Eff.runResult(Accessor.get([1, 2, 3], firstItemAccessor))
 if (firstResult.type === 'ok') {
     const first = firstResult.value // 1
 }
@@ -109,19 +109,19 @@ if (firstResult.type === 'ok') {
 
 ```typescript
 // Set with value
-const updatedResult = Eff.runResult(Optic.set({ name: 'Alice' }, nameOptic, 'Bob'))
+const updatedResult = Eff.runResult(Accessor.set({ name: 'Alice' }, nameAccessor, 'Bob'))
 if (updatedResult.type === 'ok') {
     const updated = updatedResult.value // {name: 'Bob'}
 }
 
 // Set with updater function
-const incrementedResult = Eff.runResult(Optic.set([1, 2, 3], firstItemOptic, (n) => n + 1))
+const incrementedResult = Eff.runResult(Accessor.set([1, 2, 3], firstItemAccessor, (n) => n + 1))
 if (incrementedResult.type === 'ok') {
     const incremented = incrementedResult.value // [2, 2, 3]
 }
 ```
 
-## Advanced Optics
+## Advanced Accessors
 
 ### Proxy Syntax
 
@@ -129,19 +129,19 @@ Access nested properties using familiar dot/array notation:
 
 ```typescript
 // Simple property access
-const simpleOptic = Optic.root<{ a: number }>().proxy(p => p.a)
-const result = Eff.runResult(Optic.get({ a: 42 }, simpleOptic))
+const simpleAccessor = Accessor.root<{ a: number }>().proxy(p => p.a)
+const result = Eff.runResult(Accessor.get({ a: 42 }, simpleAccessor))
 // result.value === 42
 
 // Array index access
-const arrayOptic = Optic.root<number[]>().proxy(p => p[0])
-const result = Eff.runResult(Optic.get([42], arrayOptic))
+const arrayAccessor = Accessor.root<number[]>().proxy(p => p[0])
+const result = Eff.runResult(Accessor.get([42], arrayAccessor))
 // result.value === 42
 
 // Chained operations
-const chainedOptic = Optic.root<{ items: { value: number }[] }>()
+const chainedAccessor = Accessor.root<{ items: { value: number }[] }>()
   .proxy(p => p.items[0].value)
-const result = Eff.runResult(Optic.get({ items: [{ value: 42 }] }, chainedOptic))
+const result = Eff.runResult(Accessor.get({ items: [{ value: 42 }] }, chainedAccessor))
 // result.value === 42
 
 // Deeply nested access
@@ -159,7 +159,7 @@ type ComplexState = {
   }
 }
 
-const deepOptic = Optic.root<ComplexState>().proxy(p => p.a.b.c[1].e.f.g[2].h)
+const deepAccessor = Accessor.root<ComplexState>().proxy(p => p.a.b.c[1].e.f.g[2].h)
 
 const state = {
   a: {
@@ -172,16 +172,16 @@ const state = {
   }
 }
 
-const result = Eff.runResult(Optic.get(state, deepOptic))
+const result = Eff.runResult(Accessor.get(state, deepAccessor))
 // result.value === 'target'
 ```
 
 ### Object Composition
 
 ```typescript
-const userOptic = Optic.object({
-    name: Optic.root<User>().prop('name'),
-    age: Optic.root<User>().prop('age'),
+const userAccessor = Accessor.object({
+    name: Accessor.root<User>().prop('name'),
+    age: Accessor.root<User>().prop('age'),
 })
 
 const user = {
@@ -190,7 +190,7 @@ const user = {
     email: 'alice@example.com',
 }
 
-const result = Eff.runResult(Optic.get(user, userOptic))
+const result = Eff.runResult(Accessor.get(user, userAccessor))
 if (result.type === 'ok') {
     const value = result.value // {name: 'Alice', age: 30}
 }
@@ -201,9 +201,9 @@ if (result.type === 'ok') {
 ```typescript
 // Find item
 const foundResult = Eff.runResult(
-    Optic.get(
+    Accessor.get(
         [1, 2, 3, 4],
-        Optic.root<number[]>().find((n) => n > 2),
+        Accessor.root<number[]>().find((n) => n > 2),
     ),
 )
 if (foundResult.type === 'ok') {
@@ -212,9 +212,9 @@ if (foundResult.type === 'ok') {
 
 // Filter items
 const filteredResult = Eff.runResult(
-    Optic.get(
+    Accessor.get(
         [1, 2, 3, 4],
-        Optic.root<number[]>().filter((n) => n % 2 === 0),
+        Accessor.root<number[]>().filter((n) => n % 2 === 0),
     ),
 )
 if (filteredResult.type === 'ok') {
@@ -223,9 +223,9 @@ if (filteredResult.type === 'ok') {
 
 // Map items
 const mappedResult = Eff.runResult(
-    Optic.get(
+    Accessor.get(
         [1, 2, 3],
-        Optic.root<number[]>().map((n) => n * 2),
+        Accessor.root<number[]>().map((n) => n * 2),
     ),
 )
 if (mappedResult.type === 'ok') {
@@ -238,48 +238,48 @@ if (mappedResult.type === 'ok') {
 #### Type Narrowing with `match`
 
 ```typescript
-const numberOptic = Optic.root<string | number>().match((v): v is number => typeof v === 'number')
+const numberAccessor = Accessor.root<string | number>().match((v): v is number => typeof v === 'number')
 
-const numberResult = Eff.runResult(Optic.get(42, numberOptic))
+const numberResult = Eff.runResult(Accessor.get(42, numberAccessor))
 if (numberResult.type === 'ok') {
     const value = numberResult.value // 42
 }
 
-const stringResult = Eff.runResult(Optic.get('test', numberOptic))
+const stringResult = Eff.runResult(Accessor.get('test', numberAccessor))
 if (stringResult.type === 'err') {
-    // throws OpticErr
+    // throws AccessorErr
 }
 ```
 
 #### Value Validation with `refine`
 
 ```typescript
-const refinedOptic = Optic.root<number>().refine((n) => n > 0)
+const refinedAccessor = Accessor.root<number>().refine((n) => n > 0)
 
-const positiveResult = Eff.runResult(Optic.get(42, refinedOptic))
+const positiveResult = Eff.runResult(Accessor.get(42, refinedAccessor))
 
 if (positiveResult.type === 'ok') {
     const value = positiveResult.value // 42
 }
 
-const negativeResult = Eff.runResult(Optic.get(-1, refinedOptic))
+const negativeResult = Eff.runResult(Accessor.get(-1, refinedAccessor))
 
 if (negativeResult.type === 'err') {
-    // throws OpticErr
+    // throws AccessorErr
 }
 ```
 
 ## Caching Behavior
 
-koka-optic automatically caches optic computations for better performance:
+koka-accessor automatically caches accessor computations for better performance:
 
 ```typescript
 const user = { name: 'Alice', age: 30 }
-const nameOptic = Optic.root<User>().prop('name')
+const nameAccessor = Accessor.root<User>().prop('name')
 
 // First access - computes and caches
-const name1Result = Eff.runResult(Optic.get(user, nameOptic))
-const name2Result = Eff.runResult(Optic.get(user, nameOptic))
+const name1Result = Eff.runResult(Accessor.get(user, nameAccessor))
+const name2Result = Eff.runResult(Accessor.get(user, nameAccessor))
 
 if (name1Result.type === 'ok' && name2Result.type === 'ok') {
     const name1 = name1Result.value
@@ -288,7 +288,7 @@ if (name1Result.type === 'ok' && name2Result.type === 'ok') {
 }
 ```
 
-Caching works for all optic types including:
+Caching works for all accessor types including:
 
 -   Object properties
 -   Array indices
@@ -299,12 +299,12 @@ Caching works for all optic types including:
 
 ## Error Handling
 
-All operations can throw `OpticErr`:
+All operations can throw `AccessorErr`:
 
 ```typescript
-const result = Eff.runResult(Optic.get([], Optic.root<number[]>().index(0)))
+const result = Eff.runResult(Accessor.get([], Accessor.root<number[]>().index(0)))
 if (result.type === 'err') {
-    console.error('Optic error:', result.error.message)
+    console.error('Accessor error:', result.error.message)
 }
 ```
 
@@ -319,13 +319,13 @@ Common error cases:
 
 ### Static Methods
 
-| Method                                   | Description                  |
-| ---------------------------------------- | ---------------------------- |
-| `Optic.root<T>()`                        | Create root optic for type T |
-| `Optic.object(fields)`                   | Compose object optics        |
-| `Optic.optional(optic)`                  | Create optional optic        |
-| `Optic.get(root, optic)`                 | Get value through optic      |
-| `Optic.set(root, optic, valueOrUpdater)` | Set value through optic      |
+| Method                                         | Description                     |
+| ---------------------------------------------- | ------------------------------- |
+| `Accessor.root<T>()`                           | Create root accessor for type T |
+| `Accessor.object(fields)`                      | Compose object accessors        |
+| `Accessor.optional(accessor)`                  | Create optional accessor        |
+| `Accessor.get(root, accessor)`                 | Get value through accessor      |
+| `Accessor.set(root, accessor, valueOrUpdater)` | Set value through accessor      |
 
 ### Instance Methods
 
@@ -343,15 +343,15 @@ Common error cases:
 
 ## Best Practices
 
-1. **Compose optics** to build complex data access patterns
-2. **Reuse optics** to benefit from caching
+1. **Compose accessors** to build complex data access patterns
+2. **Reuse accessors** to benefit from caching
 3. **Combine with effects** for async operations
 4. **Handle errors** for robust code
 5. **Leverage TypeScript** for maximum type safety
 
 ## Examples
 
-See the [test cases](packages/koka-optic/__tests__/koka-optic.test.ts) for more comprehensive usage examples.
+See the [test cases](packages/koka-accessor/__tests__/koka-accessor.test.ts) for more comprehensive usage examples.
 
 ## License
 

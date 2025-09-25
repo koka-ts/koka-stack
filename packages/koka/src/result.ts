@@ -74,13 +74,13 @@ export function* unwrap<Yield, Return extends AnyOk | Err.AnyErr>(
 }
 
 export function run<Yield extends Err.AnyErr | Opt.AnyOpt, Return>(
-    input: Koka.Actor<Yield, Return>,
+    input: Koka.Effector<Yield, Return>,
 ): Ok<Return> | Err.ExtractErr<Yield>
 export function run<Yield extends Err.AnyErr | Opt.AnyOpt, Return>(
-    input: Koka.Actor<Async.Async | Opt.AnyOpt | Yield, Return>,
+    input: Koka.Effector<Async.Async | Opt.AnyOpt | Yield, Return>,
 ): Async.MaybePromise<Ok<Return> | Err.ExtractErr<Yield>>
 export function run<Yield extends Err.AnyErr, Return>(
-    input: Koka.Actor<Async.Async | Opt.AnyOpt | Yield, Return>,
+    input: Koka.Effector<Async.Async | Opt.AnyOpt | Yield, Return>,
 ): Async.MaybePromise<Ok<Return> | Err.ExtractErr<Yield>> {
     const gen = typeof input === 'function' ? input() : input
 
@@ -88,14 +88,14 @@ export function run<Yield extends Err.AnyErr, Return>(
 }
 
 export function runSync<Yield, Return>(
-    input: Koka.Actor<Opt.AnyOpt | Yield, Return>,
+    input: Koka.Effector<Opt.AnyOpt | Yield, Return>,
 ): Ok<Return> | Err.ExtractErr<Yield> {
     const gen = typeof input === 'function' ? input() : input
     return Koka.runSync(wrap(gen as any) as any)
 }
 
 export function runAsync<Yield, Return>(
-    input: Koka.Actor<Async.Async | Opt.AnyOpt | Yield, Return>,
+    input: Koka.Effector<Async.Async | Opt.AnyOpt | Yield, Return>,
 ): Promise<Ok<Return> | Err.ExtractErr<Yield>> {
     const gen = typeof input === 'function' ? input() : input
     return Koka.runAsync(wrap(gen as any) as any)

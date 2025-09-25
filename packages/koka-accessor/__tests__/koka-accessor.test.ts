@@ -1,17 +1,17 @@
 import * as Koka from 'koka'
 import * as Result from 'koka/result'
-import * as Optic from '../src/koka-optic.ts'
+import * as Accessor from '../src/koka-accessor.ts'
 
-describe('Optic', () => {
+describe('Accessor', () => {
     describe('root()', () => {
-        it('should create root optic', () => {
-            const rootOptic = Optic.root<number>()
-            expect(rootOptic).toBeInstanceOf(Optic.Optic)
+        it('should create root accessor', () => {
+            const rootAccessor = Accessor.root<number>()
+            expect(rootAccessor).toBeInstanceOf(Accessor.Accessor)
         })
 
         it('should get root value', () => {
-            const rootOptic = Optic.root<number>()
-            const result = Result.run(Optic.get(42, rootOptic))
+            const rootAccessor = Accessor.root<number>()
+            const result = Result.run(Accessor.get(42, rootAccessor))
 
             if (result.type === 'err') {
                 throw new Error('Expected a number but got an error')
@@ -21,8 +21,8 @@ describe('Optic', () => {
         })
 
         it('should set root value', () => {
-            const rootOptic = Optic.root<number>()
-            const updateRoot = Optic.set(42, rootOptic, (number) => number + 58)
+            const rootAccessor = Accessor.root<number>()
+            const updateRoot = Accessor.set(42, rootAccessor, (number) => number + 58)
             const result = Result.run(updateRoot)
 
             if (result.type === 'err') {
@@ -34,10 +34,10 @@ describe('Optic', () => {
     })
 
     describe('prop()', () => {
-        const propOptic = Optic.root<{ a: number }>().prop('a')
+        const propAccessor = Accessor.root<{ a: number }>().prop('a')
 
         it('should get object property', () => {
-            const result = Result.run(Optic.get({ a: 42 }, propOptic))
+            const result = Result.run(Accessor.get({ a: 42 }, propAccessor))
 
             if (result.type === 'err') {
                 throw new Error('Expected a number but got an error')
@@ -47,7 +47,7 @@ describe('Optic', () => {
         })
 
         it('should set object property', () => {
-            const result = Result.run(Optic.set({ a: 42 }, propOptic, 100))
+            const result = Result.run(Accessor.set({ a: 42 }, propAccessor, 100))
 
             if (result.type === 'err') {
                 throw new Error('Expected an object but got an error')
@@ -58,10 +58,10 @@ describe('Optic', () => {
     })
 
     describe('index()', () => {
-        const indexOptic = Optic.root<number[]>().index(0)
+        const indexAccessor = Accessor.root<number[]>().index(0)
 
         it('should get array index', () => {
-            const result = Result.run(Optic.get([42], indexOptic))
+            const result = Result.run(Accessor.get([42], indexAccessor))
 
             if (result.type === 'err') {
                 throw new Error('Expected a number but got an error')
@@ -71,7 +71,7 @@ describe('Optic', () => {
         })
 
         it('should set array index', () => {
-            const result = Result.run(Optic.set([42], indexOptic, 100))
+            const result = Result.run(Accessor.set([42], indexAccessor, 100))
 
             if (result.type === 'err') {
                 throw new Error('Expected an array but got an error')
@@ -82,8 +82,8 @@ describe('Optic', () => {
 
         it('should throw when index out of bounds', () => {
             const result = Koka.run(
-                Koka.try(Optic.get([], indexOptic)).handle({
-                    [Optic.OpticErr.field]: (message) => {
+                Koka.try(Accessor.get([], indexAccessor)).handle({
+                    [Accessor.AccessorErr.field]: (message) => {
                         return message
                     },
                 }),
@@ -93,10 +93,10 @@ describe('Optic', () => {
     })
 
     describe('find()', () => {
-        const findOptic = Optic.root<number[]>().find((n) => n === 42)
+        const findAccessor = Accessor.root<number[]>().find((n) => n === 42)
 
         it('should find array item', () => {
-            const result = Result.run(Optic.get([1, 2, 3, 42], findOptic))
+            const result = Result.run(Accessor.get([1, 2, 3, 42], findAccessor))
 
             if (result.type === 'err') {
                 throw new Error('Expected a number but got an error')
@@ -106,7 +106,7 @@ describe('Optic', () => {
         })
 
         it('should throw when item not found', () => {
-            const result = Result.run(Optic.get([1, 2, 3], findOptic))
+            const result = Result.run(Accessor.get([1, 2, 3], findAccessor))
 
             if (result.type === 'ok') {
                 throw new Error('Expected an error but got a number')
@@ -117,10 +117,10 @@ describe('Optic', () => {
     })
 
     describe('match()', () => {
-        const matchOptic = Optic.root<string | number>().match((v): v is number => typeof v === 'number')
+        const matchAccessor = Accessor.root<string | number>().match((v): v is number => typeof v === 'number')
 
         it('should match type predicate', () => {
-            const result = Result.run(Optic.get(42, matchOptic))
+            const result = Result.run(Accessor.get(42, matchAccessor))
 
             if (result.type === 'err') {
                 throw new Error('Expected a number but got an error')
@@ -130,7 +130,7 @@ describe('Optic', () => {
         })
 
         it('should throw when not matched', () => {
-            const result = Result.run(Optic.get('test', matchOptic))
+            const result = Result.run(Accessor.get('test', matchAccessor))
 
             if (result.type === 'ok') {
                 throw new Error('Expected an error but got a string')
@@ -141,13 +141,13 @@ describe('Optic', () => {
     })
 
     describe('map()', () => {
-        const mapOptic = Optic.root<number[]>().map({
+        const mapAccessor = Accessor.root<number[]>().map({
             get: (n) => n * 2,
             set: (newN: number) => newN / 2,
         })
 
         it('should map array items', () => {
-            const result = Result.run(Optic.get([1, 2, 3], mapOptic))
+            const result = Result.run(Accessor.get([1, 2, 3], mapAccessor))
 
             if (result.type === 'err') {
                 throw new Error('Expected a number but got an error')
@@ -157,7 +157,7 @@ describe('Optic', () => {
         })
 
         it('should set mapped array', () => {
-            const result = Result.run(Optic.set([1, 2, 3], mapOptic, [4, 6, 8]))
+            const result = Result.run(Accessor.set([1, 2, 3], mapAccessor, [4, 6, 8]))
 
             if (result.type === 'err') {
                 throw new Error('Expected an array but got an error')
@@ -168,10 +168,10 @@ describe('Optic', () => {
     })
 
     describe('filter()', () => {
-        const filterOptic = Optic.root<number[]>().filter((n) => n > 2)
+        const filterAccessor = Accessor.root<number[]>().filter((n) => n > 2)
 
         it('should filter array items', () => {
-            const result = Result.run(Optic.get([1, 2, 3, 4], filterOptic))
+            const result = Result.run(Accessor.get([1, 2, 3, 4], filterAccessor))
 
             if (result.type === 'err') {
                 throw new Error('Expected a number but got an error')
@@ -181,7 +181,7 @@ describe('Optic', () => {
         })
 
         it('should set filtered array', () => {
-            const result = Result.run(Optic.set([1, 2, 3, 4], filterOptic, [30, 40]))
+            const result = Result.run(Accessor.set([1, 2, 3, 4], filterAccessor, [30, 40]))
 
             if (result.type === 'err') {
                 throw new Error('Expected an array but got an error')
@@ -192,16 +192,16 @@ describe('Optic', () => {
     })
 
     describe('object()', () => {
-        const rootOptic = Optic.root<{ a: number; b: string }>()
+        const rootAccessor = Accessor.root<{ a: number; b: string }>()
 
-        const objOptic = Optic.object({
-            a: rootOptic.prop('a'),
-            b: rootOptic.prop('b'),
+        const objAccessor = Accessor.object({
+            a: rootAccessor.prop('a'),
+            b: rootAccessor.prop('b'),
         })
 
-        it('should create object optic', () => {
+        it('should create object accessor', () => {
             const rootValue = { a: 42, b: 'test' }
-            const result = Result.run(Optic.get(rootValue, objOptic))
+            const result = Result.run(Accessor.get(rootValue, objAccessor))
 
             if (result.type === 'err') {
                 throw new Error('Expected an object but got an error')
@@ -211,7 +211,7 @@ describe('Optic', () => {
         })
 
         it('should set object properties', () => {
-            const result = Result.run(Optic.set({ a: 42, b: 'test' }, objOptic, { a: 100, b: 'updated' }))
+            const result = Result.run(Accessor.set({ a: 42, b: 'test' }, objAccessor, { a: 100, b: 'updated' }))
 
             if (result.type === 'err') {
                 throw new Error('Expected an object but got an error')
@@ -222,10 +222,10 @@ describe('Optic', () => {
     })
 
     describe('optional()', () => {
-        const optOptic = Optic.optional(Optic.root<number>().refine((n) => n > 10))
+        const optAccessor = Accessor.optional(Accessor.root<number>().refine((n) => n > 10))
 
         it('should handle undefined value', () => {
-            const result = Result.run(Optic.get(5, optOptic))
+            const result = Result.run(Accessor.get(5, optAccessor))
 
             if (result.type === 'err') {
                 throw new Error('Expected an undefined value but got an error')
@@ -235,7 +235,7 @@ describe('Optic', () => {
         })
 
         it('should preserve defined value', () => {
-            const result = Result.run(Optic.get(42, optOptic))
+            const result = Result.run(Accessor.get(42, optAccessor))
 
             if (result.type === 'err') {
                 throw new Error('Expected a number but got an error')
@@ -247,7 +247,7 @@ describe('Optic', () => {
 
     describe('caching behavior', () => {
         it('should cache prop access', () => {
-            const optic = Optic.root<{ a: { value: number } }>().prop('a')
+            const accessor = Accessor.root<{ a: { value: number } }>().prop('a')
 
             const obj = {
                 a: {
@@ -256,14 +256,14 @@ describe('Optic', () => {
             }
 
             // First access - should cache
-            const result1 = Result.run(Optic.get(obj, optic))
+            const result1 = Result.run(Accessor.get(obj, accessor))
 
             if (result1.type === 'err') {
                 throw new Error('Expected number but got error')
             }
 
             // Second access - should use cache
-            const result2 = Result.run(Optic.get(obj, optic))
+            const result2 = Result.run(Accessor.get(obj, accessor))
 
             if (result2.type === 'err') {
                 throw new Error('Expected number but got error')
@@ -272,18 +272,18 @@ describe('Optic', () => {
         })
 
         it('should cache index access', () => {
-            const optic = Optic.root<{ value: number }[]>().index(0)
+            const accessor = Accessor.root<{ value: number }[]>().index(0)
             const arr = [{ value: 42 }]
 
             // First access - should cache
-            const result1 = Result.run(Optic.get(arr, optic))
+            const result1 = Result.run(Accessor.get(arr, accessor))
 
             if (result1.type === 'err') {
                 throw new Error('Expected number but got error')
             }
 
             // Second access - should use cache
-            const result2 = Result.run(Optic.get(arr, optic))
+            const result2 = Result.run(Accessor.get(arr, accessor))
 
             if (result2.type === 'err') {
                 throw new Error('Expected number but got error')
@@ -293,21 +293,21 @@ describe('Optic', () => {
         })
 
         it('should cache filter results', () => {
-            const optic = Optic.root<{ value: number }[]>()
+            const accessor = Accessor.root<{ value: number }[]>()
                 .map((item) => item.prop('value'))
                 .filter((n) => n > 2)
 
             const arr = [1, 2, 3, 4].map((n) => ({ value: n }))
 
             // First access - should cache
-            const result1 = Result.run(Optic.get(arr, optic))
+            const result1 = Result.run(Accessor.get(arr, accessor))
 
             if (result1.type === 'err') {
                 throw new Error('Expected array but got error')
             }
 
             // Second access - should use cache
-            const result2 = Result.run(Optic.get(arr, optic))
+            const result2 = Result.run(Accessor.get(arr, accessor))
 
             if (result2.type === 'err') {
                 throw new Error('Expected array but got error')
@@ -317,7 +317,7 @@ describe('Optic', () => {
         })
 
         it('should cache map operations', () => {
-            const optic = Optic.root<{ value: number }[]>()
+            const accessor = Accessor.root<{ value: number }[]>()
                 .map((item) => item.prop('value'))
                 .map({
                     get: (n) => n * 2,
@@ -327,14 +327,14 @@ describe('Optic', () => {
             const arr = [1, 2, 3].map((n) => ({ value: n }))
 
             // First access - should cache
-            const result1 = Result.run(Optic.get(arr, optic))
+            const result1 = Result.run(Accessor.get(arr, accessor))
 
             if (result1.type === 'err') {
                 throw new Error('Expected array but got error')
             }
 
             // Second access - should use cache
-            const result2 = Result.run(Optic.get(arr, optic))
+            const result2 = Result.run(Accessor.get(arr, accessor))
             if (result2.type === 'err') {
                 throw new Error('Expected array but got error')
             }
@@ -343,19 +343,19 @@ describe('Optic', () => {
         })
 
         it('should cache find operations', () => {
-            const optic = Optic.root<{ value: number }[]>().find((obj) => obj.value === 42)
+            const accessor = Accessor.root<{ value: number }[]>().find((obj) => obj.value === 42)
 
             const arr = [1, 42, 3].map((n) => ({ value: n }))
 
             // First access - should cache
-            const result1 = Result.run(Optic.get(arr, optic))
+            const result1 = Result.run(Accessor.get(arr, accessor))
 
             if (result1.type === 'err') {
                 throw new Error('Expected number but got error')
             }
 
             // Second access - should use cache
-            const result2 = Result.run(Optic.get(arr, optic))
+            const result2 = Result.run(Accessor.get(arr, accessor))
 
             if (result2.type === 'err') {
                 throw new Error('Expected number but got error')
@@ -365,7 +365,7 @@ describe('Optic', () => {
         })
 
         it('should cache refine operations', () => {
-            const optic = Optic.root<{ a: { value: number } }>()
+            const accessor = Accessor.root<{ a: { value: number } }>()
                 .refine((obj) => obj.a.value > 2)
                 .prop('a')
 
@@ -382,8 +382,8 @@ describe('Optic', () => {
             }
 
             // First access - should cache
-            const result1 = Result.run(Optic.get(okObj, optic))
-            const result2 = Result.run(Optic.get(errObj, optic))
+            const result1 = Result.run(Accessor.get(okObj, accessor))
+            const result2 = Result.run(Accessor.get(errObj, accessor))
 
             if (result1.type === 'err') {
                 throw new Error('Expected number but got error')
@@ -394,8 +394,8 @@ describe('Optic', () => {
             }
 
             // Second access - should use cache
-            const result3 = Result.run(Optic.get(okObj, optic))
-            const result4 = Result.run(Optic.get(errObj, optic))
+            const result3 = Result.run(Accessor.get(okObj, accessor))
+            const result4 = Result.run(Accessor.get(errObj, accessor))
 
             if (result3.type === 'err') {
                 throw new Error('Expected number but got error')
@@ -410,14 +410,14 @@ describe('Optic', () => {
         })
 
         it('should cache nested object operations', () => {
-            const optic = Optic.root<{ a: { b: number }[] }>().prop('a').index(1)
+            const accessor = Accessor.root<{ a: { b: number }[] }>().prop('a').index(1)
 
             const obj = {
                 a: [{ b: 42 }, { b: 100 }],
             }
 
             // First access - should cache
-            const result1 = Result.run(Optic.get(obj, optic))
+            const result1 = Result.run(Accessor.get(obj, accessor))
 
             if (result1.type === 'err') {
                 throw new Error('Expected number but got error')
@@ -425,7 +425,7 @@ describe('Optic', () => {
 
             // Second access - should use cache
 
-            const result2 = Result.run(Optic.get(obj, optic))
+            const result2 = Result.run(Accessor.get(obj, accessor))
 
             if (result2.type === 'err') {
                 throw new Error('Expected number but got error')
@@ -437,7 +437,7 @@ describe('Optic', () => {
 
     describe('complex combinations', () => {
         it('should combine prop + refine + map', () => {
-            const optic = Optic.root<{ a: number[] }>()
+            const accessor = Accessor.root<{ a: number[] }>()
                 .prop('a')
                 .refine((arr: number[]) => arr.length > 0)
                 .map({
@@ -445,7 +445,7 @@ describe('Optic', () => {
                     set: (newValue: number) => newValue / 2,
                 })
 
-            const result = Result.run(Optic.get({ a: [1, 2, 3] }, optic))
+            const result = Result.run(Accessor.get({ a: [1, 2, 3] }, accessor))
 
             if (result.type === 'err') {
                 throw new Error('Expected array but got error')
@@ -453,7 +453,7 @@ describe('Optic', () => {
 
             expect(result.value).toEqual([2, 4, 6])
 
-            const setResult = Result.run(Optic.set({ a: [1, 2, 3] }, optic, [4, 6, 8]))
+            const setResult = Result.run(Accessor.set({ a: [1, 2, 3] }, accessor, [4, 6, 8]))
 
             if (setResult.type === 'err') {
                 throw new Error('Expected array but got error')
@@ -461,17 +461,17 @@ describe('Optic', () => {
 
             expect(setResult.value).toEqual({ a: [2, 3, 4] })
 
-            const errResult = Result.run(Optic.get({ a: [] }, optic))
+            const errResult = Result.run(Accessor.get({ a: [] }, accessor))
 
             expect(errResult.type).toBe('err')
         })
 
         it('should combine index + filter + match', () => {
-            const optic = Optic.root<(string | number)[]>()
+            const accessor = Accessor.root<(string | number)[]>()
                 .filter((v) => typeof v === 'number')
                 .index(0)
 
-            let result = Result.run(Optic.get([42, 'test', 100], optic))
+            let result = Result.run(Accessor.get([42, 'test', 100], accessor))
 
             if (result.type === 'err') {
                 throw new Error('Expected number but got error')
@@ -479,7 +479,7 @@ describe('Optic', () => {
 
             expect(result.value).toBe(42)
 
-            result = Result.run(Optic.get(['test', 42], optic))
+            result = Result.run(Accessor.get(['test', 42], accessor))
 
             if (result.type === 'err') {
                 throw new Error('Expected number but got error')
@@ -487,7 +487,7 @@ describe('Optic', () => {
 
             expect(result.value).toBe(42)
 
-            result = Result.run(Optic.get(['test', 'test'], optic))
+            result = Result.run(Accessor.get(['test', 'test'], accessor))
 
             if (result.type === 'ok') {
                 throw new Error('Expected error but got number')
@@ -497,11 +497,11 @@ describe('Optic', () => {
         })
 
         it('should handle nested object operations', () => {
-            const optic = Optic.root<{ user: { profile: { name: string; age: number } } }>()
+            const accessor = Accessor.root<{ user: { profile: { name: string; age: number } } }>()
                 .prop('user')
                 .prop('profile')
 
-            const result = Result.run(Optic.get({ user: { profile: { name: 'Alice', age: 25 } } }, optic))
+            const result = Result.run(Accessor.get({ user: { profile: { name: 'Alice', age: 25 } } }, accessor))
 
             if (result.type === 'err') {
                 throw new Error('Expected object but got error')
@@ -510,7 +510,7 @@ describe('Optic', () => {
             expect(result.value).toEqual({ name: 'Alice', age: 25 })
 
             const setResult = Result.run(
-                Optic.set({ user: { profile: { name: 'Alice', age: 25 } } }, optic, {
+                Accessor.set({ user: { profile: { name: 'Alice', age: 25 } } }, accessor, {
                     name: 'Bob',
                     age: 30,
                 }),
@@ -526,9 +526,9 @@ describe('Optic', () => {
         })
 
         it('fails when updating a non-existent array item', () => {
-            const optic = Optic.root<{ items: { value: number }[] }>().prop('items').index(5)
+            const accessor = Accessor.root<{ items: { value: number }[] }>().prop('items').index(5)
 
-            const result = Result.run(Optic.set({ items: [{ value: 1 }, { value: 2 }] }, optic, { value: 100 }))
+            const result = Result.run(Accessor.set({ items: [{ value: 1 }, { value: 2 }] }, accessor, { value: 100 }))
 
             expect(result.type).toBe('err')
         })
@@ -536,11 +536,11 @@ describe('Optic', () => {
 
     describe('select()', () => {
         it('should do nothing if no operations are provided', () => {
-            const rootOptic = Optic.root<number>()
-            const optic = rootOptic.select((p) => p)
-            const result = Result.run(Optic.get(42, optic))
+            const rootAccessor = Accessor.root<number>()
+            const accessor = rootAccessor.proxy((p) => p)
+            const result = Result.run(Accessor.get(42, accessor))
 
-            expect(optic === rootOptic).toBe(true)
+            expect(accessor === rootAccessor).toBe(true)
 
             if (result.type === 'err') {
                 throw new Error('Expected a number but got an error')
@@ -549,10 +549,10 @@ describe('Optic', () => {
             expect(result.value).toBe(42)
         })
 
-        it('should create optic from property access', () => {
-            const optic = Optic.root<{ a: number }>().select((p) => p.a)
+        it('should create accessor from property access', () => {
+            const accessor = Accessor.root<{ a: number }>().proxy((p) => p.a)
 
-            const result = Result.run(Optic.get({ a: 42 }, optic))
+            const result = Result.run(Accessor.get({ a: 42 }, accessor))
 
             if (result.type === 'err') {
                 throw new Error('Expected number but got error')
@@ -561,9 +561,9 @@ describe('Optic', () => {
             expect(result.value).toBe(42)
         })
 
-        it('should create optic from index access', () => {
-            const optic = Optic.root<number[]>().select((p) => p[0])
-            const result = Result.run(Optic.get([42], optic))
+        it('should create accessor from index access', () => {
+            const accessor = Accessor.root<number[]>().proxy((p) => p[0])
+            const result = Result.run(Accessor.get([42], accessor))
 
             if (result.type === 'err') {
                 throw new Error('Expected number but got error')
@@ -573,9 +573,9 @@ describe('Optic', () => {
         })
 
         it('should chain multiple operations', () => {
-            const optic = Optic.root<{ items: { value: number }[] }>().select((p) => p.items[0].value)
+            const accessor = Accessor.root<{ items: { value: number }[] }>().proxy((p) => p.items[0].value)
 
-            const result = Result.run(Optic.get({ items: [{ value: 42 }] }, optic))
+            const result = Result.run(Accessor.get({ items: [{ value: 42 }] }, accessor))
 
             if (result.type === 'err') {
                 throw new Error('Expected number but got error')
@@ -585,9 +585,9 @@ describe('Optic', () => {
         })
 
         it('should maintain type inference', () => {
-            const optic = Optic.root<{ a: { b: string } }>().select((p) => p.a.b)
+            const accessor = Accessor.root<{ a: { b: string } }>().proxy((p) => p.a.b)
 
-            const result = Result.run(Optic.get({ a: { b: 'test' } }, optic))
+            const result = Result.run(Accessor.get({ a: { b: 'test' } }, accessor))
 
             if (result.type === 'err') {
                 throw new Error('Expected string but got error')
@@ -612,8 +612,8 @@ describe('Optic', () => {
                     }
                 }
             }
-            const optic: Optic.Optic<string, State> = Optic.root<State>().select(
-                (p: Optic.OpticProxy<State>): Optic.OpticProxy<string> => p.a.b.c[1].e.f.g[2].h,
+            const accessor: Accessor.Accessor<string, State> = Accessor.root<State>().proxy(
+                (p: Accessor.AccessorProxy<State>): Accessor.AccessorProxy<string> => p.a.b.c[1].e.f.g[2].h,
             )
 
             const state: State = {
@@ -627,7 +627,7 @@ describe('Optic', () => {
                 },
             }
 
-            const result = Result.run(Optic.get(state, optic)) // should return 'target'
+            const result = Result.run(Accessor.get(state, accessor)) // should return 'target'
 
             if (result.type === 'err') {
                 throw new Error('Expected string but got error')

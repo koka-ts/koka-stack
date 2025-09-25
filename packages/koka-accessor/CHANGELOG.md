@@ -1,10 +1,10 @@
-# koka-optic
+# koka-accessor
 
 ## 1.0.2
 
 ### Patch Changes
 
--   improve koka, add optic.proxy to koka-optic
+-   improve koka, add accessor.proxy to koka-accessor
 -   Updated dependencies
     -   koka@1.0.3
 
@@ -12,6 +12,6 @@
 
 ### Patch Changes
 
--   add Optic.get/Optic.set, fix Eff.try().cach()
+-   add Accessor.get/Accessor.set, fix Eff.try().cach()
 -   Updated dependencies
     -   koka@1.0.2

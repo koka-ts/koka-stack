@@ -51,11 +51,11 @@ const result = Koka.run(program)
 
 **Documentation:** [📖 Full Documentation](./packages/koka/docs/)
 
-### [koka-optic](./packages/koka-optic/)
+### [koka-accessor](./packages/koka-accessor/)
 
-Optics library for immutable data manipulation.
+Accessors library for immutable data manipulation.
 
-### [koka-store](./packages/koka-domain/)
+### [koka-ddd](./packages/koka-ddd/)
 
 State management library with algebraic effects.
 
@@ -129,7 +129,7 @@ Our documentation follows the [Diátaxis](https://diataxis.fr/) framework for co
 npm install koka
 
 # Install additional packages
-npm install @koka/optic @koka/store
+npm install @koka/accessor @koka/store
 ```
 
 ## Code Style

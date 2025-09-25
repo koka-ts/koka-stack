@@ -9,7 +9,7 @@ export type Opt<Name extends string, T> = {
 export type AnyOpt = Opt<string, any>
 
 export function Opt<const Name extends string>(name: Name) {
-    return class Eff<T> {
+    return class Eff<T> implements Opt<Name, T> {
         static field: Name = name
         type = 'opt' as const
         name = name

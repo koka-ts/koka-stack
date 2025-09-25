@@ -80,9 +80,9 @@ function createStream<T>(options?: StreamOptions<T>) {
     }
 }
 
-export type TaskProducer<Yield, TaskReturn> = (index: number) => Koka.Actor<Yield, TaskReturn> | undefined
+export type TaskProducer<Yield, TaskReturn> = (index: number) => Koka.Effector<Yield, TaskReturn> | undefined
 
-export type TaskSource<Yield, TaskReturn> = TaskProducer<Yield, TaskReturn> | Array<Koka.Actor<Yield, TaskReturn>>
+export type TaskSource<Yield, TaskReturn> = TaskProducer<Yield, TaskReturn> | Array<Koka.Effector<Yield, TaskReturn>>
 
 export type TaskResult<TaskReturn> = {
     index: number

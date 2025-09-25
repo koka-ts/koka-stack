@@ -11,7 +11,7 @@ export type ExtractErr<T> = T extends AnyErr ? T : never
 export type ExcludeErr<T> = T extends AnyErr ? never : T
 
 export function Err<const Name extends string>(name: Name) {
-    return class Eff<E = void> {
+    return class Eff<E = void> implements Err<Name, E> {
         static field: Name = name
         type = 'err' as const
         name = name

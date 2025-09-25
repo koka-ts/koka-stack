@@ -1,9 +1,9 @@
-import * as Optic from 'koka-optic'
+import * as Accessor from 'koka-accessor'
 import * as Async from 'koka/async'
 import * as Koka from 'koka'
 import * as Result from 'koka/result'
 import * as Err from 'koka/err'
-import { Domain, Store, get, set } from '../src/koka-domain.ts'
+import { Domain, Store, get, set } from '../src/koka-ddd.ts'
 
 type Todo = {
     id: number
@@ -144,7 +144,7 @@ describe('TodoAppStore', () => {
             value: 'Todo added',
         })
 
-        const todos: Result.Result<Todo[], Optic.OpticErr> = Result.run(get(todoAppDomain.todos$))
+        const todos: Result.Result<Todo[], Accessor.AccessorErr> = Result.run(get(todoAppDomain.todos$))
 
         expect(todos).toEqual({
             type: 'ok',

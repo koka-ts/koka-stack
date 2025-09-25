@@ -19,7 +19,8 @@
         "lib": ["ESNext", "DOM"],
         "noEmit": true,
         "allowImportingTsExtensions": true,
-        "erasableSyntaxOnly": true
+        "erasableSyntaxOnly": true,
+        "experimentalDecorators": false
     },
     "include": ["./src", "./__tests__"]
 }

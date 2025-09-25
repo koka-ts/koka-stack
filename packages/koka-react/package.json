@@ -1,7 +1,7 @@
 {
     "name": "koka-react",
     "version": "1.0.0",
-    "description": "An AI-Oriented React framework based on Algebraic Effects, Optics and CQRS.",
+    "description": "An AI-Oriented React framework based on Algebraic Effects, Accessors and CQRS.",
     "keywords": [],
     "repository": "github:koka-ts/koka",
     "bugs": "https://github.com/koka-ts/koka-react/issues",
@@ -22,8 +22,8 @@
     },
     "dependencies": {
         "koka": "^1.0.0",
-        "koka-optic": "^1.0.0",
-        "koka-domain": "^1.0.0",
+        "koka-accessor": "^1.0.0",
+        "koka-ddd": "^1.0.0",
         "react": "^18.0.0"
     },
     "devDependencies": {
