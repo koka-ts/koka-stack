@@ -22,8 +22,8 @@ module.exports = {
         '^koka/(.*)$': 'koka/src/$1.ts',
         '^koka-accessor$': 'koka-accessor/src/koka-accessor.ts',
         '^koka-accessor/(.*)$': 'koka-accessor/src/$1.ts',
-        '^koka-ddd$': 'koka-ddd/src/koka-ddd.ts',
-        '^koka-ddd/(.*)$': 'koka-ddd/src/$1.ts',
+        '^koka-domain$': 'koka-domain/src/koka-domain.ts',
+        '^koka-domain/(.*)$': 'koka-domain/src/$1.ts',
     },
     testPathIgnorePatterns: ['/node_modules/', '/examples/'],
     globals: {

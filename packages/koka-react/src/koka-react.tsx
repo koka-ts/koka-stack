@@ -1,18 +1,18 @@
 import { useSyncExternalStore } from 'react'
-import * as DDD from 'koka-ddd'
+import * as Domain from 'koka-domain'
 import * as Err from 'koka/err'
 import * as Result from 'koka/result'
 import * as Accessor from 'koka-accessor'
 
 export function useDomainResult<State, Root>(
-    domain: DDD.Domain<State, Root>,
+    domain: Domain.Domain<State, Root>,
 ): Result.Result<State, Accessor.AccessorErr> {
     const subscribe = (onStoreChange: () => void) => {
-        return DDD.subscribeDomainResult(domain, onStoreChange)
+        return Domain.subscribeDomainResult(domain, onStoreChange)
     }
 
     const getState = () => {
-        return DDD.getState(domain)
+        return Domain.getState(domain)
     }
 
     const result = useSyncExternalStore(subscribe, getState, getState)
@@ -20,7 +20,7 @@ export function useDomainResult<State, Root>(
     return result
 }
 
-export function useDomainState<State, Root>(domain: DDD.Domain<State, Root>): State {
+export function useDomainState<State, Root>(domain: Domain.Domain<State, Root>): State {
     const result = useDomainResult(domain)
 
     if (result.type === 'err') {
@@ -31,14 +31,14 @@ export function useDomainState<State, Root>(domain: DDD.Domain<State, Root>): St
 }
 
 export function useDomainQueryResult<Return, Yield extends Err.AnyErr = Err.AnyErr>(
-    query: DDD.Query<Return, Yield>,
+    query: Domain.Query<Return, Yield>,
 ): Result.Result<Return, Yield> {
     const subscribe = (onStoreChange: () => void) => {
-        return DDD.subscribeQueryResult(query, onStoreChange)
+        return Domain.subscribeQueryResult(query, onStoreChange)
     }
 
     const getState = () => {
-        return DDD.getQueryResult(query)
+        return Domain.getQueryResult(query)
     }
 
     const result = useSyncExternalStore(subscribe, getState, getState)
@@ -46,7 +46,9 @@ export function useDomainQueryResult<Return, Yield extends Err.AnyErr = Err.AnyE
     return result
 }
 
-export function useDomainQuery<Return, Yield extends Err.AnyErr = Err.AnyErr>(query: DDD.Query<Return, Yield>): Return {
+export function useDomainQuery<Return, Yield extends Err.AnyErr = Err.AnyErr>(
+    query: Domain.Query<Return, Yield>,
+): Return {
     const result = useDomainQueryResult(query)
 
     if (result.type === 'err') {

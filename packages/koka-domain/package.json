@@ -1,5 +1,5 @@
 {
-    "name": "koka-ddd",
+    "name": "koka-domain",
     "version": "1.0.0",
     "description": "An AI-Oriented DDD framework based on Algebraic Effects, Accessors and CQRS.",
     "keywords": [],
@@ -8,7 +8,7 @@
     "author": "https://github.com/koka-ts",
     "type": "module",
     "exports": {
-        ".": "./src/koka-ddd.ts",
+        ".": "./src/koka-domain.ts",
         "./pretty-browser-logger": "./src/pretty-browser-logger.ts",
         "./pretty-cli-logger": "./src/pretty-cli-logger.ts"
     },

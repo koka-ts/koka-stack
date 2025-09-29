@@ -55,7 +55,7 @@ const result = Koka.run(program)
 
 Accessors library for immutable data manipulation.
 
-### [koka-ddd](./packages/koka-ddd/)
+### [koka-domain](./packages/koka-domain/)
 
 State management library with algebraic effects.
 

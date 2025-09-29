@@ -1,4 +1,4 @@
-import * as DDD from 'koka-ddd'
+import * as Domain from 'koka-domain'
 import * as Async from 'koka/async'
 import * as Err from 'koka/err'
 
@@ -15,33 +15,37 @@ export interface TextLoggerEnhancer {
     logText(text: string): void
 }
 
-export class CoreDomain<State, Root = any> extends DDD.Domain<State, Root, TextLoggerEnhancer & TodoStorageEnhancer> {}
+export class CoreDomain<State, Root = any> extends Domain.Domain<
+    State,
+    Root,
+    TextLoggerEnhancer & TodoStorageEnhancer
+> {}
 
 export class TextDomain extends CoreDomain<string> {
-    @DDD.command()
+    @Domain.command()
     *updateText(text: string) {
         this.store.logText(`updateText: ${text}`)
-        yield* DDD.set(this, text)
+        yield* Domain.set(this, text)
         return 'text updated'
     }
-    @DDD.command()
+    @Domain.command()
     *clearText() {
         this.store.logText(`clearText`)
-        yield* DDD.set(this, '')
+        yield* Domain.set(this, '')
         return 'text cleared'
     }
 }
 
 export class BoolDomain extends CoreDomain<boolean> {
-    @DDD.command()
+    @Domain.command()
     *toggle() {
-        yield* DDD.set(this, (value) => !value)
+        yield* Domain.set(this, (value) => !value)
         return 'bool toggled'
     }
 }
 
 // Event definition - only for operations that sub-domain cannot handle itself
-export class RemoveTodoEvent extends DDD.Event('RemoveTodo')<{ todoId: number }> {}
+export class RemoveTodoEvent extends Domain.Event('RemoveTodo')<{ todoId: number }> {}
 
 export type Todo = {
     id: number
@@ -53,25 +57,25 @@ export class TodoDomain extends CoreDomain<Todo> {
     text$ = new TextDomain(this.prop('text'))
     done$ = new BoolDomain(this.prop('done'));
 
-    @DDD.command()
+    @Domain.command()
     *updateTodoText(text: string) {
         // Can be handled within the domain, no event needed
         yield* this.text$.updateText(text)
         return 'todo updated'
     }
 
-    @DDD.command()
+    @Domain.command()
     *toggleTodo() {
         // Can be handled within the domain, no event needed
         yield* this.done$.toggle()
         return 'todo toggled'
     }
 
-    @DDD.command()
+    @Domain.command()
     *removeTodo() {
         // Cannot remove itself from the list, needs to emit event to parent domain
-        const todo = yield* DDD.get(this)
-        yield* DDD.emit(this, new RemoveTodoEvent({ todoId: todo.id }))
+        const todo = yield* Domain.get(this)
+        yield* Domain.emit(this, new RemoveTodoEvent({ todoId: todo.id }))
         return 'todo remove requested'
     }
 }
@@ -79,46 +83,46 @@ export class TodoDomain extends CoreDomain<Todo> {
 let todoUid = 100
 
 export class TodoListDomain extends CoreDomain<Todo[]> {
-    @DDD.command()
+    @Domain.command()
     *addTodo(text: string) {
         const newTodo = {
             id: todoUid++,
             text,
             done: false,
         }
-        yield* DDD.set(this, (todos) => [...todos, newTodo])
+        yield* Domain.set(this, (todos) => [...todos, newTodo])
 
         return 'todo added'
     }
 
-    @DDD.command()
+    @Domain.command()
     *toggleAll() {
-        const todos = yield* DDD.get(this)
+        const todos = yield* Domain.get(this)
         const allDone = todos.every((todo) => todo.done)
 
         // Can be handled directly within this domain
-        yield* DDD.set(this, (todos) => {
+        yield* Domain.set(this, (todos) => {
             return todos.map((todo) => ({ ...todo, done: !allDone }))
         })
 
         return 'all todos toggled'
     }
 
-    @DDD.command()
+    @Domain.command()
     *clearCompleted() {
         // Can be handled directly within this domain
-        yield* DDD.set(this, (todos) => todos.filter((todo) => !todo.done))
+        yield* Domain.set(this, (todos) => todos.filter((todo) => !todo.done))
         return 'completed todos cleared'
     }
 
-    @DDD.command()
+    @Domain.command()
     *removeTodo(id: number) {
-        yield* DDD.set(this, (todos) => todos.filter((todo) => todo.id !== id))
+        yield* Domain.set(this, (todos) => todos.filter((todo) => todo.id !== id))
         return 'todo removed'
     }
 
     // Event handler - only handle events from sub-domains that cannot be handled locally
-    @DDD.event(RemoveTodoEvent)
+    @Domain.event(RemoveTodoEvent)
     *handleRemoveTodo(event: RemoveTodoEvent) {
         yield* this.removeTodo(event.payload.todoId)
     }
@@ -137,45 +141,45 @@ export class TodoListDomain extends CoreDomain<Todo[]> {
     activeTodoTextList$ = this.activeTodoList$.map((todo$) => todo$.prop('text'))
     completedTodoTextList$ = this.completedTodoList$.map((todo$) => todo$.prop('text'));
 
-    @DDD.query()
+    @Domain.query()
     *getCompletedTodoList() {
-        const completedTodoList = yield* DDD.get(this.completedTodoList$)
+        const completedTodoList = yield* Domain.get(this.completedTodoList$)
         return completedTodoList
     }
 
-    @DDD.query()
+    @Domain.query()
     *getActiveTodoList() {
-        const activeTodoList = yield* DDD.get(this.activeTodoList$)
+        const activeTodoList = yield* Domain.get(this.activeTodoList$)
         return activeTodoList
     }
 
-    @DDD.query()
+    @Domain.query()
     *getActiveTodoTextList() {
-        const activeTodoTextList = yield* DDD.get(this.activeTodoTextList$)
+        const activeTodoTextList = yield* Domain.get(this.activeTodoTextList$)
         return activeTodoTextList
     }
 
-    @DDD.query()
+    @Domain.query()
     *getCompletedTodoTextList() {
-        const completedTodoTextList = yield* DDD.get(this.completedTodoTextList$)
+        const completedTodoTextList = yield* Domain.get(this.completedTodoTextList$)
         return completedTodoTextList
     }
 
-    @DDD.query()
+    @Domain.query()
     *getTodoCount() {
-        const todoList = yield* DDD.get(this)
+        const todoList = yield* Domain.get(this)
         return todoList.length
     }
 
-    @DDD.query()
+    @Domain.query()
     *getCompletedTodoCount() {
-        const completedTodoList = yield* DDD.get(this.completedTodoList$)
+        const completedTodoList = yield* Domain.get(this.completedTodoList$)
         return completedTodoList.length
     }
 
-    @DDD.query()
+    @Domain.query()
     *getActiveTodoCount() {
-        const activeTodoList = yield* DDD.get(this.activeTodoList$)
+        const activeTodoList = yield* Domain.get(this.activeTodoList$)
         return activeTodoList.length
     }
 }
@@ -183,9 +187,9 @@ export class TodoListDomain extends CoreDomain<Todo[]> {
 export type TodoFilter = 'all' | 'done' | 'undone'
 
 export class TodoFilterDomain extends CoreDomain<TodoFilter> {
-    @DDD.command()
+    @Domain.command()
     *setFilter(filter: TodoFilter) {
-        yield* DDD.set(this, filter)
+        yield* Domain.set(this, filter)
         return 'filter set'
     }
 }
@@ -203,9 +207,9 @@ export class TodoAppDomain extends CoreDomain<TodoApp> {
     filter$ = new TodoFilterDomain(this.prop('filter'))
     input$ = new TextDomain(this.prop('input'));
 
-    @DDD.command()
+    @Domain.command()
     *addTodo() {
-        const todoApp = yield* DDD.get(this)
+        const todoApp = yield* Domain.get(this)
 
         if (todoApp.input === '') {
             throw yield* Err.throw(new TodoInputErr('Input is empty'))
@@ -216,17 +220,17 @@ export class TodoAppDomain extends CoreDomain<TodoApp> {
         return 'Todo added'
     }
 
-    @DDD.command()
+    @Domain.command()
     *updateInput(input: string) {
         yield* Async.await(Promise.resolve('test async'))
         yield* this.input$.updateText(input)
         return 'Input updated'
     }
 
-    @DDD.query()
+    @Domain.query()
     *getFilteredTodoList() {
-        const todoList = yield* DDD.get(this.todos$)
-        const filter = yield* DDD.get(this.filter$)
+        const todoList = yield* Domain.get(this.todos$)
+        const filter = yield* Domain.get(this.filter$)
 
         if (filter === 'all') {
             return todoList
@@ -243,7 +247,7 @@ export class TodoAppDomain extends CoreDomain<TodoApp> {
         return todoList
     }
 
-    @DDD.query()
+    @Domain.query()
     *getFilteredTodoIds() {
         const todoList = yield* this.getFilteredTodoList()
         return todoList.map((todo) => todo.id)

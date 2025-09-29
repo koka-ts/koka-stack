@@ -161,7 +161,7 @@ importers:
         specifier: ^5.8.0
         version: 5.8.3
 
-  packages/koka-ddd:
+  packages/koka-domain:
     dependencies:
       chalk:
         specifier: ^4.1.2
@@ -212,9 +212,9 @@ importers:
       koka-accessor:
         specifier: ^1.0.0
         version: link:../koka-accessor
-      koka-ddd:
+      koka-domain:
         specifier: ^1.0.0
-        version: link:../koka-ddd
+        version: link:../koka-domain
       react:
         specifier: ^18.0.0
         version: 18.3.1
@@ -249,9 +249,9 @@ importers:
       koka-accessor:
         specifier: workspace:*
         version: link:../../packages/koka-accessor
-      koka-ddd:
+      koka-domain:
         specifier: workspace:*
-        version: link:../../packages/koka-ddd
+        version: link:../../packages/koka-domain
       koka-react:
         specifier: workspace:*
         version: link:../../packages/koka-react

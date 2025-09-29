@@ -1,8 +1,8 @@
-# koka-ddd - Domain Modeling with Effects
+# koka-domain - Domain Modeling with Effects
 
 **Warning: This library is in early development and may change significantly. Do not use in production yet.**
 
-Koka DDD provides a domain modeling framework built on Koka's algebraic effects system, featuring:
+Koka-Domain provides a domain modeling framework built on Koka's algebraic effects system, featuring:
 
 -   **Domain Modeling**: Type-safe domain definitions
 -   **Store Pattern**: Centralized state management
@@ -13,11 +13,11 @@ Koka DDD provides a domain modeling framework built on Koka's algebraic effects 
 ## Installation
 
 ```bash
-npm install koka-ddd
+npm install koka-domain
 # or
-yarn add koka-ddd
+yarn add koka-domain
 # or
-pnpm add koka-ddd
+pnpm add koka-domain
 ```
 
 ## Core Concepts
@@ -27,7 +27,7 @@ pnpm add koka-ddd
 Define your domain using the `Domain` base class:
 
 ```typescript
-import { Domain } from 'koka-ddd'
+import { Domain } from 'koka-domain'
 
 class TodoDomain extends Domain<Todo> {
   text = new TextDomain(this.$prop('text'))
@@ -44,7 +44,7 @@ class TodoDomain extends Domain<Todo> {
 Manage application state with the `Store` class:
 
 ```typescript
-import { Store } from 'koka-ddd'
+import { Store } from 'koka-domain'
 
 const store = new Store({
     state: {
@@ -67,7 +67,7 @@ store.runCommand(todoDomain.addTodo('New task'))
 ## Complete Todo App Example
 
 ```typescript
-import { Domain, Store } from 'koka-ddd'
+import { Domain, Store } from 'koka-domain'
 
 // Define domains
 class TodoDomain extends Domain<Todo> {
@@ -98,7 +98,7 @@ const store = new Store({
 })
 
 // Usage
-store.runCommand(todoListDomain.addTodo('Learn Koka DDD'))
+store.runCommand(todoListDomain.addTodo('Learn Koka Domain'))
 store.runCommand(todoListDomain.todo(1).toggle())
 ```
 

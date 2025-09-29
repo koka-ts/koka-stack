@@ -1,7 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import * as DDD from 'koka-ddd'
-import { PrettyLogger } from 'koka-ddd/pretty-browser-logger'
+import * as Domain from 'koka-domain'
+import { PrettyLogger } from 'koka-domain/pretty-browser-logger'
 import { useDomainState } from 'koka-react'
 import {
     type TodoApp,
@@ -48,7 +48,7 @@ const initialState: AppState = {
     todoAppList: [
         {
             todos: [
-                { id: 101, text: 'Learn koka-ddd framework', done: true },
+                { id: 101, text: 'Learn koka-domain framework', done: true },
                 { id: 102, text: 'Build React todo app', done: true },
                 { id: 103, text: 'Write comprehensive documentation', done: false },
                 { id: 104, text: 'Add unit tests', done: false },
@@ -127,11 +127,11 @@ export const logText: TextLoggerEnhancer['logText'] = (text) => {
     console.log('[logText]', text)
 }
 
-export interface StoreWithTodoStorageOptions<Root> extends DDD.StoreOptions<Root> {
+export interface StoreWithTodoStorageOptions<Root> extends Domain.StoreOptions<Root> {
     todoStorageKey?: string
 }
 
-export class StoreWithTodoStorage<Root> extends DDD.Store<Root> {
+export class StoreWithTodoStorage<Root> extends Domain.Store<Root> {
     todoStorage: TodoStorage
     constructor(options: StoreWithTodoStorageOptions<Root>) {
         super(options)

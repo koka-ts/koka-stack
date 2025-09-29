@@ -1,5 +1,5 @@
 import * as Koka from 'koka'
-import * as DDD from 'koka-ddd'
+import * as Domain from 'koka-domain'
 import * as Result from 'koka/result'
 import { useDomainState, useDomainQuery } from 'koka-react'
 import './App.css'
@@ -192,7 +192,7 @@ function TodoListHeader(props: TodoListHeaderProps) {
 }
 
 type TodoListItemsProps = {
-    getFilteredTodoIds: DDD.Query<number[]>
+    getFilteredTodoIds: Domain.Query<number[]>
     todoList$: TodoListDomain
 }
 
@@ -250,7 +250,7 @@ function EmptyTodoList() {
 }
 
 type TodoListProps = {
-    getTodoIds: DDD.Query<number[]>
+    getTodoIds: Domain.Query<number[]>
     todoList$: TodoListDomain
 }
 

@@ -1,4 +1,4 @@
-import * as DDD from 'koka'
+import * as Koka from 'koka'
 import * as Accessor from 'koka-accessor'
 import * as Opt from 'koka/opt'
 import * as Result from 'koka/result'
@@ -25,11 +25,11 @@ export function shallowEqualResult<T>(a: Result.Result<T, any>, b: Result.Result
     return false
 }
 
-export type StorePlugin<Root> = (store: Store<Root>) => (() => void) | void
+export type StorePlugin<Root, S extends Store<Root> = Store<Root>> = (store: S) => (() => void) | void
 
 export type StoreOptions<Root> = {
     state: Root
-    plugins?: StorePlugin<Root>[]
+    plugins?: StorePlugin<Root, Store<Root>>[]
 }
 
 export type AnyStore = Store<any>
@@ -40,7 +40,7 @@ export class Store<Root> {
     state: Root
     domain: Domain<Root, Root, this>
 
-    plugins: StorePlugin<Root>[] = []
+    plugins: StorePlugin<Root, this>[] = []
     private pluginCleanup: (() => void)[] = []
 
     constructor(options: StoreOptions<Root>) {
@@ -53,11 +53,24 @@ export class Store<Root> {
         this.plugins = [...this.plugins, ...(options.plugins ?? [])]
 
         for (const plugin of this.plugins) {
-            const cleanup = plugin(this)
-            if (cleanup) {
-                this.pluginCleanup.push(cleanup)
+            this.addPlugin(plugin)
+        }
+    }
+
+    addPlugin(plugin: StorePlugin<Root, this>) {
+        const cleanup = plugin(this)
+        if (cleanup) {
+            this.pluginCleanup.push(cleanup)
+            return () => {
+                const index = this.pluginCleanup.indexOf(cleanup)
+                if (index !== -1) {
+                    const cleanup = this.pluginCleanup[index]
+                    this.pluginCleanup.splice(index, 1)
+                    cleanup()
+                }
             }
         }
+        return () => {}
     }
 
     getState = (): Root => {
@@ -182,7 +195,7 @@ const eventHandlersStorages = new WeakMap<
 >()
 
 export function event<ES extends AnyEventCtor[]>(...Events: ES) {
-    return function <This extends AnyDomain, Return, E extends DDD.AnyEff>(
+    return function <This extends AnyDomain, Return, E extends Koka.AnyEff>(
         target: (this: This, event: InstanceType<ES[number]>) => Generator<E, Return>,
         context: KokaClassMethodDecoratorContext<This, typeof target>,
     ): typeof target {
@@ -237,7 +250,7 @@ export function* emit<D extends AnyDomain, E extends AnyEvent>(domain: D, event:
             const effector = Task.all(eventHandlerList.map((eventHandler) => eventHandler(event)))
 
             const result = Result.run(
-                DDD.try(effector).handle({
+                Koka.try(effector).handle({
                     [EventTracerOpt.field]: eventTree,
                 }),
             ) as Result.Result<unknown, Err.AnyErr>
@@ -295,7 +308,7 @@ export class Domain<State, Root = any, Enhancer extends {} = {}> implements Pure
         return new Domain({
             store: this.store,
             accessor: this.accessor.transform(selector),
-            parent: this.parent,
+            parent: this,
         })
     }
 
@@ -303,7 +316,7 @@ export class Domain<State, Root = any, Enhancer extends {} = {}> implements Pure
         return new Domain({
             store: this.store,
             accessor: this.accessor.prop(key),
-            parent: this.parent,
+            parent: this,
         })
     }
 
@@ -311,7 +324,7 @@ export class Domain<State, Root = any, Enhancer extends {} = {}> implements Pure
         return new Domain({
             store: this.store,
             accessor: this.accessor.index(index),
-            parent: this.parent,
+            parent: this,
         })
     }
 
@@ -323,7 +336,7 @@ export class Domain<State, Root = any, Enhancer extends {} = {}> implements Pure
         return new Domain({
             store: this.store,
             accessor: this.accessor.find(predicate),
-            parent: this.parent,
+            parent: this,
         })
     }
 
@@ -331,7 +344,7 @@ export class Domain<State, Root = any, Enhancer extends {} = {}> implements Pure
         return new Domain({
             store: this.store,
             accessor: this.accessor.match(predicate),
-            parent: this.parent,
+            parent: this,
         })
     }
 
@@ -339,7 +352,7 @@ export class Domain<State, Root = any, Enhancer extends {} = {}> implements Pure
         return new Domain({
             store: this.store,
             accessor: this.accessor.refine(predicate),
-            parent: this.parent,
+            parent: this,
         })
     }
 
@@ -347,7 +360,7 @@ export class Domain<State, Root = any, Enhancer extends {} = {}> implements Pure
         return new Domain({
             store: this.store,
             accessor: this.accessor.as<Refined>(),
-            parent: this.parent,
+            parent: this,
         })
     }
 
@@ -362,7 +375,7 @@ export class Domain<State, Root = any, Enhancer extends {} = {}> implements Pure
         return new Domain({
             store: this.store,
             accessor: this.accessor.map(mapper),
-            parent: this.parent,
+            parent: this,
         })
     }
 
@@ -374,7 +387,7 @@ export class Domain<State, Root = any, Enhancer extends {} = {}> implements Pure
         return new Domain({
             store: this.store,
             accessor: this.accessor.filter(predicate),
-            parent: this.parent,
+            parent: this,
         })
     }
 
@@ -384,7 +397,7 @@ export class Domain<State, Root = any, Enhancer extends {} = {}> implements Pure
         return new Domain({
             store: this.store,
             accessor: this.accessor.proxy(selector),
-            parent: this.parent,
+            parent: this,
         })
     }
 }
@@ -434,9 +447,9 @@ export type EventExecutionTree = {
     commands: CommandExecutionTree[]
 }
 
-export class CommandTracerOpt extends Opt.Opt('koka-ddd/command-tracer-opt')<CommandExecutionTree> {}
-export class QueryTracerOpt extends Opt.Opt('koka-ddd/query-tracer-opt')<QueryExecutionTree> {}
-export class EventTracerOpt extends Opt.Opt('koka-ddd/event-tracer-opt')<EventExecutionTree> {}
+export class CommandTracerOpt extends Opt.Opt('koka-domain/command-tracer-opt')<CommandExecutionTree> {}
+export class QueryTracerOpt extends Opt.Opt('koka-domain/query-tracer-opt')<QueryExecutionTree> {}
+export class EventTracerOpt extends Opt.Opt('koka-domain/event-tracer-opt')<EventExecutionTree> {}
 
 type KokaClassMethodDecoratorContext<
     This = unknown,
@@ -488,13 +501,13 @@ const checkQueryStorageDeps = (queryStorage: QueryStorage) => {
     return true
 }
 
-class QueryStorageOpt extends Opt.Opt('koka-ddd/query-storage-opt')<QueryStorage> {}
+class QueryStorageOpt extends Opt.Opt('koka-domain/query-storage-opt')<QueryStorage> {}
 
 const queryStorages = new WeakMap<Query<any, any>, QueryStorage>()
 
 export function query() {
-    return function <This extends AnyDomain, Args extends any[], Return, Yield extends DDD.AnyEff>(
-        target: (this: This, ...args: Args) => Generator<Yield | QueryOpt, Return>,
+    return function <This extends AnyDomain, Return, Yield extends Koka.AnyEff>(
+        target: (this: This) => Generator<Yield | QueryOpt, Return>,
         context: KokaClassMethodDecoratorContext<This, typeof target>,
     ): typeof target {
         const methodName = context.name
@@ -507,7 +520,7 @@ export function query() {
             this[methodName].store = this.store
         })
 
-        function* replacementMethod(this: This, ...args: Args): Generator<Yield | QueryOpt, Return> {
+        function* replacementMethod(this: This): Generator<Yield | QueryOpt, Return> {
             const domainName = (this as any).constructor?.name ?? 'UnknownDomain'
             const parentQueryTree: QueryExecutionTree | undefined = yield* Opt.get(QueryTracerOpt)
 
@@ -518,7 +531,7 @@ export function query() {
                       domainName,
                       async: false,
                       name: name,
-                      args: args,
+                      args: [],
                       states: [],
                       queries: [],
                   }
@@ -528,7 +541,7 @@ export function query() {
                 parentQueryTree.queries.push(queryExecutionTree)
             }
 
-            const handledQueryEff = DDD.try(target.call(this as This, ...args)).handle({
+            const handledQueryEff = Koka.try(target.call(this as This)).handle({
                 [QueryTracerOpt.field]: queryExecutionTree,
             } as any)
 
@@ -549,7 +562,7 @@ export function query() {
             return result.value as Return
         }
 
-        return function* query(this: This, ...args: Args) {
+        return function* query(this: This) {
             if (!(this instanceof Domain)) {
                 throw new Error('Query must be used on a Domain class')
             }
@@ -586,7 +599,7 @@ export function query() {
                 queryStorages.set(queryMethod, queryStorage)
             }
 
-            const withQueryStorage = DDD.try(replacementMethod.call(this, ...args)).handle({
+            const withQueryStorage = Koka.try(replacementMethod.call(this)).handle({
                 [QueryStorageOpt.field]: queryStorage,
             } as any)
 
@@ -674,7 +687,7 @@ export function subscribeQueryState<Return, Yield extends Err.AnyErr = Err.AnyEr
 }
 
 export function command() {
-    return function <This extends AnyDomain, Args extends any[], Return, E extends DDD.AnyEff>(
+    return function <This extends AnyDomain, Args extends any[], Return, E extends Koka.AnyEff>(
         target: (this: This, ...args: Args) => Generator<E, Return>,
         context: KokaClassMethodDecoratorContext<This, typeof target>,
     ): typeof target {
@@ -720,7 +733,7 @@ export function command() {
                 eventTree.commands.push(commandTree)
             }
 
-            const gen = DDD.try(Result.wrap(target.call(this, ...args))).handle({
+            const gen = Koka.try(Result.wrap(target.call(this, ...args))).handle({
                 [CommandTracerOpt.field]: commandTree,
                 [QueryTracerOpt.field]: queryTree,
             } as any)

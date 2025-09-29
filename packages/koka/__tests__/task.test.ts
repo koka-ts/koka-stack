@@ -575,7 +575,7 @@ describe('Task.concurrent', () => {
         expect(cleanupCalled).toBe(true)
     })
 
-    it('should handle unexpected completion errors in stream', async () => {
+    it('should handle stream with unexpected completion errors', async () => {
         function* normalGen() {
             return 42
         }

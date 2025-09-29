@@ -3,7 +3,7 @@ import * as Async from 'koka/async'
 import * as Koka from 'koka'
 import * as Result from 'koka/result'
 import * as Err from 'koka/err'
-import { Domain, Store, get, set } from '../src/koka-ddd.ts'
+import { Domain, Store, get, set } from '../src/koka-domain.ts'
 
 type Todo = {
     id: number

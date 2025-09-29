@@ -27,11 +27,9 @@ function createStream<T>(options?: StreamOptions<T>) {
         done: withResolvers<'done'>(),
     }
 
-    type Value = T | T[]
+    const values = [] as T[]
 
-    const values = [] as Value[]
-
-    const next = (value: Value) => {
+    const next = (value: T) => {
         values.push(value)
         // Resolve the controller to allow the async generator to yield
         const previousNext = ctrl.next
@@ -55,14 +53,7 @@ function createStream<T>(options?: StreamOptions<T>) {
 
             while (values.length > 0) {
                 const value = values.shift()!
-
-                if (Array.isArray(value)) {
-                    for (const item of value) {
-                        yield item
-                    }
-                } else {
-                    yield value
-                }
+                yield value
             }
 
             if (status === 'done') {

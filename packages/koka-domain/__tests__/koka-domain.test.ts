@@ -18,7 +18,7 @@ import {
     subscribeQueryResult,
     subscribeQueryState,
     CommandExecutionTree,
-} from '../src/koka-ddd.ts'
+} from '../src/koka-domain.ts'
 import { PrettyLogger } from '../src/pretty-cli-logger.ts'
 
 type Todo = {
