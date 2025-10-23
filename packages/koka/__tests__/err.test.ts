@@ -19,7 +19,7 @@ describe('Err', () => {
             return 'should not reach here'
         }
 
-        const result = Result.run(test())
+        const result = Result.runSync(test())
 
         expect(result).toEqual(new TestErr('error'))
     })
@@ -36,7 +36,7 @@ describe('Err', () => {
             return yield* inner()
         }
 
-        const result = Result.run(outer())
+        const result = Result.runSync(outer())
         expect(result).toEqual(new TestErr('inner error'))
     })
 
@@ -48,7 +48,7 @@ describe('Err', () => {
             return 'should not reach here'
         }
 
-        const result = Result.run(test())
+        const result = Result.runSync(test())
         expect(result).toEqual(new ComplexError({ code: 404, message: 'Not found' }))
     })
 })

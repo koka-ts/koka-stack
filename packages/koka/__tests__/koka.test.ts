@@ -14,7 +14,7 @@ describe('Err.throw', () => {
             return 'should not reach here'
         }
 
-        const result = Result.run(test())
+        const result = Result.runSync(test())
 
         expect(result).toEqual({
             type: 'err',
@@ -32,7 +32,7 @@ describe('Koka.try', () => {
         }
 
         expect(() => {
-            Koka.run(Koka.try(test()).handle({}))
+            Koka.runSync(Koka.try(test()).handle({}))
         }).toThrow()
     })
 
@@ -48,7 +48,7 @@ describe('Koka.try', () => {
             TestError: (error) => `Caught: ${error}`,
         })
 
-        const result = Koka.run(program)
+        const result = Koka.runSync(program)
         expect(result).toBe('Caught: error')
     })
 
@@ -62,7 +62,7 @@ describe('Koka.try', () => {
 
         const program = Koka.try(test()).handle({})
 
-        const result = Koka.run(
+        const result = Koka.runSync(
             Koka.try(program).handle({
                 UnhandledError: (error) => ({ error }),
             }),
@@ -107,7 +107,7 @@ describe('Koka.try', () => {
             return yield* inner()
         }
 
-        const result = Koka.run(
+        const result = Koka.runSync(
             Koka.try(outer()).handle({
                 InnerError: (error) => `Caught inner: ${error}`,
             }),
@@ -116,7 +116,7 @@ describe('Koka.try', () => {
     })
 })
 
-describe('Koka.run', () => {
+describe('Koka.runAsync', () => {
     it('should handle async effects', async () => {
         function* test() {
             const value = yield* Async.await(Promise.resolve(42))
@@ -135,7 +135,7 @@ describe('Koka.run', () => {
             return syncValue + asyncValue
         }
 
-        const result = await Koka.run(test())
+        const result = await Koka.runAsync(test())
         expect(result).toBe(42)
     })
 
@@ -154,7 +154,7 @@ describe('Koka.run', () => {
             }
         }
 
-        const result = await Koka.run(test())
+        const result = await Koka.runAsync(test())
         expect(result).toBe('Caught: Async error')
     })
 
@@ -179,14 +179,14 @@ describe('Koka.run', () => {
         }
 
         // @ts-expect-error for test
-        expect(() => Koka.run(testErr())).toThrow(/\w+/)
+        expect(() => Koka.runSync(testErr())).toThrow(/\w+/)
         // @ts-expect-error for test
-        expect(() => Koka.run(testCtx())).toThrow(/\w+/)
+        expect(() => Koka.runSync(testCtx())).toThrow(/\w+/)
 
-        expect(Koka.run(testOpt())).toBe('default')
+        expect(Koka.runSync(testOpt())).toBe('default')
 
         expect(
-            Koka.run(
+            Koka.runSync(
                 Koka.try(testOpt()).handle({
                     [TestOpt.field]: 'custom value',
                 }),
@@ -226,7 +226,7 @@ describe('Complex scenarios', () => {
             return asyncValue + 1
         }
 
-        const result = await Koka.run(
+        const result = await Koka.runAsync(
             Koka.try(program()).handle({
                 TestCtx: 21,
             }),
@@ -247,7 +247,7 @@ describe('Complex scenarios', () => {
             return asyncValue + 1
         }
 
-        const result = await Koka.run(
+        const result = await Koka.runAsync(
             Koka.try(program()).handle({
                 TestCtx: 0,
                 ZeroError: (error) => `Handled: ${error}`,
@@ -312,7 +312,7 @@ describe('design first approach', () => {
             [UserId.field]: '12345',
         })
 
-        const result = await Koka.run(program)
+        const result = await Koka.runAsync(program)
 
         expect(result).toBe('Error: User with ID 12345 not found')
     })
@@ -331,12 +331,12 @@ describe('design first approach', () => {
             Logger: logger,
         })
 
-        let result = await Koka.run(program)
+        let result = await Koka.runAsync(program)
 
         expect(result).toBe('Error: User with ID 12345 not found')
         expect(logs).toEqual(['User ID: 12345'])
 
-        result = await Koka.run(
+        result = await Koka.runAsync(
             Koka.try(getUser()).handle({
                 UserNotFound: (error) => `Error: ${error}`,
                 UserInvalid: (error) => `Invalid user: ${JSON.stringify(error, null, 2)}`,
@@ -348,112 +348,5 @@ describe('design first approach', () => {
 
         expect(result).toBe(`Invalid user: ${JSON.stringify({ reason: 'Missing user ID' }, null, 2)}`)
         expect(logs).toEqual(['User ID: 12345', 'User ID is missing, throwing UserInvalidErr'])
-    })
-})
-
-describe('Koka.runUnSafe', () => {
-    it('should handle sync effects with explicit type annotation', () => {
-        class TestOpt extends Opt.Opt('TestOpt')<string> {}
-
-        function* test(): Generator<TestOpt, string> {
-            const value = yield* Opt.get(TestOpt)
-            return value ?? 'default'
-        }
-
-        const result: string = Koka.runThrow(test())
-        expect(result).toBe('default')
-    })
-
-    it('should handle async effects with explicit type annotation', async () => {
-        function* test(): Generator<Async.Async, number> {
-            const value = yield* Async.await(Promise.resolve(42))
-            return value * 2
-        }
-
-        const result: number | Promise<number> = Koka.runThrow(test())
-        const resolved = await result
-        expect(resolved).toBe(84)
-    })
-
-    it('should handle error effects with explicit type annotation', () => {
-        class TestError extends Err.Err('TestError')<string> {}
-
-        function* test(): Generator<TestError, string> {
-            yield* Err.throw(new TestError('error message'))
-            return 'should not reach here'
-        }
-
-        expect(() => {
-            Koka.runThrow(test())
-        }).toThrow()
-    })
-
-    it('should handle context effects with explicit type annotation', () => {
-        class TestCtx extends Ctx.Ctx('TestCtx')<number> {}
-
-        function* test(): Generator<TestCtx, number> {
-            const value = yield* Ctx.get(TestCtx)
-            return value * 2
-        }
-
-        expect(() => {
-            Koka.runThrow(test())
-        }).toThrow()
-    })
-
-    it('should handle option effects with explicit type annotation', () => {
-        class TestOpt extends Opt.Opt('TestOpt')<string> {}
-
-        function* test(): Generator<TestOpt, string> {
-            const value = yield* Opt.get(TestOpt)
-            return value ?? 'default'
-        }
-
-        const result: string = Koka.runThrow(test())
-        expect(result).toBe('default')
-    })
-
-    it('should handle async function input with explicit type annotation', async () => {
-        function* test(): Generator<Async.Async, number> {
-            const value = yield* Async.await(Promise.resolve(42))
-            return value * 2
-        }
-
-        const result: number | Promise<number> = Koka.runThrow(() => test())
-        const resolved = await result
-        expect(resolved).toBe(84)
-    })
-
-    it('should handle nested generators with explicit type annotation', async () => {
-        function* inner(): Generator<Async.Async, number> {
-            return yield* Async.await(Promise.resolve(21))
-        }
-
-        function* outer(): Generator<Async.Async, number> {
-            const value = yield* inner()
-            return value * 2
-        }
-
-        const result: number | Promise<number> = Koka.runThrow(outer())
-        const resolved = await result
-        expect(resolved).toBe(42)
-    })
-
-    it('should handle error propagation in async effects with explicit type annotation', async () => {
-        function* test(): Generator<Async.Async, string> {
-            try {
-                yield* Async.await(Promise.reject(new Error('Async error')))
-                return 'should not reach here'
-            } catch (err) {
-                if (err instanceof Error) {
-                    return `Caught: ${err.message}`
-                }
-                throw err
-            }
-        }
-
-        const result: string | Promise<string> = Koka.runThrow(test())
-        const resolved = await result
-        expect(resolved).toBe('Caught: Async error')
     })
 })

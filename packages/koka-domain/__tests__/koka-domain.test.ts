@@ -230,8 +230,8 @@ describe('TodoAppDomain', () => {
     })
 
     it('should add todo', async () => {
-        const result0 = await Result.run(todoApp$.updateInput('Test todo'))
-        const result1 = await Result.run(todoApp$.addTodo())
+        const result0 = await Result.runAsync(todoApp$.updateInput('Test todo'))
+        const result1 = await Result.runAsync(todoApp$.addTodo())
 
         const state = store.getState()
 
@@ -241,49 +241,49 @@ describe('TodoAppDomain', () => {
     })
 
     it('should clear input after adding todo', async () => {
-        await Result.run(todoApp$.updateInput('Test todo'))
-        await Result.run(todoApp$.addTodo())
+        await Result.runAsync(todoApp$.updateInput('Test todo'))
+        await Result.runAsync(todoApp$.addTodo())
 
         const state = store.getState()
         expect(state.input).toBe('')
     })
 
     it('should update todo text', async () => {
-        await Result.run(todoApp$.updateInput('Todo 1'))
-        await Result.run(todoApp$.addTodo())
-        await Result.run(todoApp$.updateInput('Todo 2'))
-        await Result.run(todoApp$.addTodo())
+        await Result.runAsync(todoApp$.updateInput('Todo 1'))
+        await Result.runAsync(todoApp$.addTodo())
+        await Result.runAsync(todoApp$.updateInput('Todo 2'))
+        await Result.runAsync(todoApp$.addTodo())
 
         const todoId = store.getState().todos[0].id
-        Result.run(todoApp$.todos$.todo(todoId).updateTodoText('Updated text'))
+        Result.runSync(todoApp$.todos$.todo(todoId).updateTodoText('Updated text'))
 
         const state = store.getState()
         expect(state.todos[0].text).toBe('Updated text')
     })
 
     it('should toggle todo status', async () => {
-        await Result.run(todoApp$.updateInput('Todo 1'))
-        await Result.run(todoApp$.addTodo())
-        await Result.run(todoApp$.updateInput('Todo 2'))
-        await Result.run(todoApp$.addTodo())
+        await Result.runAsync(todoApp$.updateInput('Todo 1'))
+        await Result.runAsync(todoApp$.addTodo())
+        await Result.runAsync(todoApp$.updateInput('Todo 2'))
+        await Result.runAsync(todoApp$.addTodo())
 
         const todoId = store.getState().todos[0].id
-        Result.run(todoApp$.todos$.todo(todoId).toggleTodo())
+        Result.runSync(todoApp$.todos$.todo(todoId).toggleTodo())
 
         const state = store.getState()
         expect(state.todos[0].done).toBe(true)
     })
 
     it('should filter active todos', async () => {
-        await Result.run(todoApp$.updateInput('Active 1'))
-        await Result.run(todoApp$.addTodo())
-        await Result.run(todoApp$.updateInput('Active 2'))
-        await Result.run(todoApp$.addTodo())
-        await Result.run(todoApp$.updateInput('Completed 1'))
-        await Result.run(todoApp$.addTodo())
+        await Result.runAsync(todoApp$.updateInput('Active 1'))
+        await Result.runAsync(todoApp$.addTodo())
+        await Result.runAsync(todoApp$.updateInput('Active 2'))
+        await Result.runAsync(todoApp$.addTodo())
+        await Result.runAsync(todoApp$.updateInput('Completed 1'))
+        await Result.runAsync(todoApp$.addTodo())
 
         const todoId = store.getState().todos[2].id
-        Result.run(todoApp$.todos$.todo(todoId).toggleTodo())
+        Result.runSync(todoApp$.todos$.todo(todoId).toggleTodo())
 
         const result = getState(todoApp$.todos$.activeTodoList$)
 
@@ -296,15 +296,15 @@ describe('TodoAppDomain', () => {
     })
 
     it('should filter completed todos', async () => {
-        await Result.run(todoApp$.updateInput('Active 1'))
-        await Result.run(todoApp$.addTodo())
-        await Result.run(todoApp$.updateInput('Active 2'))
-        await Result.run(todoApp$.addTodo())
-        await Result.run(todoApp$.updateInput('Completed 1'))
-        await Result.run(todoApp$.addTodo())
+        await Result.runAsync(todoApp$.updateInput('Active 1'))
+        await Result.runAsync(todoApp$.addTodo())
+        await Result.runAsync(todoApp$.updateInput('Active 2'))
+        await Result.runAsync(todoApp$.addTodo())
+        await Result.runAsync(todoApp$.updateInput('Completed 1'))
+        await Result.runAsync(todoApp$.addTodo())
 
         const todoId = store.getState().todos[2].id
-        Result.run(todoApp$.todos$.todo(todoId).toggleTodo())
+        Result.runSync(todoApp$.todos$.todo(todoId).toggleTodo())
 
         const result = getState(todoApp$.todos$.completedTodoList$)
 
@@ -317,15 +317,15 @@ describe('TodoAppDomain', () => {
     })
 
     it('should get active todo texts', async () => {
-        await Result.run(todoApp$.updateInput('Active 1'))
-        await Result.run(todoApp$.addTodo())
-        await Result.run(todoApp$.updateInput('Active 2'))
-        await Result.run(todoApp$.addTodo())
-        await Result.run(todoApp$.updateInput('Completed 1'))
-        await Result.run(todoApp$.addTodo())
+        await Result.runAsync(todoApp$.updateInput('Active 1'))
+        await Result.runAsync(todoApp$.addTodo())
+        await Result.runAsync(todoApp$.updateInput('Active 2'))
+        await Result.runAsync(todoApp$.addTodo())
+        await Result.runAsync(todoApp$.updateInput('Completed 1'))
+        await Result.runAsync(todoApp$.addTodo())
 
         const todoId = store.getState().todos[2].id
-        Result.run(todoApp$.todos$.todo(todoId).toggleTodo())
+        Result.runSync(todoApp$.todos$.todo(todoId).toggleTodo())
 
         const result = getState(todoApp$.todos$.activeTodoTextList$)
 
@@ -337,15 +337,15 @@ describe('TodoAppDomain', () => {
     })
 
     it('should get completed todo texts', async () => {
-        await Result.run(todoApp$.updateInput('Active 1'))
-        await Result.run(todoApp$.addTodo())
-        await Result.run(todoApp$.updateInput('Active 2'))
-        await Result.run(todoApp$.addTodo())
-        await Result.run(todoApp$.updateInput('Completed 1'))
-        await Result.run(todoApp$.addTodo())
+        await Result.runAsync(todoApp$.updateInput('Active 1'))
+        await Result.runAsync(todoApp$.addTodo())
+        await Result.runAsync(todoApp$.updateInput('Active 2'))
+        await Result.runAsync(todoApp$.addTodo())
+        await Result.runAsync(todoApp$.updateInput('Completed 1'))
+        await Result.runAsync(todoApp$.addTodo())
 
         const todoId = store.getState().todos[2].id
-        Result.run(todoApp$.todos$.todo(todoId).toggleTodo())
+        Result.runSync(todoApp$.todos$.todo(todoId).toggleTodo())
 
         const result = getState(todoApp$.todos$.completedTodoTextList$)
 
@@ -357,7 +357,7 @@ describe('TodoAppDomain', () => {
     })
 
     it('should handle async input update', async () => {
-        const result = await Result.run(todoApp$.updateInput('Async test'))
+        const result = await Result.runAsync(todoApp$.updateInput('Async test'))
 
         if (result.type === 'err') {
             throw new Error('Expected success but got error')
@@ -678,7 +678,7 @@ describe('Cache mechanism', () => {
         const result3 = getState(unchangedTodo$)
         const result4 = getState(willChangedTodo$)
 
-        Result.run(willChangedTodo$.toggleTodo())
+        Result.runSync(willChangedTodo$.toggleTodo())
 
         const result5 = getState(unchangedTodo$)
         const result6 = getState(willChangedTodo$)
@@ -701,7 +701,7 @@ describe('Cache mechanism', () => {
     })
 
     it('should cache query results', async () => {
-        const result1 = Result.run(todoApp$.getTodoSummary())
+        const result1 = Result.runSync(todoApp$.getTodoSummary())
 
         expect(result1).toEqual(
             Result.ok({
@@ -711,12 +711,12 @@ describe('Cache mechanism', () => {
             }),
         )
 
-        const result2 = Result.run(todoApp$.getTodoSummary())
+        const result2 = Result.runSync(todoApp$.getTodoSummary())
         expect(shallowEqualResult(result1, result2)).toBe(true)
     })
 
     it('should invalidate query cache when dependencies change', async () => {
-        const result1 = Result.run(todoApp$.getTodoSummary())
+        const result1 = Result.runSync(todoApp$.getTodoSummary())
         const todo$ = todoApp$.todos$.todo(1)
 
         const result2 = getState(todo$)
@@ -731,16 +731,16 @@ describe('Cache mechanism', () => {
 
         expect(result2).toEqual(Result.ok({ id: 1, text: 'test', done: false }))
 
-        const result3 = Result.run(todoApp$.getTodoSummary())
+        const result3 = Result.runSync(todoApp$.getTodoSummary())
         const result4 = getState(todo$)
 
         expect(shallowEqualResult(result1, result3)).toBe(true)
         expect(shallowEqualResult(result2, result4)).toBe(true)
 
-        Result.run(todoApp$.todos$.todo(1).updateTodoText('test4'))
+        Result.runSync(todoApp$.todos$.todo(1).updateTodoText('test4'))
 
         const result5 = getState(todo$)
-        const result6 = Result.run(todoApp$.getTodoSummary())
+        const result6 = Result.runSync(todoApp$.getTodoSummary())
 
         expect(shallowEqualResult(result2, result5)).toBe(false)
         expect(shallowEqualResult(result1, result6)).toBe(true)
@@ -768,7 +768,7 @@ describe('Query functionality', () => {
     })
 
     it('should execute query and return filtered todos', async () => {
-        const result1 = Result.run(todoApp$.getFilteredTodoList())
+        const result1 = Result.runSync(todoApp$.getFilteredTodoList())
 
         expect(result1).toEqual(
             Result.ok([
@@ -778,15 +778,15 @@ describe('Query functionality', () => {
             ]),
         )
 
-        const result2 = Result.run(todoApp$.getFilteredTodoList())
+        const result2 = Result.runSync(todoApp$.getFilteredTodoList())
         expect(shallowEqualResult(result1, result2)).toBe(true)
 
         setState(todoApp$.filter$, 'done')
 
-        const result3 = Result.run(todoApp$.getFilteredTodoList())
+        const result3 = Result.runSync(todoApp$.getFilteredTodoList())
         expect(shallowEqualResult(result1, result3)).toBe(false)
 
-        const result4 = Result.run(todoApp$.getFilteredTodoList())
+        const result4 = Result.runSync(todoApp$.getFilteredTodoList())
         expect(shallowEqualResult(result3, result4)).toBe(true)
 
         expect(result4).toEqual(Result.ok([{ id: 2, text: 'todo 2', done: true }]))
@@ -795,7 +795,7 @@ describe('Query functionality', () => {
     it('should filter todos by done status', async () => {
         setState(todoApp$.filter$, 'done')
 
-        const result = Result.run(todoApp$.getFilteredTodoList())
+        const result = Result.runSync(todoApp$.getFilteredTodoList())
         expect(result).toEqual(Result.ok([store.getState().todos[1]]))
     })
 
@@ -803,45 +803,45 @@ describe('Query functionality', () => {
         // Set filter to undone
         setState(todoApp$.filter$, 'undone')
 
-        const result = Result.run(todoApp$.getFilteredTodoList())
+        const result = Result.runSync(todoApp$.getFilteredTodoList())
         expect(result).toEqual(Result.ok(store.getState().todos.filter((todo) => !todo.done)))
     })
 
     it('should cache query results', async () => {
         // First call
-        const result1 = Result.run(todoApp$.getFilteredTodoList())
+        const result1 = Result.runSync(todoApp$.getFilteredTodoList())
         expect(result1.type).toBe('ok')
 
         // Second call should return cached result
-        const result2 = Result.run(todoApp$.getFilteredTodoList())
+        const result2 = Result.runSync(todoApp$.getFilteredTodoList())
         expect(shallowEqualResult(result2, result1)).toBe(true)
     })
 
     it('should invalidate cache when dependencies change', () => {
         // First call
-        const result1 = Result.run(todoApp$.getFilteredTodoList())
+        const result1 = Result.runSync(todoApp$.getFilteredTodoList())
         expect(result1.type).toBe('ok')
 
         // Change filter
         setState(todoApp$.filter$, 'done')
 
         // Second call should return new result
-        const result2 = Result.run(todoApp$.getFilteredTodoList())
+        const result2 = Result.runSync(todoApp$.getFilteredTodoList())
         expect(shallowEqualResult(result2, result1)).toBe(false)
         expect(result2).toEqual(Result.ok([store.getState().todos[1]]))
     })
 
     it('should invalidate cache when todos change', async () => {
         // First call
-        const result1 = Result.run(todoApp$.getFilteredTodoList())
+        const result1 = Result.runSync(todoApp$.getFilteredTodoList())
         expect(result1.type).toBe('ok')
 
         // Add a new todo
-        await Result.run(todoApp$.updateInput('new todo'))
-        await Result.run(todoApp$.addTodo())
+        await Result.runAsync(todoApp$.updateInput('new todo'))
+        await Result.runAsync(todoApp$.addTodo())
 
         // Second call should return new result
-        const result2 = Result.run(todoApp$.getFilteredTodoList())
+        const result2 = Result.runSync(todoApp$.getFilteredTodoList())
 
         expect(result2).toEqual(
             Result.ok([
@@ -858,7 +858,7 @@ describe('Query functionality', () => {
     it('should handle errors in query execution', () => {
         const errorDomain = new ErrorQueryDomain(store.domain)
 
-        const result = Result.run(errorDomain.errorQuery())
+        const result = Result.runSync(errorDomain.errorQuery())
         expect(result.type).toBe('err')
     })
 })
@@ -886,14 +886,14 @@ describe('Subscription mechanisms', () => {
         const listener = jest.fn()
         const unsubscribe = subscribeDomainState(todoApp$.input$, listener)
 
-        await Result.run(todoApp$.updateInput('new input'))
+        await Result.runAsync(todoApp$.updateInput('new input'))
 
         await store.promise
 
         expect(listener).toHaveBeenCalledWith('new input')
         unsubscribe()
 
-        await Result.run(todoApp$.updateInput('new input 2'))
+        await Result.runAsync(todoApp$.updateInput('new input 2'))
 
         await store.promise
 
@@ -904,7 +904,7 @@ describe('Subscription mechanisms', () => {
         const listener = jest.fn()
         const unsubscribe = subscribeDomainResult(todoApp$.input$, listener)
 
-        await Result.run(todoApp$.updateInput('new input'))
+        await Result.runAsync(todoApp$.updateInput('new input'))
 
         await store.promise
 
@@ -917,7 +917,7 @@ describe('Subscription mechanisms', () => {
         const unsubscribe = subscribeDomainResult(todoApp$.input$, listener)
 
         // Set the same value
-        await Result.run(todoApp$.updateInput(''))
+        await Result.runAsync(todoApp$.updateInput(''))
         await store.promise
 
         expect(listener).not.toHaveBeenCalled()
@@ -936,7 +936,7 @@ describe('Subscription mechanisms', () => {
         // Mark todo as done
         const todoId = store.getState().todos[0].id
 
-        Result.run(todoApp$.todos$.todo(todoId).toggleTodo())
+        Result.runSync(todoApp$.todos$.todo(todoId).toggleTodo())
         setState(todoApp$.filter$, 'done')
 
         await store.promise
@@ -946,7 +946,7 @@ describe('Subscription mechanisms', () => {
             { id: 2, text: 'todo 2', done: true },
         ])
 
-        Result.run(todoApp$.todos$.todo(3).updateTodoText('test 3 updated'))
+        Result.runSync(todoApp$.todos$.todo(3).updateTodoText('test 3 updated'))
 
         await store.promise
 
@@ -1014,7 +1014,7 @@ describe('Event functionality', () => {
     })
 
     it('should trigger event handler', async () => {
-        Result.run(todoApp$.todos$.todo(1).removeTodo())
+        await Result.runAsync(todoApp$.todos$.todo(1).removeTodo())
 
         await store.promise
 

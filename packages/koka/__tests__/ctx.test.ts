@@ -31,7 +31,7 @@ describe('Ctx', () => {
             TestCtx: 21,
         })
 
-        const result = Koka.run(program1)
+        const result = Koka.runSync(program1)
         expect(result).toBe(42)
     })
 
@@ -50,7 +50,7 @@ describe('Ctx', () => {
             TestCtx: 42,
         })
 
-        const result = Koka.run(program)
+        const result = Koka.runSync(program)
         expect(result).toBe(42)
     })
 
@@ -66,7 +66,7 @@ describe('Ctx', () => {
             User: { id: '1', name: 'Alice', role: 'admin' },
         })
 
-        const result = Koka.run(program)
+        const result = Koka.runSync(program)
         expect(result).toBe('Alice (admin)')
     })
 
@@ -89,7 +89,7 @@ describe('Ctx', () => {
             Auth: { token: 'secret-token' },
         })
 
-        const result = Koka.run(program)
+        const result = Koka.runSync(program)
         expect(result).toBe('https://api.example.com with token secret-token')
     })
 })

@@ -247,13 +247,12 @@ export function* emit<D extends AnyDomain, E extends AnyEvent>(domain: D, event:
 
             parent?.events.push(eventTree)
 
-            const effector = Task.all(eventHandlerList.map((eventHandler) => eventHandler(event)))
+            const eventPhase = Task.all(eventHandlerList.map((eventHandler) => eventHandler(event)))
+            const tracerPhase = Koka.try(eventPhase).handle({
+                [EventTracerOpt.field]: eventTree,
+            })
 
-            const result = Result.run(
-                Koka.try(effector).handle({
-                    [EventTracerOpt.field]: eventTree,
-                }),
-            ) as Result.Result<unknown, Err.AnyErr>
+            const result = yield* Async.await(Result.runAsync(tracerPhase))
 
             if (result.type === 'err') {
                 throw yield* Err.throw(result) as any
@@ -623,10 +622,10 @@ export function query() {
 
 const queryResultWeakMap = new WeakMap<Query<any, any>, Result.Result<any, any>>()
 
-export function getQueryResult<Return, Yield extends Err.AnyErr = Err.AnyErr>(
-    query: Query<Return, Yield>,
-): Result.Result<Return, Err.ExtractErr<Yield>> {
-    const result = Result.run(query())
+export function getQueryResult<Return, E extends Err.AnyErr = Err.AnyErr>(
+    query: Query<Return, E>,
+): Result.Result<Return, E> {
+    const result = Result.runSync(query())
 
     const previousResult = queryResultWeakMap.get(query)
 
@@ -636,7 +635,7 @@ export function getQueryResult<Return, Yield extends Err.AnyErr = Err.AnyErr>(
 
     queryResultWeakMap.set(query, result)
 
-    return result
+    return result as Result.Result<Return, E>
 }
 
 export function getQueryState<Return, Yield extends Err.AnyErr = Err.AnyErr>(query: Query<Return, Yield>): Return {
@@ -879,7 +878,7 @@ export function* set<State, Root>(
 const previousResultWeakMap = new WeakMap<PureDomain<any, any>, Result.Result<any, any>>()
 
 export function getState<State, Root>(domain: PureDomain<State, Root>): Result.Result<State, Accessor.AccessorErr> {
-    const result = Result.run(get(domain))
+    const result = Result.runSync(get(domain))
 
     const previousResult = previousResultWeakMap.get(domain)
 
@@ -891,14 +890,14 @@ export function getState<State, Root>(domain: PureDomain<State, Root>): Result.R
 
     previousResultWeakMap.set(domain, result)
 
-    return result
+    return result as Result.Result<State, Accessor.AccessorErr>
 }
 
 export function setState<State, Root>(
     domain: PureDomain<State, Root>,
     setStateInput: SetStateInput<State>,
 ): Result.Result<Root, Accessor.AccessorErr> {
-    return Result.run(set(domain, setStateInput))
+    return Result.runSync(set(domain, setStateInput)) as Result.Result<Root, Accessor.AccessorErr>
 }
 
 export function subscribeDomainResult<State, Root>(

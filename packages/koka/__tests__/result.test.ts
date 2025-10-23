@@ -45,7 +45,7 @@ describe('Result.toErr', () => {
             return value
         }
 
-        const result = Koka.run(testSuccess)
+        const result = Koka.runSync(testSuccess)
 
         expect(result).toBe(42)
     })
@@ -57,7 +57,7 @@ describe('Result.toErr', () => {
             yield* Result.unwrap(Result.wrap(Err.throw(new TestError('error'))))
         }
 
-        const failureResult = Koka.run(
+        const failureResult = Koka.runSync(
             Koka.try(testFailure).handle({
                 TestError: (error) => `Caught: ${error}`,
             }),
@@ -67,7 +67,7 @@ describe('Result.toErr', () => {
     })
 })
 
-describe('Result.run', () => {
+describe('run Result', () => {
     it('should run generator and return Result', async () => {
         class ZeroError extends Err.Err('ZeroError')<string> {}
 
@@ -81,7 +81,7 @@ describe('Result.run', () => {
             return value
         }
 
-        const result: Async.MaybePromise<Result.Ok<number> | Err.AnyErr> = Result.run(program(42))
+        const result: Promise<Result.Ok<number> | Err.AnyErr> = Result.runAsync(program(42))
 
         expect(await result).toEqual({
             type: 'ok',
@@ -97,7 +97,7 @@ describe('Result.run', () => {
             return 'should not reach here'
         }
 
-        const result: Result.Result<string, Err.AnyErr> = Result.run(program)
+        const result: Result.Result<string, Err.AnyErr> = Result.runSync(program)
 
         expect(result).toEqual({
             type: 'err',
@@ -125,6 +125,7 @@ describe('Result.runSync', () => {
             yield* Async.await(Promise.resolve(42))
         }
 
+        // @ts-expect-error for test
         expect(() => Result.runSync(asyncProgram)).toThrow()
     })
 
@@ -194,7 +195,7 @@ describe('Result.wrap', () => {
             return 42
         }
 
-        const result = Koka.run(Result.wrap(success()))
+        const result = Koka.runSync(Result.wrap(success()))
         expect(result).toEqual({
             type: 'ok',
             value: 42,
@@ -209,7 +210,7 @@ describe('Result.wrap', () => {
             return 'should not reach here'
         }
 
-        const result = Koka.run(Result.wrap(failure()))
+        const result = Koka.runSync(Result.wrap(failure()))
         expect(result).toEqual({
             type: 'err',
             name: 'TestError',
@@ -223,7 +224,7 @@ describe('Result.wrap', () => {
             return value * 2
         }
 
-        const result = await Koka.run(Result.wrap(asyncSuccess()))
+        const result = await Koka.runAsync(Result.wrap(asyncSuccess()))
         expect(result).toEqual({
             type: 'ok',
             value: 84,
@@ -238,7 +239,7 @@ describe('Result.unwrap', () => {
             return value * 2
         }
 
-        const result = Koka.run(test())
+        const result = Koka.runSync(test())
         expect(result).toBe(84)
     })
 
@@ -250,7 +251,7 @@ describe('Result.unwrap', () => {
             return 'should not reach here'
         }
 
-        const result = Result.run(test())
+        const result = Result.runSync(test())
         expect(result).toEqual({
             type: 'err',
             name: 'TestError',
@@ -265,7 +266,7 @@ describe('Result.unwrap', () => {
             return value1 + value2
         }
 
-        const result = Koka.run(test())
+        const result = Koka.runSync(test())
         expect(result).toBe(42)
     })
 })

@@ -10,7 +10,7 @@ describe('Opt', () => {
             return yield* Opt.get(TestOpt)
         }
 
-        const result = Koka.run(test())
+        const result = Koka.runSync(test())
         expect(result).toBeUndefined()
     })
 
@@ -22,7 +22,7 @@ describe('Opt', () => {
             return optValue ?? 42
         }
 
-        const result = Koka.run(Koka.try(test()).handle({ TestOpt: 21 }))
+        const result = Koka.runSync(Koka.try(test()).handle({ TestOpt: 21 }))
         expect(result).toBe(21)
     })
 
@@ -35,7 +35,7 @@ describe('Opt', () => {
             return asyncValue
         }
 
-        const result = await Koka.run(test())
+        const result = await Koka.runAsync(test())
         expect(result).toBe(42)
     })
 
@@ -47,7 +47,7 @@ describe('Opt', () => {
             return optValue ?? 100
         }
 
-        const result = Koka.run(Koka.try(test()).handle({ TestOpt: undefined }))
+        const result = Koka.runSync(Koka.try(test()).handle({ TestOpt: undefined }))
         expect(result).toBe(100)
     })
 
@@ -59,7 +59,7 @@ describe('Opt', () => {
             return config ?? { theme: 'dark', language: 'en' }
         }
 
-        const result = Koka.run(
+        const result = Koka.runSync(
             Koka.try(test()).handle({
                 Config: { theme: 'light', language: 'zh' },
             }),
@@ -80,7 +80,7 @@ describe('Opt', () => {
         const logs: string[] = []
         const logger = (message: string) => logs.push(message)
 
-        const result = Koka.run(Koka.try(test()).handle({ Logger: logger }))
+        const result = Koka.runSync(Koka.try(test()).handle({ Logger: logger }))
         expect(result).toBe('Hello, World!')
         expect(logs).toEqual(['Hello, World!'])
     })
@@ -102,7 +102,7 @@ describe('Opt', () => {
             }
         }
 
-        const result = Koka.run(
+        const result = Koka.runSync(
             Koka.try(test()).handle({
                 Theme: 'light',
                 Debug: true,

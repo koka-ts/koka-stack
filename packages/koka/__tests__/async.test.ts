@@ -8,7 +8,7 @@ describe('Async', () => {
             return value * 2
         }
 
-        const result = await Koka.run(test())
+        const result = await Koka.runAsync(test())
         expect(result).toBe(84)
     })
 
@@ -25,7 +25,7 @@ describe('Async', () => {
             }
         }
 
-        const result = await Koka.run(test())
+        const result = await Koka.runAsync(test())
         expect(result).toBe('Caught: Async error')
     })
 
@@ -36,7 +36,7 @@ describe('Async', () => {
             return syncValue + asyncValue
         }
 
-        const result = await Koka.run(test())
+        const result = await Koka.runAsync(test())
         expect(result).toBe(42)
     })
 
@@ -48,7 +48,7 @@ describe('Async', () => {
             return value1 + value2 + value3
         }
 
-        const result = await Koka.run(test())
+        const result = await Koka.runAsync(test())
         expect(result).toBe(6)
     })
 
@@ -60,7 +60,7 @@ describe('Async', () => {
             return end - start
         }
 
-        const result = await Koka.run(test())
+        const result = await Koka.runAsync(test())
         expect(result).toBeGreaterThanOrEqual(10)
     })
 
@@ -76,7 +76,7 @@ describe('Async', () => {
             return `${user.name} (${user.email})`
         }
 
-        const result = await Koka.run(test())
+        const result = await Koka.runAsync(test())
         expect(result).toBe('Alice (alice@example.com)')
     })
 
@@ -86,7 +86,7 @@ describe('Async', () => {
             return numbers.reduce((sum, num) => sum + num, 0)
         }
 
-        const result = await Koka.run(test())
+        const result = await Koka.runAsync(test())
         expect(result).toBe(15)
     })
 
@@ -97,7 +97,7 @@ describe('Async', () => {
             return { nullValue, undefinedValue }
         }
 
-        const result = await Koka.run(test())
+        const result = await Koka.runAsync(test())
         expect(result).toEqual({ nullValue: null, undefinedValue: undefined })
     })
 })

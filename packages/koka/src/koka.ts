@@ -82,9 +82,24 @@ function tryEffect<Yield extends AnyEff, Return>(input: Effector<Yield, Return>)
 
 export { tryEffect as try }
 
-export function run<Return>(input: Effector<AnyOpt, Return>): Return
-export function run<Return>(input: Effector<Async | AnyOpt, Return>): MaybePromise<Return>
-export function run<Return>(input: Effector<Async | AnyOpt, Return>): MaybePromise<Return> {
+export function runSync<Return>(input: Effector<AnyOpt, Return>): Return {
+    const gen = typeof input === 'function' ? input() : input
+    let result = gen.next()
+
+    while (!result.done) {
+        const effect = result.value
+
+        if (effect.type === 'opt') {
+            result = gen.next()
+        } else {
+            throw new Error(`Unhandled effect: ${JSON.stringify(effect, null, 2)}`)
+        }
+    }
+
+    return result.value
+}
+
+export function runAsync<Return>(input: Effector<Async | AnyOpt, Return>): Promise<Return> {
     const gen = typeof input === 'function' ? input() : input
 
     const process = (result: IteratorResult<Async | AnyOpt, Return>): MaybePromise<Return> => {
@@ -110,27 +125,9 @@ export function run<Return>(input: Effector<Async | AnyOpt, Return>): MaybePromi
         return result.value as MaybePromise<Return>
     }
 
-    return process(gen.next())
-}
-
-export function runSync<Return>(actor: Effector<AnyOpt, Return>): Return {
-    const result = run(actor)
-
-    if (result instanceof Promise) {
-        throw new Error('Expected synchronous effect, but got asynchronous effect')
-    }
-
-    return result
-}
-
-export function runAsync<Return>(actor: Effector<Async | AnyOpt, Return>): Promise<Return> {
-    return Promise.resolve(run(actor))
-}
-
-export function runThrow<Yield extends AnyEff, Return>(
-    input: Effector<Yield, Return>,
-): Async extends Yield ? MaybePromise<Return> : Return {
-    return run(input as any) as any
+    return new Promise((resolve) => {
+        resolve(process(gen.next()))
+    })
 }
 
 export type ExtractEffFromObject<Gens extends object> = {

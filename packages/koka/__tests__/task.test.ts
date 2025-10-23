@@ -41,7 +41,7 @@ describe('Task.fromTuple', () => {
             return results[0] + Number(results[1])
         }
 
-        const result = await Koka.run(program())
+        const result = await Koka.runAsync(program())
         expect(result).toBe(3)
     })
 
@@ -63,7 +63,7 @@ describe('Task.fromTuple', () => {
             return results[0] + results[1]
         }
 
-        const result = await Koka.run(program())
+        const result = await Koka.runAsync(program())
         expect(result).toBe(3)
     })
 })
@@ -91,7 +91,7 @@ describe('Task.fromObject', () => {
             return results.a + results.b + results.c
         }
 
-        const result = await Koka.run(program())
+        const result = await Koka.runAsync(program())
         expect(result).toBe(6)
     })
 
@@ -113,11 +113,11 @@ describe('Task.fromObject', () => {
             return results.a + results.b + results.c
         }
 
-        const result = await Koka.run(program())
+        const result = await Koka.runAsync(program())
         expect(result).toBe(4)
     })
 
-    it('should handle errors in object input', () => {
+    it('should handle errors in object input', async () => {
         class TestErr extends Err.Err('TestErr')<string> {}
 
         function* effect1() {
@@ -140,7 +140,7 @@ describe('Task.fromObject', () => {
             return results.a + results.b
         }
 
-        const result = Result.run(program())
+        const result = await Result.runAsync(program())
         expect(result).toEqual({
             type: 'err',
             name: 'TestErr',
@@ -154,7 +154,7 @@ describe('Task.fromObject', () => {
             return results
         }
 
-        const result = await Koka.run(program())
+        const result = await Koka.runAsync(program())
         expect(result).toEqual({})
     })
 
@@ -183,7 +183,7 @@ describe('Task.fromObject', () => {
         }
 
         const start = Date.now()
-        const result = await Result.run(program())
+        const result = await Result.runAsync(program())
         const duration = Date.now() - start
 
         expect(result).toEqual({
@@ -201,7 +201,7 @@ describe('Task.fromObject', () => {
             return results
         }
 
-        const result = await Koka.run(program())
+        const result = await Koka.runAsync(program())
         expect(result).toEqual([])
     })
 
@@ -219,7 +219,7 @@ describe('Task.fromObject', () => {
             return results[0] + results[1]
         }
 
-        const result = await Koka.run(program())
+        const result = await Koka.runAsync(program())
         expect(result).toBe(3)
     })
 
@@ -238,7 +238,7 @@ describe('Task.fromObject', () => {
             }
         }
 
-        const result = await Koka.run(program())
+        const result = await Koka.runAsync(program())
 
         expect(result).toBeInstanceOf(Error)
         expect((result as Error).message).toBe('Async error')
@@ -256,7 +256,7 @@ describe('Task.fromObject', () => {
             return results[0] + results[1]
         }
 
-        await expect(Koka.run(program())).rejects.toThrow('Async error')
+        await expect(Koka.runAsync(program())).rejects.toThrow('Async error')
     })
 
     it('should handle thrown errors in async effects', async () => {
@@ -287,7 +287,7 @@ describe('Task.fromObject', () => {
             }
         }
 
-        const result = await Koka.run(program())
+        const result = await Koka.runAsync(program())
         expect(result).toBe(-100)
     })
 })
@@ -310,7 +310,7 @@ describe('Task.race', () => {
         }
 
         const inputs = [slowEffect(), fastEffect()]
-        const result = await Koka.run(Task.race(inputs))
+        const result = await Koka.runAsync(Task.race(inputs))
 
         expect(result).toBe('fast')
         expect(cleanupCalled).toBe(true)
@@ -318,7 +318,7 @@ describe('Task.race', () => {
 })
 
 describe('Task.all', () => {
-    it('should handle errors in effects', () => {
+    it('should handle errors in effects', async () => {
         class TestErr extends Err.Err('TestErr')<string> {}
 
         function* effect1() {
@@ -335,7 +335,7 @@ describe('Task.all', () => {
             return results[0] + results[1]
         }
 
-        const result = Result.run(program())
+        const result = await Result.runAsync(program())
         expect(result).toEqual({
             type: 'err',
             name: 'TestErr',
@@ -359,7 +359,7 @@ describe('Task.all', () => {
             return results
         }
 
-        const result = await Koka.run(program())
+        const result = await Koka.runAsync(program())
         expect(result).toEqual([1, 2])
     })
 })
@@ -385,7 +385,7 @@ describe('Task.concurrent', () => {
             return 42
         }
 
-        const result = await Koka.run(Task.concurrent(inputs, handler))
+        const result = await Koka.runAsync(Task.concurrent(inputs, handler))
         expect(result).toBe(42)
         expect(returnFn).toHaveBeenCalledTimes(0)
         expect(cleanUp).toHaveBeenCalledTimes(4)
@@ -421,7 +421,7 @@ describe('Task.concurrent', () => {
             throw new Error('Early return')
         }
 
-        const results = await Koka.run(Task.concurrent(inputs, handler))
+        const results = await Koka.runAsync(Task.concurrent(inputs, handler))
 
         expect(results).toEqual([
             { index: 3, value: 10 },
@@ -449,7 +449,7 @@ describe('Task.concurrent', () => {
             return results
         })
 
-        const result = await Koka.run(program)
+        const result = await Koka.runAsync(program)
         expect(result).toEqual([2, 4, 6])
     })
 
@@ -486,7 +486,7 @@ describe('Task.concurrent', () => {
 
         const program = Task.concurrent(inputs, handler)
 
-        const result = await Koka.run(program)
+        const result = await Koka.runAsync(program)
         expect(result).toEqual([2, 4, 6])
     })
 
@@ -507,7 +507,7 @@ describe('Task.concurrent', () => {
             return results
         }
 
-        const result = await Result.run(Task.concurrent(inputs, handler))
+        const result = await Result.runAsync(Task.concurrent(inputs, handler))
 
         expect(result).toEqual({
             type: 'err',
@@ -536,7 +536,7 @@ describe('Task.concurrent', () => {
             return results
         }
 
-        const result = await Koka.run(Task.concurrent(inputs, handler))
+        const result = await Koka.runAsync(Task.concurrent(inputs, handler))
 
         expect(result).toEqual([2, 4])
     })
@@ -566,7 +566,7 @@ describe('Task.concurrent', () => {
             }
         }
 
-        const result = await Result.run(Task.concurrent(inputs, handler))
+        const result = await Result.runAsync(Task.concurrent(inputs, handler))
         expect(result).toEqual({
             type: 'err',
             name: 'CleanupError',
@@ -590,7 +590,7 @@ describe('Task.concurrent', () => {
         }
 
         // This should not throw an unexpected completion error
-        const result = await Koka.run(Task.concurrent(inputs, handler))
+        const result = await Koka.runAsync(Task.concurrent(inputs, handler))
         expect(result).toEqual([{ index: 0, value: 42 }])
     })
 
@@ -613,7 +613,7 @@ describe('Task.concurrent', () => {
             return results
         }
 
-        const result = await Koka.run(Task.concurrent(inputs, handler))
+        const result = await Koka.runAsync(Task.concurrent(inputs, handler))
         expect(result).toEqual([
             { index: 0, value: 1 },
             { index: 1, value: 2 },
@@ -633,7 +633,7 @@ describe('Task.concurrent', () => {
             return 0
         }
 
-        const result = await Koka.run(Task.concurrent(inputs, handler))
+        const result = await Koka.runAsync(Task.concurrent(inputs, handler))
         expect(result).toBe(84)
     })
 })
@@ -674,7 +674,7 @@ describe('Stream maxConcurrency and TaskProducer', () => {
             return results
         }
 
-        const result = await Koka.run(Task.concurrent(producer, handler, { maxConcurrency }))
+        const result = await Koka.runAsync(Task.concurrent(producer, handler, { maxConcurrency }))
 
         expect(result).toEqual(['task-0', 'task-1', 'task-2', 'task-3'])
         // Verify that active task count never exceeds max concurrency limit
@@ -705,7 +705,7 @@ describe('Stream maxConcurrency and TaskProducer', () => {
             return results
         }
 
-        const result = await Koka.run(Task.concurrent(producer, handler, { maxConcurrency: 2 }))
+        const result = await Koka.runAsync(Task.concurrent(producer, handler, { maxConcurrency: 2 }))
 
         expect(result).toEqual(['item-0', 'item-1', 'item-2'])
         expect(callCount).toBe(4) // 4th call returns undefined
@@ -724,7 +724,7 @@ describe('Stream maxConcurrency and TaskProducer', () => {
             return results
         }
 
-        const result = await Koka.run(Task.concurrent(producer, handler))
+        const result = await Koka.runAsync(Task.concurrent(producer, handler))
 
         expect(result).toEqual([])
     })
@@ -753,7 +753,7 @@ describe('Stream maxConcurrency and TaskProducer', () => {
             return results
         }
 
-        const result = await Koka.run(Task.concurrent(producer, handler, { maxConcurrency: 3 }))
+        const result = await Koka.runAsync(Task.concurrent(producer, handler, { maxConcurrency: 3 }))
 
         expect(result).toEqual(['even-0', 'odd-1', 'even-2', 'odd-3', 'even-4'])
     })
@@ -786,7 +786,7 @@ describe('All maxConcurrency and TaskProducer', () => {
             return undefined
         }
 
-        const result = await Koka.run(Task.all(producer, { maxConcurrency }))
+        const result = await Koka.runAsync(Task.all(producer, { maxConcurrency }))
 
         expect(result).toEqual(['task-0', 'task-1', 'task-2', 'task-3'])
         // Verify that active task count never exceeds max concurrency limit
@@ -805,7 +805,7 @@ describe('All maxConcurrency and TaskProducer', () => {
             return undefined
         }
 
-        const result = await Koka.run(Task.all(producer))
+        const result = await Koka.runAsync(Task.all(producer))
 
         expect(result).toEqual(['item-0', 'item-1'])
     })
@@ -822,7 +822,7 @@ describe('All maxConcurrency and TaskProducer', () => {
             return undefined
         }
 
-        const result = await Koka.run(Task.all(producer, { maxConcurrency: 2 }))
+        const result = await Koka.runAsync(Task.all(producer, { maxConcurrency: 2 }))
 
         expect(result).toEqual(['item-0', 'item-1', 'item-2'])
     })
@@ -855,7 +855,7 @@ describe('Race maxConcurrency and TaskProducer', () => {
             return undefined
         }
 
-        const result = await Koka.run(Task.race(producer, { maxConcurrency }))
+        const result = await Koka.runAsync(Task.race(producer, { maxConcurrency }))
 
         // Should return the fastest task (task-0, 20ms delay)
         expect(result).toBe('task-0')
@@ -875,7 +875,7 @@ describe('Race maxConcurrency and TaskProducer', () => {
             return undefined
         }
 
-        const result = await Koka.run(Task.race(producer))
+        const result = await Koka.runAsync(Task.race(producer))
 
         expect(result).toBe('fast')
     })
@@ -896,7 +896,7 @@ describe('Race maxConcurrency and TaskProducer', () => {
             return undefined
         }
 
-        const result = await Koka.run(Task.race(producer, { maxConcurrency: 2 }))
+        const result = await Koka.runAsync(Task.race(producer, { maxConcurrency: 2 }))
 
         expect(result).toBe('fastest')
     })
@@ -922,12 +922,12 @@ describe('Edge cases for maxConcurrency', () => {
         }
 
         // Test maxConcurrency = 0
-        expect(() => Koka.run(Task.concurrent(producer, handler, { maxConcurrency: 0 }))).toThrow(
+        await expect(() => Koka.runAsync(Task.concurrent(producer, handler, { maxConcurrency: 0 }))).rejects.toThrow(
             'maxConcurrency must be greater than 0',
         )
 
         // Test maxConcurrency = -1
-        expect(() => Koka.run(Task.concurrent(producer, handler, { maxConcurrency: -1 }))).toThrow(
+        await expect(() => Koka.runAsync(Task.concurrent(producer, handler, { maxConcurrency: -1 }))).rejects.toThrow(
             'maxConcurrency must be greater than 0',
         )
     })
@@ -965,7 +965,7 @@ describe('Edge cases for maxConcurrency', () => {
             return results
         }
 
-        const result = await Koka.run(Task.concurrent(producer, handler, { maxConcurrency: 1 }))
+        const result = await Koka.runAsync(Task.concurrent(producer, handler, { maxConcurrency: 1 }))
 
         expect(result).toEqual(['item-0', 'item-1', 'item-2'])
         // Verify that max concurrency is indeed 1
@@ -1006,7 +1006,7 @@ describe('Edge cases for maxConcurrency', () => {
             return results
         }
 
-        const result = await Koka.run(Task.concurrent(producer, handler, { maxConcurrency: 1000 }))
+        const result = await Koka.runAsync(Task.concurrent(producer, handler, { maxConcurrency: 1000 }))
 
         expect(result).toEqual(['item-0', 'item-1', 'item-2', 'item-3', 'item-4'])
         // Verify all tasks can execute concurrently (max active tasks should equal total tasks)
@@ -1097,7 +1097,7 @@ describe('TaskProducer with error handling', () => {
             return results
         }
 
-        const result = await Koka.run(Task.concurrent(producer, handler, { maxConcurrency }))
+        const result = await Koka.runAsync(Task.concurrent(producer, handler, { maxConcurrency }))
 
         expect(result).toEqual(['task-0', 'task-1', 'task-2', 'task-3', 'task-4'])
 
@@ -1142,7 +1142,7 @@ describe('TaskProducer with error handling', () => {
             return results
         }
 
-        const result = await Koka.run(Task.concurrent(producer, handler))
+        const result = await Koka.runAsync(Task.concurrent(producer, handler))
 
         expect(result).toEqual(['function', 'generator'])
     })
@@ -1169,7 +1169,7 @@ describe('Task.series', () => {
             return streamResults
         }
 
-        const result = await Koka.run(Task.series(inputs, handler))
+        const result = await Koka.runAsync(Task.series(inputs, handler))
 
         expect(result).toEqual(['task-0', 'task-1', 'task-2'])
         expect(executionOrder).toEqual([0, 1, 2]) // Sequential execution
@@ -1197,7 +1197,7 @@ describe('Task.series', () => {
             return streamResults
         }
 
-        const result = await Koka.run(Task.series(producer, handler))
+        const result = await Koka.runAsync(Task.series(producer, handler))
 
         expect(result).toEqual(['task-0', 'task-1', 'task-2'])
         expect(executionOrder).toEqual([0, 1, 2])
@@ -1224,7 +1224,7 @@ describe('Task.series', () => {
             return results
         }
 
-        const result = await Result.run(Task.series(inputs, handler))
+        const result = await Result.runAsync(Task.series(inputs, handler))
 
         expect(result).toEqual({
             type: 'err',
@@ -1256,7 +1256,7 @@ describe('Task.parallel', () => {
         }
 
         const start = Date.now()
-        const result = await Koka.run(Task.parallel(inputs, handler))
+        const result = await Koka.runAsync(Task.parallel(inputs, handler))
         const totalTime = Date.now() - start
 
         expect(result).toEqual(['task-0', 'task-1', 'task-2'])
@@ -1291,7 +1291,7 @@ describe('Task.parallel', () => {
         }
 
         const start = Date.now()
-        const result = await Koka.run(Task.parallel(producer, handler))
+        const result = await Koka.runAsync(Task.parallel(producer, handler))
         const totalTime = Date.now() - start
 
         expect(result).toEqual(['task-0', 'task-1', 'task-2'])
@@ -1321,7 +1321,7 @@ describe('Task.parallel', () => {
             return streamResults
         }
 
-        const result = await Koka.run(Task.parallel(inputs, handler))
+        const result = await Koka.runAsync(Task.parallel(inputs, handler))
 
         expect(result).toContain('sync')
         expect(result).toContain('async')
@@ -1339,7 +1339,7 @@ describe('Task.concurrent with complex error scenarios', () => {
             throw new Error('Handler error')
         }
 
-        await expect(Result.run(Task.concurrent(inputs, handler))).rejects.toThrow('Handler error')
+        await expect(Result.runAsync(Task.concurrent(inputs, handler))).rejects.toThrow('Handler error')
     })
 
     it('should handle handler rejecting promise', async () => {
@@ -1352,7 +1352,7 @@ describe('Task.concurrent with complex error scenarios', () => {
             return Promise.reject(new Error('Handler rejection'))
         }
 
-        await expect(Result.run(Task.concurrent(inputs, handler))).rejects.toThrow('Handler rejection')
+        await expect(Result.runAsync(Task.concurrent(inputs, handler))).rejects.toThrow('Handler rejection')
     })
 
     it('should handle multiple errors in stream', async () => {
@@ -1377,13 +1377,15 @@ describe('Task.concurrent with complex error scenarios', () => {
             return results
         }
 
-        const result = await Result.run(Task.concurrent(inputs, handler))
+        const result = await Result.runAsync(Task.concurrent(inputs, handler))
 
         // Should get the first error that occurs
         expect(result.type).toBe('err')
         if (result.type === 'err') {
             expect(result.name).toBe('StreamError')
             expect(['error 1', 'error 2']).toContain(result.error)
+        } else {
+            throw new Error('Result is not an error')
         }
     })
 
@@ -1396,7 +1398,7 @@ describe('Task.concurrent with complex error scenarios', () => {
             return results
         }
 
-        const result = await Koka.run(Task.concurrent([], handler))
+        const result = await Koka.runAsync(Task.concurrent([], handler))
         expect(result).toEqual([])
     })
 
@@ -1413,7 +1415,7 @@ describe('Task.concurrent with complex error scenarios', () => {
             return results
         }
 
-        const result = await Koka.run(Task.concurrent(producer, handler))
+        const result = await Koka.runAsync(Task.concurrent(producer, handler))
         expect(result).toEqual([])
     })
 })
@@ -1436,7 +1438,7 @@ describe('Concurrent with complex async scenarios', () => {
             return results
         }
 
-        const result = await Koka.run(Task.concurrent(inputs, handler))
+        const result = await Koka.runAsync(Task.concurrent(inputs, handler))
         expect(result).toEqual([6])
     })
 
@@ -1464,7 +1466,7 @@ describe('Concurrent with complex async scenarios', () => {
             return streamResults
         }
 
-        const result = await Koka.run(Task.concurrent(inputs, handler))
+        const result = await Koka.runAsync(Task.concurrent(inputs, handler))
 
         expect(result).toEqual(['fast', 'slow'])
         expect(results).toEqual(['fast', 'slow'])
@@ -1490,7 +1492,7 @@ describe('Concurrent with complex async scenarios', () => {
             return 'no value'
         }
 
-        const result = await Koka.run(Task.concurrent(inputs, handler))
+        const result = await Koka.runAsync(Task.concurrent(inputs, handler))
         expect(result).toBe('long')
         expect(cleanupCalled).toBe(true)
     })
@@ -1519,7 +1521,7 @@ describe('Concurrent with maxConcurrency edge cases', () => {
             return results
         }
 
-        const result = await Koka.run(Task.concurrent(producer, handler, { maxConcurrency: 1 }))
+        const result = await Koka.runAsync(Task.concurrent(producer, handler, { maxConcurrency: 1 }))
 
         expect(result).toEqual(['task-0', 'task-1', 'task-2', 'task-3', 'task-4'])
         expect(executionOrder).toEqual([0, 1, 2, 3, 4]) // Sequential
@@ -1551,7 +1553,7 @@ describe('Concurrent with maxConcurrency edge cases', () => {
             return results
         }
 
-        const result = await Koka.run(Task.concurrent(producer, handler, { maxConcurrency: 10 }))
+        const result = await Koka.runAsync(Task.concurrent(producer, handler, { maxConcurrency: 10 }))
 
         expect(result).toEqual(['task-0', 'task-1', 'task-2'])
         expect(activeTasks.length).toBe(0)
@@ -1592,7 +1594,7 @@ describe('Concurrent with maxConcurrency edge cases', () => {
             return results
         }
 
-        const result = await Koka.run(Task.concurrent(producer, handler, { maxConcurrency: 2 }))
+        const result = await Koka.runAsync(Task.concurrent(producer, handler, { maxConcurrency: 2 }))
 
         expect(result.length).toBe(4)
         expect(maxActiveCount.value).toBeLessThanOrEqual(2)
@@ -1615,7 +1617,7 @@ describe('Concurrent with complex data types', () => {
             return results
         }
 
-        const result = await Koka.run(Task.concurrent(inputs, handler))
+        const result = await Koka.runAsync(Task.concurrent(inputs, handler))
         expect(result).toEqual([{ id: 1, name: 'test' }])
     })
 
@@ -1633,7 +1635,7 @@ describe('Concurrent with complex data types', () => {
             return results
         }
 
-        const result = await Koka.run(Task.concurrent(inputs, handler))
+        const result = await Koka.runAsync(Task.concurrent(inputs, handler))
         expect(result).toEqual([[1, 2, 3]])
     })
 
@@ -1655,7 +1657,7 @@ describe('Concurrent with complex data types', () => {
             return results
         }
 
-        const result = await Koka.run(Task.concurrent(inputs, handler))
+        const result = await Koka.runAsync(Task.concurrent(inputs, handler))
         expect(result).toEqual([null, undefined])
     })
 })
@@ -1691,7 +1693,7 @@ describe('Concurrent performance and stress tests', () => {
         }
 
         const start = Date.now()
-        const result = await Koka.run(Task.concurrent(producer, handler, { maxConcurrency: 10 }))
+        const result = await Koka.runAsync(Task.concurrent(producer, handler, { maxConcurrency: 10 }))
         const duration = Date.now() - start
 
         expect(result.length).toBe(taskCount)
@@ -1720,7 +1722,7 @@ describe('Concurrent performance and stress tests', () => {
             return results
         }
 
-        const result = await Koka.run(Task.concurrent(producer, handler, { maxConcurrency: 20 }))
+        const result = await Koka.runAsync(Task.concurrent(producer, handler, { maxConcurrency: 20 }))
 
         expect(result.length).toBe(taskCount)
         for (let i = 0; i < taskCount; i++) {
@@ -1756,7 +1758,7 @@ describe('Concurrent with cleanup and resource management', () => {
             return results
         }
 
-        await expect(Result.run(Task.concurrent(inputs, handler))).rejects.toThrow('Task failed')
+        await expect(Result.runAsync(Task.concurrent(inputs, handler))).rejects.toThrow('Task failed')
         expect(cleanupCalls).toEqual([0, 1])
     })
 
@@ -1777,7 +1779,7 @@ describe('Concurrent with cleanup and resource management', () => {
             throw new Error('Handler error')
         }
 
-        await expect(Result.run(Task.concurrent(inputs, handler))).rejects.toThrow('Handler error')
+        await expect(Result.runAsync(Task.concurrent(inputs, handler))).rejects.toThrow('Handler error')
         expect(cleanupCalls).toEqual([0, 1])
     })
 })

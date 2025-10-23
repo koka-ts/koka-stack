@@ -151,7 +151,7 @@ describe('Graph Domain Operations', () => {
 
     describe('User Operations', () => {
         it('should get user', () => {
-            const result = Result.run(userStorage.getUser('user1'))
+            const result = Result.runSync(userStorage.getUser('user1'))
             if (result.type === 'err') throw new Error('Expected user but got error')
             expect(result.value.name).toBe('John Doe')
         })
@@ -162,9 +162,9 @@ describe('Graph Domain Operations', () => {
                 name: 'Jane Doe',
                 orderIds: [],
             }
-            Result.run(userStorage.addUser(newUser))
+            Result.runSync(userStorage.addUser(newUser))
 
-            const result = Result.run(userStorage.getUser('user2'))
+            const result = Result.runSync(userStorage.getUser('user2'))
             if (result.type === 'err') throw new Error('Expected user but got error')
             expect(result.value.name).toBe('Jane Doe')
         })
@@ -172,13 +172,13 @@ describe('Graph Domain Operations', () => {
 
     describe('Order Operations', () => {
         it('should get order', () => {
-            const result = Result.run(orderStorage.getOrder('order1'))
+            const result = Result.runSync(orderStorage.getOrder('order1'))
             if (result.type === 'err') throw new Error('Expected order but got error')
             expect(result.value.userId).toBe('user1')
         })
 
         it('should add product to order', () => {
-            Result.run(
+            Result.runSync(
                 productStorage.addProduct({
                     id: 'product2',
                     name: 'MacBook',
@@ -187,9 +187,9 @@ describe('Graph Domain Operations', () => {
                 }),
             )
 
-            Result.run(orderStorage.addProduct('order1', 'product2'))
+            Result.runSync(orderStorage.addProduct('order1', 'product2'))
 
-            const result = Result.run(orderStorage.getOrder('order1'))
+            const result = Result.runSync(orderStorage.getOrder('order1'))
             if (result.type === 'err') throw new Error('Expected order but got error')
             expect(result.value.productIds).toEqual(['product1', 'product2'])
         })
@@ -197,13 +197,13 @@ describe('Graph Domain Operations', () => {
 
     describe('Product Operations', () => {
         it('should get product', () => {
-            const result = Result.run(productStorage.getProduct('product1'))
+            const result = Result.runSync(productStorage.getProduct('product1'))
             if (result.type === 'err') throw new Error('Expected product but got error')
             expect(result.value.name).toBe('iPhone')
         })
 
         it('should get collectors', () => {
-            const result = Result.run(productStorage.getCollectors('product1'))
+            const result = Result.runSync(productStorage.getCollectors('product1'))
             if (result.type === 'err') throw new Error('Expected collectors but got error')
             expect(result.value.length).toBe(1)
             expect(result.value[0].name).toBe('John Doe')
@@ -212,7 +212,7 @@ describe('Graph Domain Operations', () => {
 
     describe('Graph Relationships', () => {
         it('should maintain user-order relationship', () => {
-            Result.run(
+            Result.runSync(
                 orderStorage.addOrder({
                     id: 'order2',
                     userId: 'user1',
@@ -220,9 +220,9 @@ describe('Graph Domain Operations', () => {
                 }),
             )
 
-            Result.run(userStorage.addOrder('user1', 'order2'))
+            Result.runSync(userStorage.addOrder('user1', 'order2'))
 
-            const userResult = Result.run(userStorage.getUser('user1'))
+            const userResult = Result.runSync(userStorage.getUser('user1'))
             if (userResult.type === 'err') throw new Error('Expected user but got error')
             expect(userResult.value.orderIds).toEqual(['order1', 'order2'])
         })

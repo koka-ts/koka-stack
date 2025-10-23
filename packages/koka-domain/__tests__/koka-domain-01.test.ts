@@ -121,7 +121,7 @@ describe('TodoAppStore', () => {
 
     it('should add a todo', async () => {
         const todoAppDomain = new TodoAppDomain(store.domain)
-        const result: Async.MaybePromise<Result.Result<string, Err.AnyErr>> = Result.run(todoAppDomain.addTodo())
+        const result: Promise<Result.Result<string, Err.AnyErr>> = Result.runAsync(todoAppDomain.addTodo())
 
         expect(await result).toEqual({
             type: 'err',
@@ -129,22 +129,20 @@ describe('TodoAppStore', () => {
             error: 'Input is empty',
         })
 
-        const result2: Async.MaybePromise<Result.Result<string, Err.AnyErr>> = Result.run(
-            todoAppDomain.updateInput('test'),
-        )
+        const result2: Promise<Result.Result<string, Err.AnyErr>> = Result.runAsync(todoAppDomain.updateInput('test'))
         expect(await result2).toEqual({
             type: 'ok',
             value: 'Input updated',
         })
 
-        const result3: Async.MaybePromise<Result.Result<string, Err.AnyErr>> = Result.run(todoAppDomain.addTodo())
+        const result3: Promise<Result.Result<string, Err.AnyErr>> = Result.runAsync(todoAppDomain.addTodo())
 
         expect(await result3).toEqual({
             type: 'ok',
             value: 'Todo added',
         })
 
-        const todos: Result.Result<Todo[], Accessor.AccessorErr> = Result.run(get(todoAppDomain.todos$))
+        const todos: Result.Result<Todo[], Accessor.AccessorErr> = Result.runSync(get(todoAppDomain.todos$))
 
         expect(todos).toEqual({
             type: 'ok',
