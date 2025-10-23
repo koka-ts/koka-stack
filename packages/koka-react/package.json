@@ -21,9 +21,9 @@
         "test:coverage": "jest --collectCoverage --coverage"
     },
     "dependencies": {
-        "koka": "^1.0.0",
-        "koka-accessor": "^1.0.0",
-        "koka-domain": "^1.0.0",
+        "koka": "workspace:*",
+        "koka-accessor": "workspace:*",
+        "koka-domain": "workspace:*",
         "react": "^18.0.0"
     },
     "devDependencies": {
